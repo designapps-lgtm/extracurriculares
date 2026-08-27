@@ -68,11 +68,56 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
+  if (isPrismaError(err)) {
+    res.status(prismaStatus(err)).json({
+      success: false,
+      error: { code: prismaCode(err), message: prismaMessage(err) },
+    });
+    return;
+  }
+
   console.error("[Unhandled Error]", err.message);
   res.status(500).json({
     success: false,
     error: { code: "INTERNAL_ERROR", message: "Error interno del servidor" },
   });
+}
+
+function isPrismaError(err: Error): boolean {
+  return typeof (err as any).code === "string" && ((err as any).code.startsWith("P") || (err as any).meta !== undefined);
+}
+
+function prismaCode(err: Error): string {
+  const code = (err as any).code as string;
+  switch (code) {
+    case "P2002": return "DUPLICATE_EMAIL";
+    case "P2025": return "NOT_FOUND";
+    case "P2003": return "REFERENCED_RECORD_MISSING";
+    default: return `PRISMA_${code}`;
+  }
+}
+
+function prismaStatus(err: Error): number {
+  const code = (err as any).code as string;
+  switch (code) {
+    case "P2002": return 409;
+    case "P2025": return 404;
+    case "P2003": return 400;
+    default: return 500;
+  }
+}
+
+function prismaMessage(err: Error): string {
+  const code = (err as any).code as string;
+  switch (code) {
+    case "P2002": {
+      const target = (err as any).meta?.target;
+      return `Ya existe un registro con ese ${Array.isArray(target) ? target.join(", ") : "valor"}.`;
+    }
+    case "P2025": return "El registro solicitado no existe.";
+    case "P2003": return "Referencia a un registro inexistente.";
+    default: return err.message;
+  }
 }
 
 function extractResourceType(url: string): string {

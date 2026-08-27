@@ -1,10 +1,12 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
 import { config } from "./config";
 import { errorHandler, notFound } from "./middlewares/errorHandler";
 import { requestLogger } from "./middlewares/requestLogger";
 import { authenticate, requireAdmin } from "./middlewares/auth";
+import { apiLimiter, authLimiter } from "./middlewares/rateLimiter";
 import { healthRouter } from "./modules/health/healthRouter";
 import { studentRouter } from "./modules/students/student.routes";
 import { disciplineRouter } from "./modules/disciplines/discipline.routes";
@@ -32,13 +34,15 @@ import { authenticateTeacher, requireActiveTeacher } from "./middlewares/teacher
 const app = express();
 
 // Global middleware
+app.use(helmet());
+app.disable("x-powered-by");
 app.use(cors({ origin: config.frontendUrl, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(requestLogger);
 
 // Public routes
-app.use("/api", healthRouter);
+app.use("/api", apiLimiter, healthRouter);
 app.use("/api/students", studentRouter);
 app.use("/api/disciplines", disciplineRouter);
 app.use("/api/teachers", teacherRouter);
@@ -47,7 +51,7 @@ app.use("/api/assignments", assignmentRouter);
 app.use("/api/schedules", scheduleRouter);
 
 // Admin auth (login/logout don't need auth)
-app.use("/api/admin/auth", adminAuthRouter);
+app.use("/api/admin/auth", authLimiter, adminAuthRouter);
 
 // Protected admin routes   
 app.use("/api/admin/dashboard", authenticate, requireAdmin, adminDashboardRouter);
@@ -60,7 +64,7 @@ app.use("/api/admin/grades", authenticate, requireAdmin, adminGradeRouter);
 app.use("/api/admin/admins", authenticate, requireAdmin, adminUserRouter);
 
 // Teacher auth (login/logout don't need auth)
-app.use("/api/teacher/auth", teacherAuthRouter);
+app.use("/api/teacher/auth", authLimiter, teacherAuthRouter);
 
 // Protected teacher routes
 app.use("/api/teacher", authenticateTeacher, requireActiveTeacher, teacherDashboardRouter);
