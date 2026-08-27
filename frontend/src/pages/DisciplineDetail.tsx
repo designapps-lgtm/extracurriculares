@@ -17,6 +17,9 @@ export default function DisciplineDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const backTo = isAdmin ? "/admin/disciplines" : "/disciplines";
+  const studentProfileBase = isAdmin ? "/admin/students" : "/students";
+
   const load = () => {
     if (!codigo) return;
     setLoading(true);
@@ -65,7 +68,7 @@ export default function DisciplineDetail() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <Link
-        to={isAdmin ? "/admin/disciplines" : "/disciplines"}
+        to={backTo}
         className="inline-flex items-center gap-1.5 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
       >
         <svg
@@ -85,11 +88,11 @@ export default function DisciplineDetail() {
       </Link>
 
       {/* Header card */}
-      <div className="card p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-terracotta-50 dark:bg-terracotta-950 flex items-center justify-center shrink-0">
+      <div className="card p-5 sm:p-6">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-terracotta-50 dark:bg-terracotta-950 flex items-center justify-center shrink-0">
             <svg
-              className="w-6 h-6 text-terracotta-600 dark:text-terracotta-400"
+              className="w-5 h-5 sm:w-6 sm:h-6 text-terracotta-600 dark:text-terracotta-400"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -102,8 +105,8 @@ export default function DisciplineDetail() {
               />
             </svg>
           </div>
-          <div>
-            <h1 className="text-xl font-display font-bold text-surface-900 dark:text-surface-50">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl font-display font-bold text-surface-900 dark:text-surface-50 break-words">
               {discipline.nombre}
             </h1>
             <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
@@ -114,7 +117,7 @@ export default function DisciplineDetail() {
                 {discipline.descripcion}
               </p>
             )}
-            <div className="flex items-center gap-4 mt-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-3">
               <span className="badge-success">
                 {discipline._count.studentSchedules} estudiantes inscritos
               </span>
@@ -263,7 +266,8 @@ export default function DisciplineDetail() {
             {students.map((s) => (
               <Link
                 key={s.codigoEstudiante}
-                to={isAdmin ? `/admin/students/${s.codigoEstudiante}` : `/students/${s.codigoEstudiante}`}
+                to={`${studentProfileBase}/${s.codigoEstudiante}`}
+                state={{ from: "discipline", disciplina: codigo }}
                 className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors group"
               >
                 <div>

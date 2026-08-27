@@ -26,6 +26,12 @@ export default function StudentProfile() {
   const { codigo } = useParams<{ codigo: string }>();
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
+  const from = location.state as { from?: string; disciplina?: string } | null;
+
+  const backTo = from?.from === "discipline" && from.disciplina
+    ? `${isAdmin ? "/admin" : ""}/disciplines/${from.disciplina}`
+    : isAdmin ? "/admin/students" : "/students";
+
   const [profile, setProfile] = useState<StudentProfileType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +77,7 @@ export default function StudentProfile() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <Link
-        to={isAdmin ? "/admin/students" : "/students"}
+        to={backTo}
         className="inline-flex items-center gap-1.5 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 transition-colors"
       >
         <svg
@@ -87,35 +93,35 @@ export default function StudentProfile() {
             d="M15 19l-7-7 7-7"
           />
         </svg>
-        Volver a estudiantes
+        Volver a {from?.from === "discipline" ? "la disciplina" : "estudiantes"}
       </Link>
 
       {/* Student info card */}
       <div className="card overflow-hidden">
         <div className="bg-gradient-to-br from-brand-600 to-brand-700 px-6 py-8">
-          <div className="flex items-start gap-5">
+          <div className="flex items-start gap-4 sm:gap-5">
             {student.fotoUrl ? (
               <img
                 src={student.fotoUrl}
                 alt={`${student.nombre} ${student.apellido}`}
-                className="w-20 h-20 rounded-2xl object-cover ring-4 ring-white/20"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-4 ring-white/20 shrink-0"
               />
             ) : (
-              <div className="w-20 h-20 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 ring-4 ring-white/10">
-                <span className="text-white font-display font-bold text-2xl">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 ring-4 ring-white/10">
+                <span className="text-white font-display font-bold text-xl sm:text-2xl">
                   {student.nombre.charAt(0)}
                   {student.apellido.charAt(0)}
                 </span>
               </div>
             )}
-            <div className="min-w-0">
-              <h1 className="text-2xl font-display font-bold text-white">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl font-display font-bold text-white break-words">
                 {student.nombre} {student.apellido}
               </h1>
-              <p className="text-brand-100 text-sm mt-1.5 font-medium">
+              <p className="text-brand-100 text-sm mt-1.5 font-medium break-words">
                 Código: {student.codigoEstudiante}
               </p>
-              <p className="text-brand-200 text-sm">
+              <p className="text-brand-200 text-sm break-words">
                 {student.grupo || student.grade.nombre} · {student.grade.nivel || "Secundaria"}
               </p>
             </div>
