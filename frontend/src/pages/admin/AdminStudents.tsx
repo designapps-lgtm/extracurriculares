@@ -33,12 +33,15 @@ export default function AdminStudents() {
 
   const notify = useNotify();
 
-  const load = (page = 1) => {
+  const load = (page = 1, overrides?: { search?: string; filtroGrado?: string; filtroInscrito?: string }) => {
     setLoading(true);
     const params: Record<string, string> = { page: String(page), limit: "20" };
-    if (search) params.search = search;
-    if (filterGrado) params.grado = filterGrado;
-    if (filterInscrito) params.inscrito = filterInscrito;
+    const searchValue = overrides?.search ?? search;
+    const gradoValue = overrides?.filtroGrado ?? filterGrado;
+    const inscritoValue = overrides?.filtroInscrito ?? filterInscrito;
+    if (searchValue) params.search = searchValue;
+    if (gradoValue) params.grado = gradoValue;
+    if (inscritoValue) params.inscrito = inscritoValue;
 
     getAdminStudents(params)
       .then((res) => {
@@ -98,7 +101,7 @@ export default function AdminStudents() {
           />
           <select
             value={filterGrado}
-            onChange={(e) => { setFilterGrado(e.target.value); setTimeout(() => load(1), 0); }}
+            onChange={(e) => { const v = e.target.value; setFilterGrado(v); load(1, { filtroGrado: v }); }}
             className="px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 text-sm"
           >
             <option value="">Todos los grados</option>
@@ -108,7 +111,7 @@ export default function AdminStudents() {
           </select>
           <select
             value={filterInscrito}
-            onChange={(e) => { setFilterInscrito(e.target.value); setTimeout(() => load(1), 0); }}
+            onChange={(e) => { const v = e.target.value; setFilterInscrito(v); load(1, { filtroInscrito: v }); }}
             className="px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 text-sm"
           >
             <option value="">Todos</option>

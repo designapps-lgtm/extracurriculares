@@ -92,7 +92,7 @@ export default function Teachers() {
           {teachers.map((t) => (
             <Link
               key={t.idProfesor}
-              to={`/teachers/${t.idProfesor}`}
+              to={`/admin/teachers-view/${t.idProfesor}`}
               className="card-interactive px-5 py-4 group"
             >
               <div className="flex items-center gap-3.5">

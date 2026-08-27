@@ -13,6 +13,7 @@ import {
   getAdminSchedules,
 } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
+import TeacherForm from "../../components/teachers/TeacherForm";
 import { createPortal } from "react-dom";
 
 interface Teacher {
@@ -304,72 +305,6 @@ export default function AdminTeachers() {
     {} as Record<string, Schedule[]>,
   );
 
-  const TeacherForm = ({
-    onSave,
-    onCancel,
-  }: {
-    onSave: () => void;
-    onCancel: () => void;
-  }) => (
-    <div className="space-y-3">
-      <div>
-        <label className="block text-xs font-medium text-surface-500 mb-1">
-          Nombre *
-        </label>
-        <input
-          value={form.nombre}
-          onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-          className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-surface-500 mb-1">
-          Apellido *
-        </label>
-        <input
-          value={form.apellido}
-          onChange={(e) => setForm({ ...form, apellido: e.target.value })}
-          className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-surface-500 mb-1">
-          Correo
-        </label>
-        <input
-          value={form.correo}
-          onChange={(e) => setForm({ ...form, correo: e.target.value })}
-          className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-surface-500 mb-1">
-          Foto (URL)
-        </label>
-        <input
-          value={form.fotoUrl}
-          onChange={(e) => setForm({ ...form, fotoUrl: e.target.value })}
-          placeholder="https://..."
-          className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-        />
-      </div>
-      <div className="flex gap-3 mt-4">
-        <button
-          onClick={onCancel}
-          className="flex-1 px-4 py-2.5 border border-surface-200 dark:border-surface-700 rounded-xl text-sm font-medium hover:bg-surface-50"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={onSave}
-          className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700"
-        >
-          Guardar
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -534,6 +469,8 @@ export default function AdminTeachers() {
                 Nuevo profesor
               </h2>
               <TeacherForm
+                values={form}
+                onChange={setForm}
                 onSave={handleCreate}
                 onCancel={() => setShowCreate(false)}
               />
@@ -555,6 +492,8 @@ export default function AdminTeachers() {
               Editar profesor
             </h2>
             <TeacherForm
+              values={form}
+              onChange={setForm}
               onSave={handleEdit}
               onCancel={() => setEditing(null)}
             />

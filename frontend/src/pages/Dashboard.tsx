@@ -69,7 +69,7 @@ export default function Dashboard() {
 
   const handleResultClick = useCallback(
     (codigo: string) => {
-      navigate(`/students/${codigo}`);
+      navigate(`/admin/students/${codigo}`);
     },
     [navigate],
   );
@@ -254,20 +254,20 @@ export default function Dashboard() {
         </h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <QuickLink
-            to="/students"
+            to="/admin/students"
             title="Estudiantes"
             description="Consulta y busca estudiantes inscritos por nombre, código o grado"
             icon="students"
             featured
           />
           <QuickLink
-            to="/disciplines"
+            to="/admin/disciplines"
             title="Disciplinas"
             description="Explora las actividades disponibles"
             icon="disciplines"
           />
           <QuickLink
-            to="/teachers"
+            to="/admin/teachers-view"
             title="Profesores"
             description="Consulta profesores y sus asignaciones"
             icon="teachers"
@@ -291,7 +291,7 @@ export default function Dashboard() {
               </p>
             </div>
             <Link
-              to="/disciplines"
+              to="/admin/disciplines"
               className="text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors inline-flex items-center gap-1"
             >
               Ver todas
@@ -314,7 +314,7 @@ export default function Dashboard() {
             {disciplines.slice(0, 6).map((d, i) => (
               <Link
                 key={d.codigoDisciplina}
-                to={`/disciplines/${d.codigoDisciplina}`}
+                to={`/admin/disciplines/${d.codigoDisciplina}`}
                 className={`group relative bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 shadow-card hover:shadow-card-hover hover:border-brand-300 dark:hover:border-brand-700 transition-all duration-200 px-5 py-5 overflow-hidden ${
                   i === 0 ? "sm:col-span-2 lg:col-span-1" : ""
                 }`}
@@ -370,7 +370,7 @@ export default function Dashboard() {
               </p>
             </div>
             <Link
-              to="/teachers"
+              to="/admin/teachers-view"
               className="text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors inline-flex items-center gap-1"
             >
               Ver todos
@@ -393,7 +393,7 @@ export default function Dashboard() {
             {teachersList.slice(0, 6).map((t) => (
               <Link
                 key={t.idProfesor}
-                to={`/teachers/${t.idProfesor}`}
+                to={`/admin/teachers-view/${t.idProfesor}`}
                 className="card-interactive px-5 py-4 group"
               >
                 <div className="flex items-center gap-3.5">
