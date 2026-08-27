@@ -1,0 +1,72 @@
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import { config } from "./config";
+import { errorHandler, notFound } from "./middlewares/errorHandler";
+import { requestLogger } from "./middlewares/requestLogger";
+import { authenticate, requireAdmin } from "./middlewares/auth";
+import { healthRouter } from "./modules/health/healthRouter";
+import { studentRouter } from "./modules/students/student.routes";
+import { disciplineRouter } from "./modules/disciplines/discipline.routes";
+import { teacherRouter } from "./modules/teachers/teacher.routes";
+import { gradeRouter } from "./modules/grades/grade.routes";
+import { assignmentRouter } from "./modules/assignments/assignment.routes";
+import { scheduleRouter } from "./modules/schedules/schedule.routes";
+
+// Admin routes
+import { adminAuthRouter } from "./modules/admin/auth.routes";
+import { adminStudentRouter } from "./modules/admin/studentAdmin.routes";
+import { adminTeacherRouter } from "./modules/admin/teacherAdmin.routes";
+import { adminAssignmentRouter } from "./modules/admin/assignmentAdmin.routes";
+import { adminDisciplineRouter } from "./modules/admin/disciplineAdmin.routes";
+import { adminScheduleRouter } from "./modules/admin/scheduleAdmin.routes";
+import { adminGradeRouter } from "./modules/admin/gradeAdmin.routes";
+import { adminUserRouter } from "./modules/admin/adminUser.routes";
+import { adminDashboardRouter } from "./modules/admin/dashboardAdmin.routes";
+
+// Teacher routes
+import { teacherAuthRouter } from "./modules/teacher/auth.routes";
+import { teacherDashboardRouter } from "./modules/teacher/teacher.routes";
+import { authenticateTeacher, requireActiveTeacher } from "./middlewares/teacherAuth";
+
+const app = express();
+
+// Global middleware
+app.use(cors({ origin: config.frontendUrl, credentials: true }));
+app.use(express.json());
+app.use(cookieParser());
+app.use(requestLogger);
+
+// Public routes
+app.use("/api", healthRouter);
+app.use("/api/students", studentRouter);
+app.use("/api/disciplines", disciplineRouter);
+app.use("/api/teachers", teacherRouter);
+app.use("/api/grades", gradeRouter);
+app.use("/api/assignments", assignmentRouter);
+app.use("/api/schedules", scheduleRouter);
+
+// Admin auth (login/logout don't need auth)
+app.use("/api/admin/auth", adminAuthRouter);
+
+// Protected admin routes   
+app.use("/api/admin/dashboard", authenticate, requireAdmin, adminDashboardRouter);
+app.use("/api/admin/students", authenticate, requireAdmin, adminStudentRouter);
+app.use("/api/admin/teachers", authenticate, requireAdmin, adminTeacherRouter);
+app.use("/api/admin/assignments", authenticate, requireAdmin, adminAssignmentRouter);
+app.use("/api/admin/disciplines", authenticate, requireAdmin, adminDisciplineRouter);
+app.use("/api/admin/schedules", authenticate, requireAdmin, adminScheduleRouter);
+app.use("/api/admin/grades", authenticate, requireAdmin, adminGradeRouter);
+app.use("/api/admin/admins", authenticate, requireAdmin, adminUserRouter);
+
+// Teacher auth (login/logout don't need auth)
+app.use("/api/teacher/auth", teacherAuthRouter);
+
+// Protected teacher routes
+app.use("/api/teacher", authenticateTeacher, requireActiveTeacher, teacherDashboardRouter);
+
+// 404 + error handler
+app.use(notFound);
+app.use(errorHandler);
+
+export default app;

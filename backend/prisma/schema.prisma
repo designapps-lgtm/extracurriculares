@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Student {
+  codigoEstudiante String   @id
+  nombre           String
+  apellido         String
+  idGrado          Int
+  grupo            String?
+  correo           String?
+  fotoUrl          String?
+  estado           String   @default("activo")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  grade            Grade              @relation(fields: [idGrado], references: [idGrado])
+  studentSchedules StudentSchedule[]
+  attendances      AttendanceRecord[]
+
+  @@index([idGrado])
+  @@index([nombre, apellido])
+}
+
+model Discipline {
+  codigoDisciplina String   @id
+  nombre           String
+  descripcion      String?
+  estado           String   @default("activa")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  studentSchedules       StudentSchedule[]
+  assignments            ExtracurricularAssignment[]
+
+  @@index([nombre])
+}
+
+model StudentSchedule {
+  id               String   @id @default(uuid())
+  codigoEstudiante String
+  codigoDisciplina String
+  diaSemana        String
+  createdAt        DateTime @default(now())
+
+  student    Student    @relation(fields: [codigoEstudiante], references: [codigoEstudiante], onDelete: Cascade)
+  discipline Discipline @relation(fields: [codigoDisciplina], references: [codigoDisciplina])
+
+  @@unique([codigoEstudiante, diaSemana])
+  @@index([codigoEstudiante])
+  @@index([codigoDisciplina])
+  @@index([diaSemana])
+}
+
+model Teacher {
+  idProfesor      String   @id @default(uuid())
+  codigoProfesor  String?  @unique
+  nombre          String
+  apellido        String
+  correo          String?  @unique
+  fotoUrl         String?
+  passwordHash    String?
+  estado          String   @default("activo")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  assignments          ExtracurricularAssignment[]
+  sessions             ClassSession[]
+  refreshTokens        TeacherRefreshToken[]
+
+  @@index([codigoProfesor])
+  @@index([nombre, apellido])
+}
+
+model TeacherRefreshToken {
+  id         String    @id @default(uuid())
+  teacherId  String
+  tokenHash  String    @unique
+  familyId   String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
+
+  teacher Teacher @relation(fields: [teacherId], references: [idProfesor], onDelete: Cascade)
+
+  @@index([teacherId])
+  @@index([familyId])
+}
+
+model Grade {
+  idGrado Int    @id @default(autoincrement())
+  nombre  String @unique
+  nivel   String?
+  estado  String @default("activo")
+
+  students    Student[]
+  assignments ExtracurricularAssignment[]
+}
+
+model Schedule {
+  idHorario  String   @id @default(uuid())
+  diaSemana  String
+  horaInicio String?
+  horaFin    String?
+  aula       String?
+  estado     String   @default("activo")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  assignmentSchedules AssignmentSchedule[]
+  sessions            ClassSession[]
+
+  @@index([diaSemana])
+}
+
+model ExtracurricularAssignment {
+  idAsignacion     String   @id @default(uuid())
+  idProfesor       String
+  codigoDisciplina String
+  idGrado          Int
+  esPrincipal      Boolean  @default(false)
+  estado           String   @default("activo")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  teacher    Teacher              @relation(fields: [idProfesor], references: [idProfesor])
+  discipline Discipline           @relation(fields: [codigoDisciplina], references: [codigoDisciplina])
+  grade      Grade                @relation(fields: [idGrado], references: [idGrado])
+  schedules  AssignmentSchedule[]
+  sessions   ClassSession[]
+
+  @@unique([idProfesor, codigoDisciplina, idGrado])
+  @@index([codigoDisciplina])
+  @@index([idGrado])
+  @@index([idProfesor])
+}
+
+model AssignmentSchedule {
+  id             String   @id @default(uuid())
+  idAsignacion   String
+  idHorario      String
+  createdAt      DateTime @default(now())
+
+  assignment ExtracurricularAssignment @relation(fields: [idAsignacion], references: [idAsignacion], onDelete: Cascade)
+  schedule   Schedule                  @relation(fields: [idHorario], references: [idHorario])
+
+  @@unique([idAsignacion, idHorario])
+  @@index([idAsignacion])
+  @@index([idHorario])
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  nombre       String
+  apellido     String
+  estado       String   @default("activo")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  auditLogs     AuditLog[]
+  refreshTokens AdminRefreshToken[]
+}
+
+model AdminRefreshToken {
+  id         String    @id @default(uuid())
+  adminId    String
+  tokenHash  String    @unique
+  familyId   String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
+
+  admin AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([familyId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  accion     String
+  entidad    String
+  entidadId  String?
+  detalles   Json?
+  createdAt  DateTime @default(now())
+
+  admin AdminUser @relation(fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([entidad])
+  @@index([createdAt])
+}
+
+model ClassSession {
+  id             String   @id @default(uuid())
+  idAsignacion   String
+  idHorario      String
+  fecha          DateTime
+  estado         String   @default("programada")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  assignment ExtracurricularAssignment @relation(fields: [idAsignacion], references: [idAsignacion])
+  schedule   Schedule                  @relation(fields: [idHorario], references: [idHorario])
+  teacher    Teacher                   @relation(fields: [idProfesor], references: [idProfesor])
+  idProfesor String
+  attendances AttendanceRecord[]
+
+  @@unique([idAsignacion, idHorario, fecha])
+  @@index([idProfesor])
+  @@index([fecha])
+  @@index([idAsignacion])
+}
+
+model AttendanceRecord {
+  id               String   @id @default(uuid())
+  sessionId        String
+  codigoEstudiante String
+  estado           String   @default("presente")
+  createdAt        DateTime @default(now())
+
+  session ClassSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student Student           @relation(fields: [codigoEstudiante], references: [codigoEstudiante])
+
+  @@unique([sessionId, codigoEstudiante])
+  @@index([sessionId])
+  @@index([codigoEstudiante])
+}

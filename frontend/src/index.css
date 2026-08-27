@@ -1,0 +1,84 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-body text-surface-900 bg-surface-50 antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+  }
+
+  /* Dark mode base */
+  .dark body,
+  .dark {
+    @apply bg-surface-950 text-surface-100;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 shadow-card;
+  }
+
+  .card-interactive {
+    @apply card hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-card-hover transition-all duration-200;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-brand-600 text-white font-medium text-sm rounded-xl
+      hover:bg-brand-700 active:bg-brand-800
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+      disabled:opacity-50 disabled:pointer-events-none
+      transition-colors duration-150;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-200 font-medium text-sm rounded-xl border border-surface-200 dark:border-surface-700
+      hover:bg-surface-200 dark:hover:bg-surface-700 active:bg-surface-300
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+      disabled:opacity-50 disabled:pointer-events-none
+      transition-colors duration-150;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 border border-surface-200 dark:border-surface-700 rounded-xl text-sm bg-white dark:bg-surface-900 text-surface-900 dark:text-surface-100
+      placeholder:text-surface-400 dark:placeholder:text-surface-500
+      focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent
+      transition-colors duration-150;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-neutral {
+    @apply badge bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300;
+  }
+
+  .badge-success {
+    @apply badge bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-300;
+  }
+
+  .badge-terracotta {
+    @apply badge bg-terracotta-50 dark:bg-terracotta-950 text-terracotta-700 dark:text-terracotta-300;
+  }
+
+  .page-header {
+    @apply space-y-1;
+  }
+
+  .page-title {
+    @apply text-xl sm:text-2xl font-display font-bold text-surface-900 dark:text-surface-50;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-surface-500 dark:text-surface-400;
+  }
+}
