@@ -12,6 +12,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 400);
+  const [inscrito, setInscrito] = useState<"" | "true" | "false">("");
   const [results, setResults] = useState<Student[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -57,7 +58,11 @@ export default function Dashboard() {
     setSearching(true);
     setSearchError(null);
 
-    getStudents({ search: debouncedSearch, limit: 8 })
+    getStudents({
+      search: debouncedSearch,
+      limit: 8,
+      inscrito: inscrito || undefined,
+    })
       .then((res) => {
         setResults(res.data);
         setSearching(false);
@@ -66,7 +71,7 @@ export default function Dashboard() {
         setSearchError(err.message);
         setSearching(false);
       });
-  }, [debouncedSearch]);
+  }, [debouncedSearch, inscrito]);
 
   const handleResultClick = useCallback(
     (codigo: string) => {
@@ -120,7 +125,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Search — full width inside hero */}
+        {/* Search + enrollment filter */}
         <div className="relative mt-8 max-w-xl">
           <label htmlFor="dashboard-search" className="sr-only">
             Buscar estudiante
@@ -140,14 +145,26 @@ export default function Dashboard() {
               />
             </svg>
           </div>
-          <input
-            id="dashboard-search"
-            type="text"
-            placeholder="Buscar por código, nombre o apellido..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-white dark:bg-surface-900 border border-brand-200 dark:border-brand-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent shadow-sm placeholder:text-surface-400"
-          />
+          <div className="flex flex-col xs:flex-row gap-2 sm:gap-2.5">
+            <input
+              id="dashboard-search"
+              type="text"
+              placeholder="Buscar por código, nombre o apellido..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 pl-11 pr-4 py-3 bg-white dark:bg-surface-900 border border-brand-200 dark:border-brand-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent shadow-sm placeholder:text-surface-400"
+            />
+            <select
+              aria-label="Filtrar por inscripción"
+              value={inscrito}
+              onChange={(e) => setInscrito(e.target.value as "" | "true" | "false")}
+              className="px-3 py-3 bg-white dark:bg-surface-900 border border-brand-200 dark:border-brand-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent shadow-sm text-surface-700 dark:text-surface-300"
+            >
+              <option value="">Todos</option>
+              <option value="true">Inscritos</option>
+              <option value="false">No inscritos</option>
+            </select>
+          </div>
           {searching && (
             <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
               <svg
@@ -228,21 +245,25 @@ export default function Dashboard() {
               label="Estudiantes"
               value={stats.students}
               accent="brand"
+              to="/admin/students"
             />
             <StatCard
               label="Inscritos"
               value={stats.enrolled}
               accent="terracotta"
+              to="/admin/students?inscrito=true"
+            />
+            <StatCard
+              label="No inscritos"
+              value={stats.students - stats.enrolled}
+              accent="surface"
+              to="/admin/students?inscrito=false"
             />
             <StatCard
               label="Disciplinas"
               value={stats.disciplines}
               accent="surface"
-            />
-            <StatCard
-              label="Profesores"
-              value={stats.teachers}
-              accent="surface"
+              to="/admin/disciplines"
             />
           </div>
         )
@@ -492,16 +513,16 @@ function StatCard({
   label,
   value,
   accent,
+  to,
 }: {
   label: string;
   value: number;
   accent: keyof typeof STAT_ACCENTS;
+  to?: string;
 }) {
   const a = STAT_ACCENTS[accent];
-  return (
-    <div
-      className={`bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 border-l-[3px] ${a.border} ${a.bg} px-5 py-5 shadow-card`}
-    >
+  const inner = (
+    <>
       <div className="flex items-center justify-between mb-3">
         <div>{a.icon}</div>
       </div>
@@ -511,8 +532,15 @@ function StatCard({
       <p className="text-sm text-surface-500 dark:text-surface-400 mt-1 font-medium">
         {label}
       </p>
-    </div>
+    </>
   );
+  const className = `bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 border-l-[3px] ${a.border} ${a.bg} px-5 py-5 shadow-card ${
+    to ? "transition-all duration-200 hover:shadow-card-hover hover:border-brand-300 dark:hover:border-brand-700 group" : ""
+  }`;
+  if (to) {
+    return <Link to={to} className={className}>{inner}</Link>;
+  }
+  return <div className={className}>{inner}</div>;
 }
 
 function QuickLink({

@@ -22,11 +22,24 @@ export default function Students() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("search") ?? "";
+  });
   const debouncedSearch = useDebounce(search, 400);
-  const [grado, setGrado] = useState("");
-  const [disciplina, setDisciplina] = useState("");
-  const [inscrito, setInscrito] = useState("");
+  const [grado, setGrado] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("grado") ?? "";
+  });
+  const [disciplina, setDisciplina] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("disciplina") ?? "";
+  });
+  const [inscrito, setInscrito] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get("inscrito");
+    return v === "true" || v === "false" ? v : "";
+  });
   const [page, setPage] = useState(1);
 
   const [grades, setGrades] = useState<GradeWithCount[]>([]);
