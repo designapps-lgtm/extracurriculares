@@ -1,61 +1,56 @@
-import { Request, Response } from "express";
 import prisma from "../../config/prisma";
 import { AppError } from "../../middlewares/errorHandler";
+import { getOr404 } from "../../utils/getOr404";
+import { PaginationParams, paginatedResult } from "../../utils/pagination";
+import { assignmentInclude } from "../../utils/prismaIncludes";
 import { Prisma } from "@prisma/client";
 
-export async function getAssignments(req: Request, res: Response) {
-  const page = parseInt((req.query.page as string) || "1");
-  const limit = Math.min(parseInt((req.query.limit as string) || "20"), 100);
-  const { disciplina, grado, profesor } = req.query;
-
+export async function getAssignments(query: {
+  disciplina?: string;
+  grado?: string;
+  profesor?: string;
+}, pagination: PaginationParams) {
   const where: Prisma.ExtracurricularAssignmentWhereInput = {};
-  if (disciplina) where.codigoDisciplina = disciplina as string;
-  if (grado) {
-    const grade = await prisma.grade.findFirst({ where: { nombre: grado as string } });
+  if (query.disciplina) where.codigoDisciplina = query.disciplina;
+  if (query.grado) {
+    const grade = await prisma.grade.findFirst({ where: { nombre: query.grado } });
     if (grade) where.idGrado = grade.idGrado;
   }
-  if (profesor) where.idProfesor = profesor as string;
+  if (query.profesor) where.idProfesor = query.profesor;
 
   const [data, total] = await Promise.all([
     prisma.extracurricularAssignment.findMany({
       where,
-      include: {
-        teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-        discipline: { select: { codigoDisciplina: true, nombre: true } },
-        grade: { select: { idGrado: true, nombre: true } },
-        schedules: { include: { schedule: true } },
-      },
-      skip: (page - 1) * limit,
-      take: limit,
+      include: assignmentInclude,
+      skip: (pagination.page - 1) * pagination.limit,
+      take: pagination.limit,
       orderBy: { createdAt: "asc" },
     }),
     prisma.extracurricularAssignment.count({ where }),
   ]);
 
-  res.json({
-    success: true,
-    data,
-    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
-  });
+  return paginatedResult(data, total, pagination);
 }
 
-export async function getAssignmentById(req: Request, res: Response) {
-  const assignment = await prisma.extracurricularAssignment.findUnique({
-    where: { idAsignacion: req.params.id },
-    include: {
-      teacher: true,
-      discipline: true,
-      grade: true,
-      schedules: { include: { schedule: true } },
-    },
-  });
-
-  if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
-  res.json({ success: true, data: assignment });
+export async function getAssignmentById(id: string) {
+  return getOr404(
+    prisma.extracurricularAssignment.findUnique({
+      where: { idAsignacion: id },
+      include: assignmentInclude,
+    }),
+    "ASSIGNMENT_NOT_FOUND",
+    "No se encontró la asignación",
+  );
 }
 
-export async function createAssignment(req: Request, res: Response) {
-  const { codigoDisciplina, idGrado, idProfesor, esPrincipal, schedules } = req.body;
+export async function createAssignment(data: {
+  codigoDisciplina: string;
+  idGrado: number;
+  idProfesor: string;
+  esPrincipal?: boolean;
+  schedules?: any[];
+}) {
+  const { codigoDisciplina, idGrado, idProfesor, esPrincipal, schedules } = data;
 
   // Validate required fields
   if (!codigoDisciplina || !idGrado || !idProfesor) {
@@ -85,7 +80,7 @@ export async function createAssignment(req: Request, res: Response) {
   const scheduleLinks = await resolveScheduleLinks(schedules);
 
   // Create assignment with schedules
-  const assignment = await prisma.extracurricularAssignment.create({
+  return prisma.extracurricularAssignment.create({
     data: {
       idProfesor,
       codigoDisciplina,
@@ -95,15 +90,8 @@ export async function createAssignment(req: Request, res: Response) {
         create: scheduleLinks,
       } : undefined,
     },
-    include: {
-      teacher: true,
-      discipline: true,
-      grade: true,
-      schedules: { include: { schedule: true } },
-    },
+    include: assignmentInclude,
   });
-
-  res.status(201).json({ success: true, data: assignment });
 }
 
 async function resolveScheduleLinks(schedules: any): Promise<{ idHorario: string }[]> {
@@ -151,25 +139,17 @@ async function resolveScheduleLinks(schedules: any): Promise<{ idHorario: string
   return links;
 }
 
-export async function updateAssignment(req: Request, res: Response) {
-  const { id } = req.params;
-  const { esPrincipal, estado, schedules } = req.body;
+export async function updateAssignment(id: string, data: { esPrincipal?: boolean; estado?: string; schedules?: any[] }) {
+  const { esPrincipal, estado, schedules } = data;
 
-  const assignment = await prisma.extracurricularAssignment.findUnique({ where: { idAsignacion: id } });
-  if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
+  await getOr404(prisma.extracurricularAssignment.findUnique({ where: { idAsignacion: id } }), "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
 
   // Update assignment fields
-  const updated = await prisma.extracurricularAssignment.update({
+  await prisma.extracurricularAssignment.update({
     where: { idAsignacion: id },
     data: {
       ...(esPrincipal !== undefined && { esPrincipal }),
       ...(estado !== undefined && { estado }),
-    },
-    include: {
-      teacher: true,
-      discipline: true,
-      grade: true,
-      schedules: { include: { schedule: true } },
     },
   });
 
@@ -189,25 +169,14 @@ export async function updateAssignment(req: Request, res: Response) {
   // Fetch updated assignment
   const result = await prisma.extracurricularAssignment.findUnique({
     where: { idAsignacion: id },
-    include: {
-      teacher: true,
-      discipline: true,
-      grade: true,
-      schedules: { include: { schedule: true } },
-    },
+    include: assignmentInclude,
   });
 
-  res.json({ success: true, data: result });
+  return result;
 }
 
-export async function deleteAssignment(req: Request, res: Response) {
-  const { id } = req.params;
-
-  const assignment = await prisma.extracurricularAssignment.findUnique({
-    where: { idAsignacion: id },
-  });
-
-  if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
+export async function deleteAssignment(id: string) {
+  const assignment = await getOr404(prisma.extracurricularAssignment.findUnique({ where: { idAsignacion: id } }), "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
 
   // Check if students are enrolled in this discipline
   const enrolledCount = await prisma.studentSchedule.count({
@@ -220,10 +189,10 @@ export async function deleteAssignment(req: Request, res: Response) {
       where: { idAsignacion: id },
       data: { estado: "inactivo" },
     });
-    res.json({ success: true, data: { message: "Asignación desactivada (tiene estudiantes inscritos)" } });
+    return { message: "Asignación desactivada (tiene estudiantes inscritos)" };
   } else {
     // Hard delete
     await prisma.extracurricularAssignment.delete({ where: { idAsignacion: id } });
-    res.json({ success: true, data: { message: "Asignación eliminada" } });
+    return { message: "Asignación eliminada" };
   }
 }

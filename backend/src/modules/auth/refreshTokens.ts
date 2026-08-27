@@ -82,7 +82,7 @@ export function createRefreshService({
     }
 
     const userId = record[userIdField];
-    const email = null;
+    const email = record.email ?? "";
 
     const newToken = generateRefreshToken();
     const newExpiresAt = new Date(Date.now() + daysToMs(config.refreshTokenExpiresInDays));

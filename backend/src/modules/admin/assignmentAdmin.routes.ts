@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getAssignments, getAssignmentById, createAssignment, updateAssignment, deleteAssignment } from "./assignmentAdmin.service";
+import { getAssignments, getAssignmentById, createAssignment, updateAssignment, deleteAssignment } from "./assignmentAdmin.controller";
 import { asyncHandler } from "../../middlewares/errorHandler";
 
 const router = Router();

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import * as assignmentService from "./assignment.service";
 import { parsePagination } from "../../utils/pagination";
 import { AssignmentQuery } from "./assignment.types";
+import { param } from "../../utils/reqParams";
 
 export async function getAll(req: Request, res: Response, next: NextFunction) {
   try {
@@ -16,7 +17,7 @@ export async function getAll(req: Request, res: Response, next: NextFunction) {
 
 export async function getById(req: Request, res: Response, next: NextFunction) {
   try {
-    const assignment = await assignmentService.getAssignmentById(req.params.id);
+    const assignment = await assignmentService.getAssignmentById(param(req, "id"));
     res.json({ success: true, data: assignment });
   } catch (err) {
     next(err);

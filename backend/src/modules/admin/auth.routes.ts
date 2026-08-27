@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { login, refreshSession, logout, me, bootstrap } from "./auth.service";
+import { login, refreshSession, logout, me, bootstrap } from "./auth.controller";
 import { authenticate, requireAdmin } from "../../middlewares/auth";
 import { asyncHandler } from "../../middlewares/errorHandler";
 

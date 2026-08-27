@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listAdmins, createAdmin, updateAdmin, resetPassword, deleteAdmin } from "./adminUser.service";
+import { listAdmins, createAdmin, updateAdmin, resetPassword, deleteAdmin } from "./adminUser.controller";
 import { asyncHandler } from "../../middlewares/errorHandler";
 
 const router = Router();

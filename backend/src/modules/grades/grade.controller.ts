@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import * as gradeService from "./grade.service";
 import { parsePagination } from "../../utils/pagination";
 import { validateNumericId } from "../../utils/validators";
+import { param } from "../../utils/reqParams";
 
 export async function getAll(req: Request, res: Response, next: NextFunction) {
   try {
@@ -15,7 +16,7 @@ export async function getAll(req: Request, res: Response, next: NextFunction) {
 
 export async function getById(req: Request, res: Response, next: NextFunction) {
   try {
-    const id = validateNumericId(req.params.id, "idGrado");
+    const id = validateNumericId(param(req, "id"), "idGrado");
     const grade = await gradeService.getGradeById(id);
     res.json({ success: true, data: grade });
   } catch (err) {
@@ -25,7 +26,7 @@ export async function getById(req: Request, res: Response, next: NextFunction) {
 
 export async function getStudents(req: Request, res: Response, next: NextFunction) {
   try {
-    const id = validateNumericId(req.params.id, "idGrado");
+    const id = validateNumericId(param(req, "id"), "idGrado");
     const pagination = parsePagination(req.query as Record<string, string>);
     const result = await gradeService.getGradeStudents(id, pagination);
     res.json({ success: true, ...result });
@@ -36,7 +37,7 @@ export async function getStudents(req: Request, res: Response, next: NextFunctio
 
 export async function getAssignments(req: Request, res: Response, next: NextFunction) {
   try {
-    const id = validateNumericId(req.params.id, "idGrado");
+    const id = validateNumericId(param(req, "id"), "idGrado");
     const assignments = await gradeService.getGradeAssignments(id);
     res.json({ success: true, data: assignments });
   } catch (err) {

@@ -1,8 +1,10 @@
 import prisma from "../../config/prisma";
 import { AppError } from "../../middlewares/errorHandler";
 import { PaginationParams, PaginatedResult, paginatedResult } from "../../utils/pagination";
+import { assignmentInclude } from "../../utils/prismaIncludes";
+import { Prisma } from "@prisma/client";
 
-export async function getGrades(pagination: PaginationParams): Promise<PaginatedResult<unknown>> {
+export async function getGrades(pagination: PaginationParams): Promise<PaginatedResult<Prisma.GradeGetPayload<{ include: { _count: { select: { students: true; assignments: true } } } }>>> {
   const [data, total] = await Promise.all([
     prisma.grade.findMany({
       include: { _count: { select: { students: true, assignments: true } } },
@@ -29,7 +31,7 @@ export async function getGradeById(id: number) {
   return grade;
 }
 
-export async function getGradeStudents(id: number, pagination: PaginationParams): Promise<PaginatedResult<unknown>> {
+export async function getGradeStudents(id: number, pagination: PaginationParams): Promise<PaginatedResult<Prisma.StudentGetPayload<{ include: { grade: true } }>>> {
   const grade = await prisma.grade.findUnique({ where: { idGrado: id } });
   if (!grade) {
     throw new AppError(404, "GRADE_NOT_FOUND", "No se encontró el grado");
@@ -59,15 +61,7 @@ export async function getGradeAssignments(id: number) {
 
   return prisma.extracurricularAssignment.findMany({
     where: { idGrado: id },
-    include: {
-      teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-      discipline: { select: { codigoDisciplina: true, nombre: true } },
-      schedules: {
-        include: {
-          schedule: { select: { diaSemana: true, horaInicio: true, horaFin: true, aula: true } },
-        },
-      },
-    },
+    include: assignmentInclude,
     orderBy: { createdAt: "asc" },
   });
 }

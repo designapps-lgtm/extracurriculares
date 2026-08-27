@@ -1,21 +1,11 @@
 import prisma from "../../config/prisma";
 import { AppError } from "../../middlewares/errorHandler";
 import { PaginationParams, PaginatedResult, paginatedResult } from "../../utils/pagination";
+import { assignmentInclude } from "../../utils/prismaIncludes";
 import { AssignmentQuery } from "./assignment.types";
 import { Prisma } from "@prisma/client";
 
-const assignmentInclude = {
-  teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-  discipline: { select: { codigoDisciplina: true, nombre: true } },
-  grade: { select: { idGrado: true, nombre: true } },
-  schedules: {
-    include: {
-      schedule: { select: { diaSemana: true, horaInicio: true, horaFin: true, aula: true } },
-    },
-  },
-};
-
-export async function getAssignments(query: AssignmentQuery, pagination: PaginationParams): Promise<PaginatedResult<unknown>> {
+export async function getAssignments(query: AssignmentQuery, pagination: PaginationParams): Promise<PaginatedResult<Prisma.ExtracurricularAssignmentGetPayload<{ include: typeof assignmentInclude }>>> {
   const where: Prisma.ExtracurricularAssignmentWhereInput = {};
 
   if (query.grado) {

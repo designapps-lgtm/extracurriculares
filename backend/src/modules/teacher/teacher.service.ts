@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../../config/prisma";
 import { AppError } from "../../middlewares/errorHandler";
+import { param } from "../../utils/reqParams";
 
 function nowColombia() {
   const now = new Date();
@@ -133,7 +134,7 @@ export async function startSession(req: Request, res: Response) {
 
 export async function getAttendanceList(req: Request, res: Response) {
   const teacherId = req.teacher!.teacherId;
-  const { sessionId } = req.params;
+  const sessionId = param(req, "sessionId");
 
   const session = await prisma.classSession.findUnique({
     where: { id: sessionId },
@@ -185,7 +186,7 @@ export async function getAttendanceList(req: Request, res: Response) {
 
 export async function saveAttendance(req: Request, res: Response) {
   const teacherId = req.teacher!.teacherId;
-  const { sessionId } = req.params;
+  const sessionId = param(req, "sessionId");
   const { records } = req.body;
 
   if (!records || !Array.isArray(records)) {

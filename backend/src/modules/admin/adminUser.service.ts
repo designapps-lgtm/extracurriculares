@@ -1,18 +1,35 @@
-import { Request, Response } from "express";
 import prisma from "../../config/prisma";
 import bcrypt from "bcryptjs";
 import { AppError } from "../../middlewares/errorHandler";
+import { getOr404 } from "../../utils/getOr404";
 
-export async function listAdmins(_req: Request, res: Response) {
-  const admins = await prisma.adminUser.findMany({
-    select: { id: true, email: true, nombre: true, apellido: true, estado: true, createdAt: true },
-    orderBy: { createdAt: "asc" },
-  });
-  res.json({ success: true, data: admins });
+export interface AdminUserData {
+  id: string;
+  email: string;
+  nombre: string;
+  apellido: string;
+  estado: string;
+  createdAt: Date;
 }
 
-export async function createAdmin(req: Request, res: Response) {
-  const { email, nombre, apellido, password } = req.body;
+const adminSelect = {
+  id: true,
+  email: true,
+  nombre: true,
+  apellido: true,
+  estado: true,
+  createdAt: true,
+} as const;
+
+export async function listAdmins(): Promise<AdminUserData[]> {
+  return prisma.adminUser.findMany({
+    select: adminSelect,
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export async function createAdmin(data: { email: string; nombre?: string; apellido?: string; password: string }): Promise<AdminUserData> {
+  const { email, nombre, apellido, password } = data;
 
   if (!email) throw new AppError(400, "VALIDATION_ERROR", "Email es requerido");
 
@@ -24,28 +41,24 @@ export async function createAdmin(req: Request, res: Response) {
   if (existing) throw new AppError(409, "DUPLICATE_EMAIL", "Ya existe un admin con ese email");
 
   const hash = await bcrypt.hash(password, 12);
-  const admin = await prisma.adminUser.create({
+  return prisma.adminUser.create({
     data: {
       email,
       passwordHash: hash,
       nombre: nombre || email.split("@")[0],
       apellido: apellido || "",
     },
-    select: { id: true, email: true, nombre: true, apellido: true, estado: true, createdAt: true },
+    select: adminSelect,
   });
-
-  res.status(201).json({ success: true, data: admin });
 }
 
-export async function updateAdmin(req: Request, res: Response) {
-  const { id } = req.params;
-  const { nombre, apellido, estado } = req.body;
+export async function updateAdmin(id: string, callerAdminId: string | undefined, data: { nombre?: string; apellido?: string; estado?: string }): Promise<AdminUserData> {
+  const { nombre, apellido, estado } = data;
 
-  const admin = await prisma.adminUser.findUnique({ where: { id } });
-  if (!admin) throw new AppError(404, "ADMIN_NOT_FOUND", "No se encontró el admin");
+  await getOr404(prisma.adminUser.findUnique({ where: { id } }), "ADMIN_NOT_FOUND", "No se encontró el admin");
 
   // Prevent disabling yourself
-  if (req.admin?.adminId === id && estado === "inactivo") {
+  if (callerAdminId === id && estado === "inactivo") {
     throw new AppError(400, "CANNOT_DISABLE_SELF", "No puedes desactivarte a ti mismo");
   }
 
@@ -57,41 +70,31 @@ export async function updateAdmin(req: Request, res: Response) {
     }
   }
 
-  const updated = await prisma.adminUser.update({
+  return prisma.adminUser.update({
     where: { id },
     data: {
       ...(nombre !== undefined && { nombre }),
       ...(apellido !== undefined && { apellido }),
       ...(estado !== undefined && { estado }),
     },
-    select: { id: true, email: true, nombre: true, apellido: true, estado: true, createdAt: true },
+    select: adminSelect,
   });
-
-  res.json({ success: true, data: updated });
 }
 
-export async function resetPassword(req: Request, res: Response) {
-  const { id } = req.params;
-  const { password } = req.body;
-
+export async function resetPassword(id: string, password: string): Promise<void> {
   if (!password || password.length < 6) {
     throw new AppError(400, "VALIDATION_ERROR", "La contraseña debe tener al menos 6 caracteres");
   }
 
-  const admin = await prisma.adminUser.findUnique({ where: { id } });
-  if (!admin) throw new AppError(404, "ADMIN_NOT_FOUND", "No se encontró el admin");
+  await getOr404(prisma.adminUser.findUnique({ where: { id } }), "ADMIN_NOT_FOUND", "No se encontró el admin");
 
   const hash = await bcrypt.hash(password, 12);
   await prisma.adminUser.update({ where: { id }, data: { passwordHash: hash } });
-
-  res.json({ success: true, data: { message: "Contraseña actualizada" } });
 }
 
-export async function deleteAdmin(req: Request, res: Response) {
-  const { id } = req.params;
-
+export async function deleteAdmin(id: string, callerAdminId: string | undefined): Promise<void> {
   // Prevent deleting yourself
-  if (req.admin?.adminId === id) {
+  if (callerAdminId === id) {
     throw new AppError(400, "CANNOT_DELETE_SELF", "No puedes eliminarte a ti mismo");
   }
 
@@ -107,5 +110,4 @@ export async function deleteAdmin(req: Request, res: Response) {
   }
 
   await prisma.adminUser.delete({ where: { id } });
-  res.json({ success: true, data: { message: "Admin eliminado" } });
 }

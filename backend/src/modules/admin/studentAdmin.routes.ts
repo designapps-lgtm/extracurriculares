@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getStudents, getStudentByCode, updateStudent } from "./studentAdmin.service";
+import { getStudents, getStudentByCode, updateStudent } from "./studentAdmin.controller";
 import { asyncHandler } from "../../middlewares/errorHandler";
 
 const router = Router();

@@ -1,26 +1,24 @@
-import { Request, Response } from "express";
 import prisma from "../../config/prisma";
 import { AppError } from "../../middlewares/errorHandler";
-import { PaginationParams } from "../../utils/pagination";
+import { getOr404 } from "../../utils/getOr404";
+import { PaginationParams, paginatedResult } from "../../utils/pagination";
 import { Prisma } from "@prisma/client";
 
-export async function getStudents(req: Request, res: Response) {
-  const page = parseInt((req.query.page as string) || "1");
-  const limit = Math.min(parseInt((req.query.limit as string) || "20"), 100);
-  const { search, grado, inscrito } = req.query;
+export async function getStudents(query: { search?: string; grado?: string; inscrito?: string }, pagination: PaginationParams) {
+  const { search, grado, inscrito } = query;
 
   const where: Prisma.StudentWhereInput = {};
 
   if (search) {
     where.OR = [
-      { codigoEstudiante: { contains: search as string, mode: "insensitive" } },
-      { nombre: { contains: search as string, mode: "insensitive" } },
-      { apellido: { contains: search as string, mode: "insensitive" } },
+      { codigoEstudiante: { contains: search, mode: "insensitive" } },
+      { nombre: { contains: search, mode: "insensitive" } },
+      { apellido: { contains: search, mode: "insensitive" } },
     ];
   }
 
   if (grado) {
-    const grade = await prisma.grade.findFirst({ where: { nombre: grado as string } });
+    const grade = await prisma.grade.findFirst({ where: { nombre: grado } });
     if (grade) where.idGrado = grade.idGrado;
   }
 
@@ -34,36 +32,39 @@ export async function getStudents(req: Request, res: Response) {
     prisma.student.findMany({
       where,
       include: { grade: true, studentSchedules: true },
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (pagination.page - 1) * pagination.limit,
+      take: pagination.limit,
       orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
     }),
     prisma.student.count({ where }),
   ]);
 
-  res.json({
-    success: true,
-    data,
-    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
-  });
+  return paginatedResult(data, total, pagination);
 }
 
-export async function getStudentByCode(req: Request, res: Response) {
-  const student = await prisma.student.findUnique({
-    where: { codigoEstudiante: req.params.codigo },
-    include: { grade: true, studentSchedules: { include: { discipline: true } } },
-  });
-
-  if (!student) throw new AppError(404, "STUDENT_NOT_FOUND", "No se encontró el estudiante");
-  res.json({ success: true, data: student });
+export async function getStudentByCode(codigo: string) {
+  return getOr404(
+    prisma.student.findUnique({
+      where: { codigoEstudiante: codigo },
+      include: { grade: true, studentSchedules: { include: { discipline: true } } },
+    }),
+    "STUDENT_NOT_FOUND",
+    "No se encontró el estudiante",
+  );
 }
 
-export async function updateStudent(req: Request, res: Response) {
-  const { codigo } = req.params;
-  const { nombre, apellido, idGrado, grupo, correo, estado, fotoUrl } = req.body;
+export async function updateStudent(codigo: string, data: {
+  nombre?: string;
+  apellido?: string;
+  idGrado?: number;
+  grupo?: string;
+  correo?: string;
+  estado?: string;
+  fotoUrl?: string;
+}) {
+  const { nombre, apellido, idGrado, grupo, correo, estado, fotoUrl } = data;
 
-  const student = await prisma.student.findUnique({ where: { codigoEstudiante: codigo } });
-  if (!student) throw new AppError(404, "STUDENT_NOT_FOUND", "No se encontró el estudiante");
+  await getOr404(prisma.student.findUnique({ where: { codigoEstudiante: codigo } }), "STUDENT_NOT_FOUND", "No se encontró el estudiante");
 
   // Validate grade exists if provided
   if (idGrado) {
@@ -85,5 +86,5 @@ export async function updateStudent(req: Request, res: Response) {
     include: { grade: true },
   });
 
-  res.json({ success: true, data: updated });
+  return updated;
 }

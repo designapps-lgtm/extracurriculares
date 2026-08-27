@@ -4,7 +4,7 @@ import { PaginationParams, PaginatedResult, paginatedResult } from "../../utils/
 import { ScheduleQuery } from "./schedule.types";
 import { Prisma } from "@prisma/client";
 
-export async function getSchedules(query: ScheduleQuery, pagination: PaginationParams): Promise<PaginatedResult<unknown>> {
+export async function getSchedules(query: ScheduleQuery, pagination: PaginationParams): Promise<PaginatedResult<Prisma.ScheduleGetPayload<{}>>> {
   const where: Prisma.ScheduleWhereInput = {};
 
   if (query.dia) {

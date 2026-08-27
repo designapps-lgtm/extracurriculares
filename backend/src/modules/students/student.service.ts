@@ -4,7 +4,7 @@ import { PaginationParams, PaginatedResult, paginatedResult } from "../../utils/
 import { StudentQuery } from "./student.types";
 import { Prisma } from "@prisma/client";
 
-export async function getStudents(query: StudentQuery, pagination: PaginationParams): Promise<PaginatedResult<unknown>> {
+export async function getStudents(query: StudentQuery, pagination: PaginationParams): Promise<PaginatedResult<Prisma.StudentGetPayload<{ include: { grade: true; studentSchedules: { include: { discipline: true } } } }>>> {
   const { search, grado, disciplina, inscrito } = query;
 
   const where: Prisma.StudentWhereInput = {};

@@ -1,20 +1,11 @@
 import prisma from "../../config/prisma";
 import { AppError } from "../../middlewares/errorHandler";
 import { PaginationParams, PaginatedResult, paginatedResult } from "../../utils/pagination";
+import { assignmentInclude } from "../../utils/prismaIncludes";
 import { DisciplineQuery } from "./discipline.types";
 import { Prisma } from "@prisma/client";
 
-const assignmentInclude = {
-  teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-  grade: { select: { idGrado: true, nombre: true } },
-  schedules: {
-    include: {
-      schedule: { select: { diaSemana: true, horaInicio: true, horaFin: true, aula: true } },
-    },
-  },
-};
-
-export async function getDisciplines(query: DisciplineQuery, pagination: PaginationParams): Promise<PaginatedResult<unknown>> {
+export async function getDisciplines(query: DisciplineQuery, pagination: PaginationParams): Promise<PaginatedResult<Prisma.DisciplineGetPayload<{ include: { _count: { select: { studentSchedules: true; assignments: true } } } }>>> {
   const where: Prisma.DisciplineWhereInput = {};
 
   if (query.search) {
@@ -56,7 +47,7 @@ export async function getDisciplineByCodigo(codigo: string) {
   return discipline;
 }
 
-export async function getDisciplineStudents(codigo: string, pagination: PaginationParams): Promise<PaginatedResult<unknown>> {
+export async function getDisciplineStudents(codigo: string, pagination: PaginationParams): Promise<PaginatedResult<Prisma.StudentGetPayload<{ include: { grade: true } }>>> {
   const discipline = await prisma.discipline.findUnique({ where: { codigoDisciplina: codigo } });
   if (!discipline) {
     throw new AppError(404, "DISCIPLINE_NOT_FOUND", "No se encontró la disciplina");

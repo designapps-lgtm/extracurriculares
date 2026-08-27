@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import * as scheduleService from "./schedule.service";
 import { parsePagination } from "../../utils/pagination";
 import { ScheduleQuery } from "./schedule.types";
+import { param } from "../../utils/reqParams";
 
 export async function getAll(req: Request, res: Response, next: NextFunction) {
   try {
@@ -16,7 +17,7 @@ export async function getAll(req: Request, res: Response, next: NextFunction) {
 
 export async function getById(req: Request, res: Response, next: NextFunction) {
   try {
-    const schedule = await scheduleService.getScheduleById(req.params.id);
+    const schedule = await scheduleService.getScheduleById(param(req, "id"));
     res.json({ success: true, data: schedule });
   } catch (err) {
     next(err);

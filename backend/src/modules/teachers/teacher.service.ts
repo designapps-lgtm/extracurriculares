@@ -26,7 +26,7 @@ const teacherSelect = {
   updatedAt: true,
 } as const;
 
-export async function getTeachers(query: TeacherQuery, pagination: PaginationParams): Promise<PaginatedResult<unknown>> {
+export async function getTeachers(query: TeacherQuery, pagination: PaginationParams): Promise<PaginatedResult<Prisma.TeacherGetPayload<{ select: { idProfesor: true; codigoProfesor: true; nombre: true; apellido: true; correo: true; fotoUrl: true; estado: true; createdAt: true; updatedAt: true; _count: { select: { assignments: true } } } }>>> {
   const where: Prisma.TeacherWhereInput = {};
 
   if (query.search) {
