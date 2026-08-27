@@ -19,7 +19,7 @@ export async function getStudentByCode(req: Request, res: Response) {
 }
 
 export async function updateStudent(req: Request, res: Response) {
-  const { nombre, apellido, idGrado, grupo, correo, estado, fotoUrl } = req.body;
-  const data = await service.updateStudent(req.params.codigo as string, { nombre, apellido, idGrado, grupo, correo, estado, fotoUrl });
+  const { nombre, apellido, idGrado, grupo, correo, estado, fotoUrl, schedules } = req.body;
+  const data = await service.updateStudent(req.params.codigo as string, { nombre, apellido, idGrado, grupo, correo, estado, fotoUrl, schedules });
   res.json({ success: true, data });
 }

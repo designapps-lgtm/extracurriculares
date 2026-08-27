@@ -1,13 +1,24 @@
 import { useState, useEffect } from "react";
-import { getAdminStudents, updateAdminStudent, getAdminGrades } from "../../services/admin";
+import { getAdminStudents, updateAdminStudent, getAdminGrades, getAdminDisciplines } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
 import { Pagination } from "../../components/common/Pagination";
 import { Loading } from "../../components/common/States";
-import type { Student, Grade } from "../../types";
+import type { Student, Grade, Discipline } from "../../types";
+
+const DIAS_ORDEN = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+const DIAS_CORTO: Record<string, string> = {
+  LUNES: "Lun",
+  MARTES: "Mar",
+  MIERCOLES: "Mié",
+  JUEVES: "Jue",
+  VIERNES: "Vie",
+  SABADO: "Sáb",
+};
 
 export default function AdminStudents() {
   const [students, setStudents] = useState<Student[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [search, setSearch] = useState("");
   const [filterGrado, setFilterGrado] = useState("");
@@ -15,6 +26,7 @@ export default function AdminStudents() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Student | null>(null);
   const [editForm, setEditForm] = useState<Partial<Student>>({});
+  const [editSchedules, setEditSchedules] = useState<Record<string, string>>({});
 
   const notify = useNotify();
 
@@ -40,6 +52,7 @@ export default function AdminStudents() {
   useEffect(() => {
     load();
     getAdminGrades().then((res) => setGrades(res.data)).catch(console.error);
+    getAdminDisciplines({ limit: "100" }).then((res) => setDisciplines(res.data)).catch(console.error);
   }, []);
 
   const handleSearch = () => load(1);
@@ -54,12 +67,20 @@ export default function AdminStudents() {
       correo: student.correo,
       estado: student.estado,
     });
+    const byDay: Record<string, string> = {};
+    for (const sc of student.studentSchedules) {
+      byDay[sc.diaSemana] = sc.codigoDisciplina;
+    }
+    setEditSchedules(byDay);
   };
 
   const handleSave = async () => {
     if (!editing) return;
     try {
-      await updateAdminStudent(editing.codigoEstudiante, editForm);
+      const schedules = DIAS_ORDEN
+        .filter((d) => editSchedules[d])
+        .map((d) => ({ diaSemana: d, codigoDisciplina: editSchedules[d] }));
+      await updateAdminStudent(editing.codigoEstudiante, { ...editForm, schedules });
       setEditing(null);
       load(meta.page);
     } catch (err: any) {
@@ -168,7 +189,7 @@ export default function AdminStudents() {
       {/* Edit modal */}
       {editing && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setEditing(null)}>
-          <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">
               Editar estudiante
             </h2>
@@ -215,6 +236,36 @@ export default function AdminStudents() {
                   <option value="activo">Activo</option>
                   <option value="inactivo">Inactivo</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-surface-500 mb-2">
+                  Actividades (disciplina por día)
+                </label>
+                <div className="space-y-2">
+                  {DIAS_ORDEN.map((d) => (
+                    <div key={d} className="flex items-center gap-3">
+                      <span className="w-10 text-xs font-medium text-surface-500">
+                        {DIAS_CORTO[d]}
+                      </span>
+                      <select
+                        value={editSchedules[d] || ""}
+                        onChange={(e) => setEditSchedules({ ...editSchedules, [d]: e.target.value })}
+                        className="flex-1 px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+                      >
+                        <option value="">Sin actividad</option>
+                        {disciplines.map((disc) => (
+                          <option key={disc.codigoDisciplina} value={disc.codigoDisciplina}>
+                            {disc.nombre} ({disc.codigoDisciplina})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-surface-400 mt-2">
+                  Cambiar una actividad actualiza la lista del profesor el día correspondiente.
+                </p>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
