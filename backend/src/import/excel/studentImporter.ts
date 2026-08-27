@@ -94,11 +94,21 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
 
   // Find students in DB that are NOT in the Excel
   const excelBarcodes = new Set(students.map((s) => s.codigoEstudiante));
+  const absentBarcodes: string[] = [];
   for (const barcode of existingBarcodes) {
     if (!excelBarcodes.has(barcode)) {
       result.absentStudents.push(barcode);
       result.absent++;
+      absentBarcodes.push(barcode);
     }
+  }
+
+  // Mark absent students as inactive (they are no longer in the activity list)
+  if (!dryRun && absentBarcodes.length > 0) {
+    await prisma.student.updateMany({
+      where: { codigoEstudiante: { in: absentBarcodes } },
+      data: { estado: "inactivo" },
+    });
   }
 
   // Process each student

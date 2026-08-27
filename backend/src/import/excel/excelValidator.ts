@@ -25,7 +25,7 @@ export function validateRows(rows: RawStudentRow[]): ValidationResult {
   const errors: ValidationError[] = [];
   const valid: RawStudentRow[] = [];
   const barcodeCount = new Map<string, number[]>();
-  const disciplineCodes = new Set<string>();
+  const duplicateBarcodes: string[] = [];
 
   for (const row of rows) {
     let hasError = false;
@@ -42,29 +42,31 @@ export function validateRows(rows: RawStudentRow[]): ValidationResult {
       hasError = true;
     }
 
-    // Collect discipline codes
-    for (const dayCol of DAY_COLUMNS) {
-      const val = row[dayCol];
-      if (val) {
-        disciplineCodes.add(val);
-      }
-    }
-
-    // Track barcodes for duplicate detection
+    // Track barcodes for duplicate detection: the first occurrence stays valid,
+    // subsequent rows with the same barcode are excluded (they would overwrite it).
     if (!barcodeCount.has(row.BARCODE)) {
       barcodeCount.set(row.BARCODE, []);
     }
-    barcodeCount.get(row.BARCODE)!.push(row._excelRow);
+    const occurrences = barcodeCount.get(row.BARCODE)!;
+    occurrences.push(row._excelRow);
+    if (occurrences.length > 1) {
+      hasError = true;
+      if (occurrences.length === 2) {
+        duplicateBarcodes.push(row.BARCODE);
+      }
+      errors.push({
+        row: row._excelRow,
+        codigoEstudiante: row.BARCODE,
+        field: "barcode",
+        value: row.BARCODE,
+        error: `Barcode duplicado (también en fila ${occurrences[0]})`,
+      });
+    }
 
     if (!hasError) {
       valid.push(row);
     }
   }
-
-  // Find duplicates
-  const duplicateBarcodes = [...barcodeCount.entries()]
-    .filter(([, rows]) => rows.length > 1)
-    .map(([code]) => code);
 
   return { valid, errors, duplicateBarcodes };
 }

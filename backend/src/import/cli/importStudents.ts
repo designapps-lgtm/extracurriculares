@@ -96,10 +96,20 @@ async function main() {
   console.log(`\n${"=".repeat(60)}`);
   if (dryRun) {
     console.log("MODO DRY-RUN — Ninguna modificación realizada");
+  } else if (result.errorDetails.length > 0) {
+    console.log("IMPORTACIÓN FINALIZADA CON ERRORES");
   } else {
     console.log("IMPORTACIÓN COMPLETADA");
   }
   console.log(`${"=".repeat(60)}\n`);
+
+  if (dryRun && errors.length > 0) {
+    console.error("Validación con errores: revise las filas marcadas antes de importar en modo real");
+    process.exit(1);
+  }
+  if (!dryRun && result.errorDetails.length > 0) {
+    process.exit(1);
+  }
 }
 
 main()

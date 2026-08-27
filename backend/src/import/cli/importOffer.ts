@@ -220,9 +220,48 @@ async function main() {
   console.log(`IMPORTADOR DE OFERTA — ${dryRun ? "MODO DRY-RUN" : "MODO REAL"}`);
   console.log(`${"=".repeat(60)}\n`);
 
+  // 0. Validate offer (grades + disciplines) BEFORE writing anything
+  console.log("0. Validando oferta (grados y disciplinas):");
+  const gradeMap = new Map<string, number>(); // "K4" → idGrado
+  const uniqueGrades = [...new Set(OFFER.map((o) => o.grade))];
+  const missingGrades: string[] = [];
+
+  for (const g of uniqueGrades) {
+    const grade = await prisma.grade.findFirst({ where: { nombre: g } });
+    if (grade) {
+      gradeMap.set(g, grade.idGrado);
+      console.log(`   ✓ ${g} → idGrado ${grade.idGrado}`);
+    } else {
+      missingGrades.push(g);
+    }
+  }
+
+  const disciplineSet = new Set(OFFER.map((o) => o.discipline));
+  const disciplineMap = new Map<string, boolean>(); // code → exists
+  const missingDisciplines: string[] = [];
+
+  for (const d of disciplineSet) {
+    const disc = await prisma.discipline.findFirst({ where: { codigoDisciplina: d } });
+    if (disc) {
+      disciplineMap.set(d, true);
+      console.log(`   ✓ ${d}`);
+    } else {
+      missingDisciplines.push(d);
+    }
+  }
+
+  if (missingGrades.length > 0 || missingDisciplines.length > 0) {
+    for (const g of missingGrades) console.error(`   ❌ GRADO NO ENCONTRADO: ${g}`);
+    for (const d of missingDisciplines) console.error(`   ❌ DISCIPLINA NO ENCONTRADA: ${d}`);
+    console.error("Abortando antes de escribir cualquier dato");
+    process.exit(1);
+  }
+
   // 1. Create teachers
-  console.log("1. Profesores:");
+  console.log("\n1. Profesores:");
   const teacherMap = new Map<string, string>(); // "Nombre Apellido" → idProfesor
+  let teachersCreated = 0;
+  let teachersExisting = 0;
 
   for (const t of TEACHERS) {
     const fullName = `${t.nombre} ${t.apellido}`;
@@ -232,12 +271,14 @@ async function main() {
 
     if (existing) {
       teacherMap.set(fullName, existing.idProfesor);
+      teachersExisting++;
       console.log(`   ✓ ${fullName} (ya existe)`);
     } else if (!dryRun) {
       const created = await prisma.teacher.create({
         data: { nombre: t.nombre, apellido: t.apellido },
       });
       teacherMap.set(fullName, created.idProfesor);
+      teachersCreated++;
       console.log(`   + ${fullName}`);
     } else {
       // In dry-run, create a placeholder entry so offer validation works
@@ -249,6 +290,8 @@ async function main() {
   // 2. Create schedules
   console.log("\n2. Horarios:");
   const scheduleMap = new Map<string, string>(); // S1 → idHorario
+  let schedulesCreated = 0;
+  let schedulesExisting = 0;
 
   for (const [key, sched] of Object.entries(SCHEDULES)) {
     const existing = await prisma.schedule.findFirst({
@@ -261,10 +304,12 @@ async function main() {
 
     if (existing) {
       scheduleMap.set(key, existing.idHorario);
+      schedulesExisting++;
       console.log(`   ✓ ${key}: ${sched.diaSemana} ${sched.horaInicio || "NULL"}-${sched.horaFin || "NULL"} (ya existe)`);
     } else if (!dryRun) {
       const created = await prisma.schedule.create({ data: sched });
       scheduleMap.set(key, created.idHorario);
+      schedulesCreated++;
       console.log(`   + ${key}: ${sched.diaSemana} ${sched.horaInicio || "NULL"}-${sched.horaFin || "NULL"}`);
     } else {
       // In dry-run, create a placeholder entry so offer validation works
@@ -273,40 +318,8 @@ async function main() {
     }
   }
 
-  // 3. Resolve grade IDs
-  console.log("\n3. Grados:");
-  const gradeMap = new Map<string, number>(); // "K4" → idGrado
-  const uniqueGrades = [...new Set(OFFER.map((o) => o.grade))];
-
-  for (const g of uniqueGrades) {
-    const grade = await prisma.grade.findFirst({ where: { nombre: g } });
-    if (grade) {
-      gradeMap.set(g, grade.idGrado);
-      console.log(`   ✓ ${g} → idGrado ${grade.idGrado}`);
-    } else {
-      console.error(`   ❌ GRADO NO ENCONTRADO: ${g}`);
-      process.exit(1);
-    }
-  }
-
-  // 4. Resolve discipline codes
-  console.log("\n4. Disciplinas:");
-  const disciplineSet = new Set(OFFER.map((o) => o.discipline));
-  const disciplineMap = new Map<string, boolean>(); // code → exists
-
-  for (const d of disciplineSet) {
-    const disc = await prisma.discipline.findFirst({ where: { codigoDisciplina: d } });
-    if (disc) {
-      disciplineMap.set(d, true);
-      console.log(`   ✓ ${d}`);
-    } else {
-      console.error(`   ❌ DISCIPLINA NO ENCONTRADA: ${d}`);
-      process.exit(1);
-    }
-  }
-
-  // 5. Create assignments + assignment schedules
-  console.log(`\n5. Asignaciones (${OFFER.length} offerings):`);
+  // 3. Create assignments + assignment schedules
+  console.log(`\n3. Asignaciones (${OFFER.length} offerings):`);
   let assignmentsCreated = 0;
   let assignmentsReactivated = 0;
   let assignmentSchedulesCreated = 0;
@@ -402,8 +415,8 @@ async function main() {
   console.log(`\n${"=".repeat(60)}`);
   console.log("REPORTE DE IMPORTACIÓN DE OFERTA");
   console.log(`${"=".repeat(60)}`);
-  console.log(`\nProfesores creados:   ${TEACHERS.length}`);
-  console.log(`Horarios creados:     ${Object.keys(SCHEDULES).length}`);
+  console.log(`\nProfesores:           ${teachersCreated} creados, ${teachersExisting} ya existían`);
+  console.log(`Horarios:             ${schedulesCreated} creados, ${schedulesExisting} ya existían`);
   console.log(`Asignaciones:         ${assignmentsCreated} nuevas, ${assignmentsReactivated} reactivadas, ${skipped} ya existentes`);
   console.log(`Schedule links:       ${assignmentSchedulesCreated} creados`);
 
@@ -415,10 +428,16 @@ async function main() {
   console.log(`\n${"=".repeat(60)}`);
   if (dryRun) {
     console.log("MODO DRY-RUN — Ninguna modificación realizada");
+  } else if (errors.length > 0) {
+    console.log("IMPORTACIÓN DE OFERTA FINALIZADA CON ERRORES");
   } else {
     console.log("IMPORTACIÓN DE OFERTA COMPLETADA");
   }
   console.log(`${"=".repeat(60)}\n`);
+
+  if (!dryRun && errors.length > 0) {
+    process.exit(1);
+  }
 }
 
 main()
