@@ -2,8 +2,10 @@
 
 Arquitectura elegida: **Vercel** (frontend) + **Render** (backend Node) + **Neon** (PostgreSQL).
 
-Auth refactorizada a **tokens Bearer** (header `Authorization` + `localStorage`), porque
-las cookies no viajan entre dominios distintos. **No usamos cookies en producción.**
+Auth por **cookies httpOnly con `SameSite=None; Secure`**, porque el frontend y el
+backend son sitios distintos (Vercel + Render). El navegador guarda y envía la cookie
+entre dominios gracias a `SameSite=None`; el frontend manda `credentials: "include"`
+en todos los fetch. Los tokens NUNCA viven en el cliente (ni localStorage ni headers).
 
 ---
 
@@ -79,6 +81,8 @@ DATABASE_URL="postgresql://USER:PASS@HOST/neondb?sslmode=require" npx prisma db 
 - Vercel auto-detecta Vite. Configura el **Root Directory** a `frontend/`.
 - Build command: `npm run build` · Output: `dist`
 - `vercel.json` maneja los rewrites SPA (rutas `/admin/*` en refresh directo).
+  **No usar `cleanUrls: true`**: rompe el catch-all rewrite y las rutas anidadas
+  devuelven 404 al recargar la página.
 
 ---
 
@@ -114,11 +118,14 @@ DATABASE_URL="..." npx ts-node src/import/cli/importOffer.ts
 
 ---
 
-## Notas de seguridad / limitaciones (refactor a tokens)
+## Notas de seguridad / limitaciones (auth por cookies)
 
-- Los tokens viven en `localStorage` (vulnerable a XSS). Compensaciones ya existentes:
-  `helmet`, JWT firmado, refresh tokens rotativos con detección de reuso.
-- `httpOnly` cookies eran más seguras, pero incompatibles con dominios distintos
-  (Vercel + Render). Si más adelante se tolera un solo dominio, se puede volver a cookies.
+- Las cookies son `httpOnly` (inalcanzables desde JS) → no vulnerables a XSS.
+  La sesión se mantiene con refresh tokens rotativos con detección de reuso.
+- `SameSite=None` requiere HTTPS (`secure: true` se activa con `NODE_ENV=production`).
+- Las mutaciones usan `Content-Type: application/json`, lo que exige preflight CORS;
+  el origin debe ser el del frontend permitido, mitigando CSRF en gran parte.
+- Si en el futuro frontend y backend comparten un solo dominio, se puede volver a
+  `SameSite=Lax`/`Strict` (más robusto frente al bloqueo de cookies de terceros).
 - No hay migraciones de Prisma comiteadas. Al primer cambio de schema en prod,
   generar migraciones y correr `prisma migrate deploy` en vez de `db push`.

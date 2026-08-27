@@ -4,6 +4,7 @@ import prisma from "../../config/prisma";
 import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { createRefreshService } from "../../modules/auth/refreshTokens";
+import { setAuthCookies, clearAuthCookies, ADMIN_REFRESH_COOKIE } from "../../utils/authCookies";
 import * as service from "./auth.service";
 
 const adminRefresh = createRefreshService({
@@ -20,43 +21,48 @@ export async function login(req: Request, res: Response) {
   const admin = await service.login(email, password);
   const { accessToken, refreshToken } = await adminRefresh.issue(admin.id, admin.email);
 
+  setAuthCookies(res, "admin", accessToken, refreshToken);
+
   res.json({
     success: true,
     data: {
-      accessToken,
-      refreshToken,
       admin: { id: admin.id, email: admin.email, nombre: admin.nombre, apellido: admin.apellido },
     },
   });
 }
 
 export async function refreshSession(req: Request, res: Response) {
-  const { refreshToken } = req.body;
+  const refreshToken = req.cookies?.[ADMIN_REFRESH_COOKIE];
 
   if (!refreshToken) {
     throw new AppError(401, "REFRESH_REQUIRED", "No hay sesión activa para renovar");
   }
 
-  const { userId, accessToken, refreshToken: newRefreshToken } = await adminRefresh.rotate(
-    refreshToken,
-    ""
-  );
+  const { userId, refreshToken: newRefreshToken } = await adminRefresh.rotate(refreshToken, "");
 
   const admin = await service.getAdminById(userId);
+
+  // Re-firmar el access token con el email real del admin (rotate() recibe "")
+  const accessToken = jwt.sign(
+    { adminId: admin.id, email: admin.email },
+    config.jwtSecret,
+    { expiresIn: config.accessTokenExpiresIn } as jwt.SignOptions
+  );
+
+  setAuthCookies(res, "admin", accessToken, newRefreshToken);
 
   res.json({
     success: true,
     data: {
-      accessToken,
-      refreshToken: newRefreshToken,
       admin: { id: admin.id, email: admin.email, nombre: admin.nombre, apellido: admin.apellido },
     },
   });
 }
 
 export async function logout(req: Request, res: Response) {
-  const { refreshToken } = req.body;
+  const refreshToken = req.cookies?.[ADMIN_REFRESH_COOKIE];
   await adminRefresh.revoke(refreshToken);
+  clearAuthCookies(res, "admin");
   res.json({ success: true, data: { message: "Sesión cerrada" } });
 }
 
@@ -74,5 +80,7 @@ export async function bootstrap(req: Request, res: Response) {
   const admin = await service.bootstrap({ email, password, nombre, apellido });
   const { accessToken, refreshToken } = await adminRefresh.issue(admin.id, admin.email);
 
-  res.status(201).json({ success: true, data: { admin, accessToken, refreshToken } });
+  setAuthCookies(res, "admin", accessToken, refreshToken);
+
+  res.status(201).json({ success: true, data: { admin } });
 }

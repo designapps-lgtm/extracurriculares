@@ -1,5 +1,4 @@
 import { api } from "./api";
-import { saveTokens, clearTokens } from "./tokenStorage";
 import type {
   ApiResponse,
   TeacherClassesResponse,
@@ -14,23 +13,16 @@ export interface TeacherUser {
   email: string | null;
 }
 
-interface TeacherLoginResponse {
-  teacher: TeacherUser;
-  accessToken: string;
-  refreshToken: string;
-}
-
 export async function teacherLogin(email: string): Promise<{ teacher: TeacherUser }> {
-  const res = await api.post<ApiResponse<TeacherLoginResponse>>("/api/teacher/auth/login", { email });
-  saveTokens("teacher", { accessToken: res.data.accessToken, refreshToken: res.data.refreshToken });
+  const res = await api.post<ApiResponse<{ teacher: TeacherUser }>>("/api/teacher/auth/login", { email });
   return { teacher: res.data.teacher };
 }
 
 export async function teacherLogout(): Promise<void> {
   try {
     await api.post<ApiResponse<null>>("/api/teacher/auth/logout", {});
-  } finally {
-    clearTokens("teacher");
+  } catch {
+    // Las cookies se limpian en el backend; si falla la llamada, igual navegamos.
   }
 }
 

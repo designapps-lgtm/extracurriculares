@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation, Navigate } from "react-router-dom";
+import { Outlet, Link, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getMe, logout } from "../../services/admin";
 import type { AdminUser } from "../../services/admin";
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
 
 export default function AdminLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -39,7 +40,7 @@ export default function AdminLayout() {
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = "/admin/login";
+    navigate("/admin/login");
   };
 
   return (

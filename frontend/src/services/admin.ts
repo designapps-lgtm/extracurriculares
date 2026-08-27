@@ -1,5 +1,4 @@
 import { api } from "./api";
-import { saveTokens, clearTokens } from "./tokenStorage";
 import type {
   ApiResponse,
   PaginatedResponse,
@@ -19,12 +18,6 @@ export interface AdminUser {
   apellido: string;
 }
 
-interface AdminLoginResponse {
-  admin: AdminUser;
-  accessToken: string;
-  refreshToken: string;
-}
-
 export interface DashboardStats {
   totalStudents: number;
   enrolledStudents: number;
@@ -38,16 +31,15 @@ export interface DashboardStats {
 }
 
 export async function login(email: string, password: string): Promise<{ admin: AdminUser }> {
-  const res = await api.post<ApiResponse<AdminLoginResponse>>("/api/admin/auth/login", { email, password });
-  saveTokens("admin", { accessToken: res.data.accessToken, refreshToken: res.data.refreshToken });
+  const res = await api.post<ApiResponse<{ admin: AdminUser }>>("/api/admin/auth/login", { email, password });
   return { admin: res.data.admin };
 }
 
 export async function logout(): Promise<void> {
   try {
     await api.post<ApiResponse<null>>("/api/admin/auth/logout", {});
-  } finally {
-    clearTokens("admin");
+  } catch {
+    // Las cookies se limpian en el backend; si falla la llamada, igual navegamos.
   }
 }
 

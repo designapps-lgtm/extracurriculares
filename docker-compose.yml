@@ -24,10 +24,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-extracurriculares}:${POSTGRES_PASSWORD:-secret_password}@postgres:5432/${POSTGRES_DB:-extracurriculares}?schema=public
+      DATABASE_URL: ${DATABASE_URL:-postgresql://extracurriculares:secret_password@postgres:5432/extracurriculares?schema=public}
       PORT: 3000
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV:-development}
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       ACCESS_TOKEN_EXPIRES_IN: ${ACCESS_TOKEN_EXPIRES_IN:-15m}
       REFRESH_TOKEN_EXPIRES_IN_DAYS: ${REFRESH_TOKEN_EXPIRES_IN_DAYS:-7}

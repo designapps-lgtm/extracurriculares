@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config";
 import prisma from "../config/prisma";
+import { ADMIN_ACCESS_COOKIE } from "../utils/authCookies";
 
 export interface AuthPayload {
   adminId: string;
@@ -23,7 +24,7 @@ export function extractBearerToken(req: Request): string | null {
 }
 
 export function authenticate(req: Request, res: Response, next: NextFunction) {
-  const token = extractBearerToken(req);
+  const token = extractBearerToken(req) || req.cookies?.[ADMIN_ACCESS_COOKIE] || null;
   if (!token) {
     res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "No autenticado" } });
     return;

@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { config } from "./config";
 import { errorHandler, notFound } from "./middlewares/errorHandler";
@@ -32,6 +33,13 @@ import { authenticateTeacher, requireActiveTeacher } from "./middlewares/teacher
 
 const app = express();
 
+// Detrás de un reverse proxy (Render) el IP real del cliente viene en
+// X-Forwarded-For. Sin "trust proxy", req.ip es siempre el proxy → el rate
+// limiter cuenta a todos los usuarios como una sola IP y bloquea la app entera.
+if (config.nodeEnv === "production") {
+  app.set("trust proxy", 1);
+}
+
 // Global middleware
 app.use(helmet());
 app.disable("x-powered-by");
@@ -45,18 +53,19 @@ function corsOrigin(origin: string | undefined, callback: (err: Error | null, al
   callback(null, isAllowed);
 }
 
-app.use(cors({ origin: corsOrigin }));
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 app.use(requestLogger);
 
-// Public routes
-app.use("/api", apiLimiter, healthRouter);
-app.use("/api/students", studentRouter);
-app.use("/api/disciplines", disciplineRouter);
-app.use("/api/teachers", teacherRouter);
-app.use("/api/grades", gradeRouter);
-app.use("/api/assignments", assignmentRouter);
-app.use("/api/schedules", scheduleRouter);
+// Public routes (apiLimiter solo en endpoints públicos sin autenticación)
+app.use("/api", healthRouter);
+app.use("/api/students", apiLimiter, studentRouter);
+app.use("/api/disciplines", apiLimiter, disciplineRouter);
+app.use("/api/teachers", apiLimiter, teacherRouter);
+app.use("/api/grades", apiLimiter, gradeRouter);
+app.use("/api/assignments", apiLimiter, assignmentRouter);
+app.use("/api/schedules", apiLimiter, scheduleRouter);
 
 // Admin auth (login/logout don't need auth)
 app.use("/api/admin/auth", authLimiter, adminAuthRouter);
