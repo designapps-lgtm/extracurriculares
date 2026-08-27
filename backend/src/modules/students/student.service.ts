@@ -25,11 +25,15 @@ export async function getStudents(query: StudentQuery, pagination: PaginationPar
   }
 
   if (disciplina) {
-    where.studentSchedules = { some: { codigoDisciplina: disciplina } };
+    // Si viene inscrito=false junto con disciplina, se ignora la disciplina:
+    // un estudiante sin inscripciones no puede filtrarse por disciplina.
+    if (inscrito !== "false") {
+      where.studentSchedules = { some: { codigoDisciplina: disciplina } };
+    }
   }
 
   if (inscrito === "true") {
-    where.studentSchedules = { some: {} };
+    where.studentSchedules = disciplina ? where.studentSchedules : { some: {} };
   } else if (inscrito === "false") {
     where.studentSchedules = { none: {} };
   }

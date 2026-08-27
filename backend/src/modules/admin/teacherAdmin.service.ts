@@ -1,8 +1,19 @@
 import { Request, Response } from "express";
-import bcrypt from "bcryptjs";
 import prisma from "../../config/prisma";
 import { AppError } from "../../middlewares/errorHandler";
 import { Prisma } from "@prisma/client";
+
+const teacherAdminSelect = {
+  idProfesor: true,
+  codigoProfesor: true,
+  nombre: true,
+  apellido: true,
+  correo: true,
+  fotoUrl: true,
+  estado: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 export async function getTeachers(req: Request, res: Response) {
   const page = parseInt((req.query.page as string) || "1");
@@ -21,7 +32,7 @@ export async function getTeachers(req: Request, res: Response) {
   const [data, total] = await Promise.all([
     prisma.teacher.findMany({
       where,
-      include: { _count: { select: { assignments: true } } },
+      select: { ...teacherAdminSelect, _count: { select: { assignments: true } } },
       skip: (page - 1) * limit,
       take: limit,
       orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
@@ -39,7 +50,7 @@ export async function getTeachers(req: Request, res: Response) {
 export async function getTeacherById(req: Request, res: Response) {
   const teacher = await prisma.teacher.findUnique({
     where: { idProfesor: req.params.id },
-    include: { _count: { select: { assignments: true } } },
+    select: { ...teacherAdminSelect, _count: { select: { assignments: true } } },
   });
 
   if (!teacher) throw new AppError(404, "TEACHER_NOT_FOUND", "No se encontró el profesor");
@@ -55,6 +66,7 @@ export async function createTeacher(req: Request, res: Response) {
 
   const teacher = await prisma.teacher.create({
     data: { nombre, apellido, correo, fotoUrl },
+    select: teacherAdminSelect,
   });
 
   res.status(201).json({ success: true, data: teacher });
@@ -86,6 +98,7 @@ export async function updateTeacher(req: Request, res: Response) {
       ...(fotoUrl !== undefined && { fotoUrl }),
       ...(estado !== undefined && { estado }),
     },
+    select: teacherAdminSelect,
   });
 
   res.json({ success: true, data: updated });
@@ -106,25 +119,4 @@ export async function deleteTeacher(req: Request, res: Response) {
 
   await prisma.teacher.delete({ where: { idProfesor: id } });
   res.json({ success: true, data: { message: "Profesor eliminado" } });
-}
-
-export async function resetTeacherPassword(req: Request, res: Response) {
-  const { id } = req.params;
-  const { password } = req.body;
-
-  if (!password || password.length < 6) {
-    throw new AppError(400, "VALIDATION_ERROR", "La contraseña debe tener al menos 6 caracteres");
-  }
-
-  const teacher = await prisma.teacher.findUnique({ where: { idProfesor: id } });
-  if (!teacher) throw new AppError(404, "TEACHER_NOT_FOUND", "No se encontró el profesor");
-
-  const passwordHash = await bcrypt.hash(password, 10);
-
-  await prisma.teacher.update({
-    where: { idProfesor: id },
-    data: { passwordHash },
-  });
-
-  res.json({ success: true, data: { message: "Contraseña actualizada" } });
 }

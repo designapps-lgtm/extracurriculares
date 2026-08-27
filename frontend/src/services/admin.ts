@@ -146,7 +146,3 @@ export async function resetAdminPassword(id: string, password: string) {
 export async function deleteAdminUser(id: string) {
   return api.delete<{ success: boolean; data: any }>(`/api/admin/admins/${id}`);
 }
-
-export async function resetTeacherPassword(id: string, password: string) {
-  return api.patch<{ success: boolean; data: any }>(`/api/admin/teachers/${id}/reset-password`, { password });
-}

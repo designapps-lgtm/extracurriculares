@@ -14,6 +14,18 @@ const assignmentInclude = {
   },
 };
 
+const teacherSelect = {
+  idProfesor: true,
+  codigoProfesor: true,
+  nombre: true,
+  apellido: true,
+  correo: true,
+  fotoUrl: true,
+  estado: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 export async function getTeachers(query: TeacherQuery, pagination: PaginationParams): Promise<PaginatedResult<unknown>> {
   const where: Prisma.TeacherWhereInput = {};
 
@@ -28,7 +40,7 @@ export async function getTeachers(query: TeacherQuery, pagination: PaginationPar
   const [data, total] = await Promise.all([
     prisma.teacher.findMany({
       where,
-      include: { _count: { select: { assignments: true } } },
+      select: { ...teacherSelect, _count: { select: { assignments: true } } },
       skip: (pagination.page - 1) * pagination.limit,
       take: pagination.limit,
       orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
@@ -42,7 +54,7 @@ export async function getTeachers(query: TeacherQuery, pagination: PaginationPar
 export async function getTeacherById(id: string) {
   const teacher = await prisma.teacher.findUnique({
     where: { idProfesor: id },
-    include: { _count: { select: { assignments: true } } },
+    select: { ...teacherSelect, _count: { select: { assignments: true } } },
   });
 
   if (!teacher) {

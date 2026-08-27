@@ -11,7 +11,6 @@ import {
   getAdminDisciplines,
   getAdminGrades,
   getAdminSchedules,
-  resetTeacherPassword,
 } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
 import { createPortal } from "react-dom";
@@ -288,25 +287,6 @@ export default function AdminTeachers() {
     });
   };
 
-  const handleResetPassword = async (teacher: Teacher) => {
-    const pwd = await notify.prompt(
-      "Restablecer contraseña",
-      `Nueva contraseña para ${teacher.nombre} ${teacher.apellido}:`,
-      { inputType: "password", inputPlaceholder: "Mínimo 6 caracteres" },
-    );
-    if (pwd === null) return;
-    if (pwd.length < 6) {
-      notify.info("La contraseña debe tener al menos 6 caracteres");
-      return;
-    }
-    try {
-      await resetTeacherPassword(teacher.idProfesor, pwd);
-      notify.success("Contraseña actualizada");
-    } catch (err: any) {
-      notify.error(err.message || "Error al actualizar contraseña");
-    }
-  };
-
   const toggleSchedule = (idHorario: string) => {
     setAssignForm((prev) => ({
       ...prev,
@@ -501,12 +481,6 @@ export default function AdminTeachers() {
                       className="text-xs font-medium text-surface-600 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-200"
                     >
                       Editar
-                    </button>
-                    <button
-                      onClick={() => handleResetPassword(t)}
-                      className="text-xs font-medium text-amber-600 hover:text-amber-700"
-                    >
-                      Contraseña
                     </button>
                     <button
                       onClick={() => handleToggleStatus(t)}

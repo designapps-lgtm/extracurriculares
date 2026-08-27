@@ -16,10 +16,14 @@ export async function createAdmin(req: Request, res: Response) {
 
   if (!email) throw new AppError(400, "VALIDATION_ERROR", "Email es requerido");
 
+  if (!password || password.length < 6) {
+    throw new AppError(400, "VALIDATION_ERROR", "La contraseña debe tener al menos 6 caracteres");
+  }
+
   const existing = await prisma.adminUser.findUnique({ where: { email } });
   if (existing) throw new AppError(409, "DUPLICATE_EMAIL", "Ya existe un admin con ese email");
 
-  const hash = await bcrypt.hash(password || "admin123", 12);
+  const hash = await bcrypt.hash(password, 12);
   const admin = await prisma.adminUser.create({
     data: {
       email,
