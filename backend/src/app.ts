@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { config } from "./config";
 import { errorHandler, notFound } from "./middlewares/errorHandler";
@@ -36,9 +35,8 @@ const app = express();
 // Global middleware
 app.use(helmet());
 app.disable("x-powered-by");
-app.use(cors({ origin: config.frontendUrl, credentials: true }));
+app.use(cors({ origin: config.frontendUrl }));
 app.use(express.json());
-app.use(cookieParser());
 app.use(requestLogger);
 
 // Public routes

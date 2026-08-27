@@ -16,13 +16,14 @@ declare global {
   }
 }
 
-export const ADMIN_AUTH_COOKIES = {
-  access: "admin_access",
-  refresh: "admin_refresh",
-} as const;
+export function extractBearerToken(req: Request): string | null {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith("Bearer ")) return null;
+  return header.slice(7).trim() || null;
+}
 
 export function authenticate(req: Request, res: Response, next: NextFunction) {
-  const token = req.cookies?.admin_access;
+  const token = extractBearerToken(req);
   if (!token) {
     res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "No autenticado" } });
     return;

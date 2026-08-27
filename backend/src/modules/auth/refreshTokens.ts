@@ -1,15 +1,8 @@
-import { Request, Response } from "express";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import prisma from "../../config/prisma";
 import { config } from "../../config";
-import { generateRefreshToken, hashRefreshToken, parseDurationToMs, daysToMs } from "../../utils/tokens";
-import {
-  setAccessCookie,
-  setRefreshCookie,
-  clearAuthCookies,
-  AuthCookieNames,
-} from "../../utils/authCookies";
+import { generateRefreshToken, hashRefreshToken, daysToMs } from "../../utils/tokens";
 import { AppError } from "../../middlewares/errorHandler";
 
 interface RefreshModel {
@@ -22,20 +15,29 @@ interface RefreshModel {
 interface RefreshServiceOptions {
   userIdField: "teacherId" | "adminId";
   refreshModel: any;
-  cookieNames: AuthCookieNames;
   buildAccessToken: (identity: { id: string; email: string }) => string;
+}
+
+export interface IssueResult {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface RotateResult {
+  userId: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
 export function createRefreshService({
   userIdField,
   refreshModel,
-  cookieNames,
   buildAccessToken,
 }: RefreshServiceOptions) {
   const userIdWhere = (userId: string) =>
     userIdField === "teacherId" ? { teacherId: userId } : { adminId: userId };
 
-  const issue = async (res: Response, userId: string, email: string) => {
+  const issue = async (userId: string, email: string): Promise<IssueResult> => {
     const token = generateRefreshToken();
     const familyId = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + daysToMs(config.refreshTokenExpiresInDays));
@@ -50,12 +52,10 @@ export function createRefreshService({
     });
 
     const accessToken = buildAccessToken({ id: userId, email });
-    setAccessCookie(res, cookieNames, accessToken, parseDurationToMs(config.accessTokenExpiresIn));
-    setRefreshCookie(res, cookieNames, token, daysToMs(config.refreshTokenExpiresInDays));
+    return { accessToken, refreshToken: token };
   };
 
-  const rotate = async (req: Request, res: Response) => {
-    const presented = req.cookies?.[cookieNames.refresh];
+  const rotate = async (presented: string, email: string): Promise<RotateResult> => {
     if (!presented) {
       throw new AppError(401, "REFRESH_REQUIRED", "No hay sesión activa para renovar");
     }
@@ -82,7 +82,6 @@ export function createRefreshService({
     }
 
     const userId = record[userIdField];
-    const email = record.email ?? "";
 
     const newToken = generateRefreshToken();
     const newExpiresAt = new Date(Date.now() + daysToMs(config.refreshTokenExpiresInDays));
@@ -101,26 +100,20 @@ export function createRefreshService({
     });
 
     const accessToken = buildAccessToken({ id: userId, email });
-    setAccessCookie(res, cookieNames, accessToken, parseDurationToMs(config.accessTokenExpiresIn));
-    setRefreshCookie(res, cookieNames, newToken, daysToMs(config.refreshTokenExpiresInDays));
-
-    return userId;
+    return { userId, accessToken, refreshToken: newToken };
   };
 
-  const revoke = async (req: Request, res: Response) => {
-    const presented = req.cookies?.[cookieNames.refresh];
-    if (presented) {
-      const record = await refreshModel.findUnique({
-        where: { tokenHash: hashRefreshToken(presented) },
+  const revoke = async (presented: string) => {
+    if (!presented) return;
+    const record = await refreshModel.findUnique({
+      where: { tokenHash: hashRefreshToken(presented) },
+    });
+    if (record) {
+      await refreshModel.updateMany({
+        where: { familyId: record.familyId },
+        data: { revokedAt: new Date() },
       });
-      if (record) {
-        await refreshModel.updateMany({
-          where: { familyId: record.familyId },
-          data: { revokedAt: new Date() },
-        });
-      }
     }
-    clearAuthCookies(res, cookieNames);
   };
 
   return { issue, rotate, revoke };

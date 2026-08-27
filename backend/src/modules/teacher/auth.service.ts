@@ -3,16 +3,11 @@ import jwt from "jsonwebtoken";
 import prisma from "../../config/prisma";
 import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
-import { TEACHER_AUTH_COOKIES } from "../../middlewares/teacherAuth";
 import { createRefreshService } from "../../modules/auth/refreshTokens";
 
 const teacherRefresh = createRefreshService({
   userIdField: "teacherId",
   refreshModel: prisma.teacherRefreshToken as any,
-  cookieNames: {
-    access: TEACHER_AUTH_COOKIES.access,
-    refresh: TEACHER_AUTH_COOKIES.refresh,
-  },
   buildAccessToken: ({ id, email }) =>
     jwt.sign({ teacherId: id, email }, config.jwtSecret, {
       expiresIn: config.accessTokenExpiresIn,
@@ -35,11 +30,16 @@ export async function teacherLogin(req: Request, res: Response) {
     throw new AppError(403, "TEACHER_INACTIVE", "La cuenta está desactivada");
   }
 
-  await teacherRefresh.issue(res, teacher.idProfesor, teacher.correo || "");
+  const { accessToken, refreshToken } = await teacherRefresh.issue(
+    teacher.idProfesor,
+    teacher.correo || ""
+  );
 
   res.json({
     success: true,
     data: {
+      accessToken,
+      refreshToken,
       teacher: {
         idProfesor: teacher.idProfesor,
         nombre: teacher.nombre,
@@ -51,9 +51,19 @@ export async function teacherLogin(req: Request, res: Response) {
 }
 
 export async function teacherRefreshSession(req: Request, res: Response) {
-  const teacherId = await teacherRefresh.rotate(req, res);
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    throw new AppError(401, "REFRESH_REQUIRED", "No hay sesión activa para renovar");
+  }
+
+  const { userId, accessToken, refreshToken: newRefreshToken } = await teacherRefresh.rotate(
+    refreshToken,
+    ""
+  );
+
   const teacher = await prisma.teacher.findUnique({
-    where: { idProfesor: teacherId },
+    where: { idProfesor: userId },
     select: { idProfesor: true, nombre: true, apellido: true, correo: true, estado: true },
   });
 
@@ -64,6 +74,8 @@ export async function teacherRefreshSession(req: Request, res: Response) {
   res.json({
     success: true,
     data: {
+      accessToken,
+      refreshToken: newRefreshToken,
       teacher: {
         idProfesor: teacher.idProfesor,
         nombre: teacher.nombre,
@@ -75,7 +87,8 @@ export async function teacherRefreshSession(req: Request, res: Response) {
 }
 
 export async function teacherLogout(req: Request, res: Response) {
-  await teacherRefresh.revoke(req, res);
+  const { refreshToken } = req.body;
+  await teacherRefresh.revoke(refreshToken);
   res.json({ success: true, data: { message: "Sesión cerrada" } });
 }
 
