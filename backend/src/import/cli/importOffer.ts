@@ -94,8 +94,8 @@ const OFFER: OfferEntry[] = [
   // ========== PRIMARIA (hoja PRIMARIA) ==========
 
   // Entrenamiento olimpiadas Matemáticas 4-5 (Lun 3:15-5:15)
-  { teacher: "Alejandra Ramírez",   discipline: "XC_45_OlimpiadasMat",  grade: "4",  scheduleKeys: ["S12"] },
-  { teacher: "Alejandra Ramírez",   discipline: "XC_45_OlimpiadasMat",  grade: "5",  scheduleKeys: ["S12"] },
+  { teacher: "Alejandra Ramírez",   discipline: "XC_45_OlympMath",  grade: "4",  scheduleKeys: ["S12"] },
+  { teacher: "Alejandra Ramírez",   discipline: "XC_45_OlympMath",  grade: "5",  scheduleKeys: ["S12"] },
   // Artes plásticas 1-5 (Lun 3:15-5:15) — 3 profesores × 5 grados
   ...["1", "2", "3", "4", "5"].flatMap((g) => [
     { teacher: "Liliana Niño",      discipline: "XC_EL_ArtesPlasticas", grade: g, scheduleKeys: ["S12"] },
@@ -173,8 +173,8 @@ const OFFER: OfferEntry[] = [
   // Banda Fireworks 7° (Mar 3:15-5:15)
   { teacher: "Mauricio Porras",     discipline: "XC_SEC_BandaFW",       grade: "7",  scheduleKeys: ["S4"] },
   // Olimpiadas Matemáticas 6° y 12° (Mar 3:15-5:15) — solo grados 6 y 12
-  { teacher: "Alejandra Ramírez", discipline: "XC_SEC_OlimpiadasMat", grade: "6",  scheduleKeys: ["S4"] },
-  { teacher: "Alejandra Ramírez", discipline: "XC_SEC_OlimpiadasMat", grade: "12", scheduleKeys: ["S4"] },
+  { teacher: "Alejandra Ramírez", discipline: "XC_SEC_OlympMath", grade: "6",  scheduleKeys: ["S4"] },
+  { teacher: "Alejandra Ramírez", discipline: "XC_SEC_OlympMath", grade: "12", scheduleKeys: ["S4"] },
   // MS Fútbol 6-8 (Lun 3:30-5:30, Mié 2:20-4:20, Jue 3:30-5:30, Sáb partidos)
   ...["6", "7", "8"].map((g) => (
     { teacher: "Luis Eduardo Martínez", discipline: "XC_MS_Futbol_M",   grade: g, scheduleKeys: ["S8", "S10", "S9", "S11"] }
