@@ -35,7 +35,17 @@ const app = express();
 // Global middleware
 app.use(helmet());
 app.disable("x-powered-by");
-app.use(cors({ origin: config.frontendUrl }));
+// CORS: permite el frontend de producción (FRONTEND_URL) y cualquier
+// preview de Vercel (*.vercel.app) sin barra final, para que los deploy
+// preview no rompan el login entre commits.
+function corsOrigin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+  const allowed = [config.frontendUrl, "http://localhost:5173"];
+  const isVercelPreview = typeof origin === "string" && /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin);
+  const isAllowed = !origin || allowed.some((a) => a.replace(/\/$/, "") === origin.replace(/\/$/, "") ) || isVercelPreview;
+  callback(null, isAllowed);
+}
+
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 app.use(requestLogger);
 
