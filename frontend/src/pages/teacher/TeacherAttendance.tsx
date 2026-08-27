@@ -2,20 +2,13 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getAttendanceList, saveAttendance } from "../../services/teacher";
 import { useNotify } from "../../components/common/Notify";
-
-interface Student {
-  codigoEstudiante: string;
-  nombre: string;
-  apellido: string;
-  grupo: string | null;
-  estado: string;
-}
+import type { AttendanceStudent as Student, Schedule, Assignment } from "../../types";
 
 export default function TeacherAttendance() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const [assignment, setAssignment] = useState<any>(null);
-  const [schedule, setSchedule] = useState<any>(null);
+  const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

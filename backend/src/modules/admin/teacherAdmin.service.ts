@@ -77,6 +77,15 @@ export async function updateTeacher(id: string, data: {
 
   const teacher = await getOr404(prisma.teacher.findUnique({ where: { idProfesor: id } }), "TEACHER_NOT_FOUND", "No se encontró el profesor");
 
+  if (estado === "inactivo" && teacher.estado !== "inactivo") {
+    const activeAssignments = await prisma.extracurricularAssignment.count({
+      where: { idProfesor: id, estado: "activo" },
+    });
+    if (activeAssignments > 0) {
+      throw new AppError(400, "HAS_ACTIVE_ASSIGNMENTS", "No se puede desactivar un profesor con asignaciones activas");
+    }
+  }
+
   const updated = await prisma.teacher.update({
     where: { idProfesor: id },
     data: {

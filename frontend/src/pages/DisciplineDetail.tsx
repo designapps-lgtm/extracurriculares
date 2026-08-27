@@ -5,17 +5,8 @@ import {
   getDisciplineStudents,
 } from "../services/disciplines";
 import { Loading, ErrorMessage, EmptyState } from "../components/common/States";
+import { Avatar } from "../components/common/Avatar";
 import type { DisciplineDetail, Student } from "../types";
-
-const AVATAR_COLORS = [
-  "bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300",
-  "bg-terracotta-100 text-terracotta-700 dark:bg-terracotta-900 dark:text-terracotta-300",
-  "bg-surface-200 text-surface-700 dark:bg-surface-700 dark:text-surface-200",
-];
-
-function hashString(str: string) {
-  return str.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-}
 
 export default function DisciplineDetail() {
   const { codigo } = useParams<{ codigo: string }>();
@@ -143,27 +134,25 @@ export default function DisciplineDetail() {
           </h2>
           {teachers.length > 0 ? (
             <ul className="space-y-2.5">
-              {teachers.map((t) => {
-                const colorIndex = hashString(t.id) % AVATAR_COLORS.length;
-                return (
+              {teachers.map((t) => (
                   <li key={t.id}>
                     <Link
                       to={isAdmin ? `/admin/teachers-view/${t.id}` : `/teachers/${t.id}`}
                       className="flex items-center gap-3 p-2 -m-2 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors group"
                     >
-                      <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-semibold text-xs ${AVATAR_COLORS[colorIndex]}`}
+                      <Avatar
+                        seed={t.id}
+                        className="w-8 h-8 rounded-lg text-xs"
                       >
                         {t.nombre.charAt(0)}
                         {t.apellido.charAt(0)}
-                      </div>
+                      </Avatar>
                       <span className="text-sm text-surface-700 dark:text-surface-300 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
                         {t.nombre} {t.apellido}
                       </span>
                     </Link>
                   </li>
-                );
-              })}
+              ))}
             </ul>
           ) : (
             <p className="text-sm text-surface-400 dark:text-surface-500">

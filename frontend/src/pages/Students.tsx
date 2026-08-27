@@ -5,20 +5,9 @@ import { getDisciplines as getDisciplineList } from "../services/disciplines";
 import { getGrades } from "../services/grades";
 import { useDebounce } from "../hooks";
 import { Loading, ErrorMessage, EmptyState } from "../components/common/States";
+import { Pagination } from "../components/common/Pagination";
+import { Avatar } from "../components/common/Avatar";
 import type { Student, Discipline, GradeWithCount } from "../types";
-
-const AVATAR_COLORS = [
-  "bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300",
-  "bg-terracotta-100 text-terracotta-700 dark:bg-terracotta-900 dark:text-terracotta-300",
-  "bg-surface-200 text-surface-700 dark:bg-surface-700 dark:text-surface-200",
-];
-
-function getAvatarColor(id: string) {
-  const index =
-    id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) %
-    AVATAR_COLORS.length;
-  return AVATAR_COLORS[index];
-}
 
 export default function Students() {
   const location = useLocation();
@@ -211,14 +200,13 @@ export default function Students() {
                 >
                   <div className="flex items-center gap-4 px-5 py-4">
                     {/* Avatar */}
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-semibold text-sm ${getAvatarColor(student.codigoEstudiante)} ${
-                        enrolled ? "ring-2 ring-brand-100 dark:ring-brand-900" : ""
-                      }`}
+                    <Avatar
+                      seed={student.codigoEstudiante}
+                      className={enrolled ? "ring-2 ring-brand-100 dark:ring-brand-900" : ""}
                     >
                       {student.nombre.charAt(0)}
                       {student.apellido.charAt(0)}
-                    </div>
+                    </Avatar>
 
                     {/* Info */}
                     <div className="min-w-0 flex-1">
@@ -263,53 +251,12 @@ export default function Students() {
           </div>
 
           {/* Pagination */}
-          {meta.totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 pt-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="btn-secondary"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-                Anterior
-              </button>
-              <span className="text-sm text-surface-500 dark:text-surface-400 font-medium tabular-nums">
-                {meta.page} / {meta.totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                disabled={page === meta.totalPages}
-                className="btn-secondary"
-              >
-                Siguiente
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            variant="centered"
+          />
         </>
       )}
     </div>

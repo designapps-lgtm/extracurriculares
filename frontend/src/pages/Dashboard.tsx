@@ -5,6 +5,7 @@ import { getDisciplines } from "../services/disciplines";
 import { getTeachers } from "../services/teachers";
 import { useDebounce } from "../hooks";
 import { Loading, ErrorMessage } from "../components/common/States";
+import { Avatar } from "../components/common/Avatar";
 import type { Student, Discipline, TeacherWithCount } from "../types";
 
 export default function Dashboard() {
@@ -398,9 +399,11 @@ export default function Dashboard() {
               >
                 <div className="flex items-center gap-3.5">
                   <Avatar
-                    initials={`${t.nombre.charAt(0)}${t.apellido.charAt(0)}`}
                     seed={t.idProfesor}
-                  />
+                  >
+                    {t.nombre.charAt(0)}
+                    {t.apellido.charAt(0)}
+                  </Avatar>
                   <div className="min-w-0">
                     <p className="font-medium text-surface-900 dark:text-surface-100 text-sm truncate">
                       {t.nombre} {t.apellido}
@@ -642,21 +645,3 @@ function QuickLink({
   );
 }
 
-const AVATAR_COLORS = [
-  "bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300",
-  "bg-terracotta-100 text-terracotta-700 dark:bg-terracotta-900 dark:text-terracotta-300",
-  "bg-surface-200 text-surface-700 dark:bg-surface-700 dark:text-surface-200",
-];
-
-function Avatar({ initials, seed }: { initials: string; seed: string }) {
-  const colorIndex =
-    seed.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) %
-    AVATAR_COLORS.length;
-  return (
-    <div
-      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-semibold text-sm ${AVATAR_COLORS[colorIndex]}`}
-    >
-      {initials}
-    </div>
-  );
-}

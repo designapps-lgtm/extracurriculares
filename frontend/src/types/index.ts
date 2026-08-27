@@ -47,6 +47,7 @@ export interface Teacher {
 }
 
 export interface Schedule {
+  idHorario: string;
   diaSemana: string;
   horaInicio: string;
   horaFin: string;
@@ -134,6 +135,8 @@ export interface GradeWithCount extends Grade {
 
 export interface Assignment {
   idAsignacion: string;
+  codigoDisciplina: string;
+  idGrado: number;
   teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
   discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
   grade: Pick<Grade, "idGrado" | "nombre">;
@@ -142,4 +145,36 @@ export interface Assignment {
   }[];
   esPrincipal: boolean;
   estado: string;
+}
+
+export interface TeacherClass {
+  idAsignacion: string;
+  discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
+  grade: Pick<Grade, "idGrado" | "nombre">;
+  schedule: Schedule;
+  enrolledCount: number;
+  sessionId: string | null;
+  sessionEstado: string | null;
+  attendanceCount: number;
+}
+
+export interface TeacherClassesResponse {
+  teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
+  classes: TeacherClass[];
+  dayName: string;
+  date: string;
+}
+
+export interface AttendanceStudent {
+  codigoEstudiante: string;
+  nombre: string;
+  apellido: string;
+  grupo: string | null;
+  estado: string;
+}
+
+export interface AttendanceResponse {
+  assignment: Assignment;
+  schedule: Schedule;
+  students: AttendanceStudent[];
 }

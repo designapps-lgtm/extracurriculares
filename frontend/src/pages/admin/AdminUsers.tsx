@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { getAdminUsers, createAdminUser, updateAdminUser, resetAdminPassword, deleteAdminUser, type AdminUserEntry } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
+import { Loading } from "../../components/common/States";
 
 export default function AdminUsers() {
   const [admins, setAdmins] = useState<AdminUserEntry[]>([]);
@@ -76,9 +77,7 @@ export default function AdminUsers() {
 
       <div className="card">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full" />
-          </div>
+          <Loading />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

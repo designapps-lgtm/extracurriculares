@@ -1,5 +1,10 @@
 const BASE = "http://localhost:3000/api";
 
+// Las credenciales reales vienen por env (ver plan FASE 5.1); el fallback
+// nunca funciona contra la DB de producción, solo para desarrollo limpio.
+const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || "admin@test.local";
+const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || "test-password";
+
 let passed = 0;
 let failed = 0;
 let total = 0;
@@ -20,7 +25,7 @@ async function login(): Promise<string> {
   const res = await req("/admin/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "senatics@gi.edu.co", password: "admin123" }),
+    body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
   });
   // Extract access token from set-cookie header
   const setCookie = res.headers.get("set-cookie");
@@ -42,10 +47,10 @@ async function run() {
   const loginRes = await req("/admin/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "senatics@gi.edu.co", password: "admin123" }),
+    body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
   });
   assert("login authorized → 200", loginRes.status === 200);
-  assert("login returns admin", loginRes.body.data?.admin?.email === "senatics@gi.edu.co");
+  assert("login returns admin", loginRes.body.data?.admin?.email === ADMIN_EMAIL);
 
   // 2. Login wrong password
   const loginFail = await req("/admin/auth/login", {
@@ -94,7 +99,7 @@ async function run() {
   // 6. /me endpoint
   const me = await req("/admin/auth/me", { headers: authHeaders });
   assert("GET /me → 200", me.status === 200);
-  assert("me returns email", me.body.data?.email === "senatics@gi.edu.co");
+  assert("me returns email", me.body.data?.email === ADMIN_EMAIL);
 
   // 7. /me without token
   const meNoAuth = await req("/admin/auth/me");
@@ -352,13 +357,13 @@ async function run() {
   // 31. List admins
   const admins = await req("/admin/admins", { headers: authHeaders });
   assert("list admins → 200", admins.status === 200);
-  assert("has senatics", admins.body.data?.some((a: any) => a.email === "senatics@gi.edu.co"));
+  assert(`has ${ADMIN_EMAIL}`, admins.body.data?.some((a: any) => a.email === ADMIN_EMAIL));
 
   // 32. Create admin
   const newAdmin = await req("/admin/admins", {
     method: "POST",
     headers: { ...authHeaders, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "test-admin@gi.edu.co", nombre: "Test", apellido: "Admin" }),
+    body: JSON.stringify({ email: "test-admin@gi.edu.co", nombre: "Test", apellido: "Admin", password: "test-pass-123" }),
   });
   assert("create admin → 201", newAdmin.status === 201);
   assert("has id", newAdmin.body.data?.id !== undefined);
@@ -368,7 +373,7 @@ async function run() {
   const dupAdmin = await req("/admin/admins", {
     method: "POST",
     headers: { ...authHeaders, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "test-admin@gi.edu.co" }),
+    body: JSON.stringify({ email: "test-admin@gi.edu.co", password: "test-pass-123" }),
   });
   assert("duplicate email → 409", dupAdmin.status === 409);
 
@@ -390,7 +395,7 @@ async function run() {
   assert("reset password → 200", resetPass.status === 200);
 
   // 36. Can't disable yourself
-  const meAdmin = admins.body.data.find((a: any) => a.email === "senatics@gi.edu.co");
+  const meAdmin = admins.body.data.find((a: any) => a.email === ADMIN_EMAIL);
   const disableSelf = await req(`/admin/admins/${meAdmin.id}`, {
     method: "PATCH",
     headers: { ...authHeaders, "Content-Type": "application/json" },

@@ -2,17 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getTeacherClasses, teacherLogout, startSession } from "../../services/teacher";
 import { useNotify } from "../../components/common/Notify";
-
-interface ClassItem {
-  idAsignacion: string;
-  discipline: { codigoDisciplina: string; nombre: string };
-  grade: { idGrado: number; nombre: string };
-  schedule: { idHorario: string; diaSemana: string; horaInicio: string; horaFin: string; aula: string | null };
-  enrolledCount: number;
-  sessionId: string | null;
-  sessionEstado: string | null;
-  attendanceCount: number;
-}
+import type { TeacherClass } from "../../types";
 
 const DIAS_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 const DIAS_ES: Record<string, string> = {
@@ -22,7 +12,7 @@ const DIAS_ES: Record<string, string> = {
 
 export default function TeacherDashboard() {
   const [teacher, setTeacher] = useState<{ idProfesor: string; nombre: string; apellido: string } | null>(null);
-  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [classes, setClasses] = useState<TeacherClass[]>([]);
   const [dayName, setDayName] = useState("");
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(true);
@@ -32,7 +22,7 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     getTeacherClasses()
-      .then((data: any) => {
+      .then((data) => {
         setTeacher(data.teacher);
         setClasses(data.classes);
         setDayName(data.dayName);
@@ -46,7 +36,7 @@ export default function TeacherDashboard() {
       .finally(() => setLoading(false));
   }, [navigate]);
 
-  const handleStartSession = async (cls: ClassItem) => {
+  const handleStartSession = async (cls: TeacherClass) => {
     setStarting(`${cls.idAsignacion}-${cls.schedule.idHorario}`);
     try {
       const session = await startSession({
@@ -78,7 +68,7 @@ export default function TeacherDashboard() {
     const day = cls.schedule.diaSemana;
     (acc[day] = acc[day] || []).push(cls);
     return acc;
-  }, {} as Record<string, ClassItem[]>);
+  }, {} as Record<string, TeacherClass[]>);
 
   const sortedDays = DIAS_ORDER.filter((d) => grouped[d]);
   const sortedDaysReordered = [

@@ -6,11 +6,6 @@ export interface ApiRequestOptions {
   [key: string]: unknown;
 }
 
-type RefreshContext = {
-  url: string;
-  attempts: number;
-};
-
 function isAuthPath(path: string): boolean {
   return path.startsWith("/api/admin/auth") || path.startsWith("/api/teacher/auth");
 }
@@ -21,12 +16,7 @@ function resolveRefreshUrl(path: string): string | null {
   return null;
 }
 
-function isRefreshing(path: string): boolean {
-  return path === "/api/admin/auth/refresh" || path === "/api/teacher/auth/refresh";
-}
-
 let pendingRefresh: { url: string; promise: Promise<boolean> } | null = null;
-const refreshQueue: (() => void)[] = [];
 
 function runRefresh(url: string): Promise<boolean> {
   if (pendingRefresh && pendingRefresh.url === url) {
@@ -46,7 +36,6 @@ function runRefresh(url: string): Promise<boolean> {
     }
   })().finally(() => {
     pendingRefresh = null;
-    refreshQueue.splice(0).forEach((cb) => cb());
   });
 
   pendingRefresh = { url, promise };

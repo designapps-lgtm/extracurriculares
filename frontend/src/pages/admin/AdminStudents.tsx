@@ -1,24 +1,9 @@
 import { useState, useEffect } from "react";
 import { getAdminStudents, updateAdminStudent, getAdminGrades } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
-
-interface Student {
-  codigoEstudiante: string;
-  nombre: string;
-  apellido: string;
-  idGrado: number;
-  grupo: string | null;
-  correo: string | null;
-  fotoUrl: string | null;
-  estado: string;
-  grade: { idGrado: number; nombre: string };
-  studentSchedules: { codigoDisciplina: string }[];
-}
-
-interface Grade {
-  idGrado: number;
-  nombre: string;
-}
+import { Pagination } from "../../components/common/Pagination";
+import { Loading } from "../../components/common/States";
+import type { Student, Grade } from "../../types";
 
 export default function AdminStudents() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -127,9 +112,7 @@ export default function AdminStudents() {
       {/* Table */}
       <div className="card overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full" />
-          </div>
+          <Loading />
         ) : students.length === 0 ? (
           <div className="text-center py-12 text-surface-500">No se encontraron estudiantes</div>
         ) : (
@@ -174,29 +157,12 @@ export default function AdminStudents() {
         )}
 
         {/* Pagination */}
-        {meta.totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-surface-100 dark:border-surface-800 flex items-center justify-between text-sm">
-            <span className="text-surface-500">
-              {meta.total} resultados · Página {meta.page} de {meta.totalPages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => load(meta.page - 1)}
-                disabled={meta.page <= 1}
-                className="px-3 py-1 rounded-lg border border-surface-200 dark:border-surface-700 disabled:opacity-50 text-sm"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => load(meta.page + 1)}
-                disabled={meta.page >= meta.totalPages}
-                className="px-3 py-1 rounded-lg border border-surface-200 dark:border-surface-700 disabled:opacity-50 text-sm"
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
-        )}
+        <Pagination
+          page={meta.page}
+          totalPages={meta.totalPages}
+          total={meta.total}
+          onPageChange={load}
+        />
       </div>
 
       {/* Edit modal */}

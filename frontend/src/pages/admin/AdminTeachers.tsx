@@ -13,67 +13,18 @@ import {
   getAdminSchedules,
 } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
+import { Pagination } from "../../components/common/Pagination";
+import { Avatar } from "../../components/common/Avatar";
+import { Loading } from "../../components/common/States";
 import TeacherForm from "../../components/teachers/TeacherForm";
 import { createPortal } from "react-dom";
-
-interface Teacher {
-  idProfesor: string;
-  nombre: string;
-  apellido: string;
-  correo: string | null;
-  fotoUrl: string | null;
-  estado: string;
-  _count: { assignments: number };
-}
-
-interface Assignment {
-  idAsignacion: string;
-  codigoDisciplina: string;
-  idGrado: number;
-  esPrincipal: boolean;
-  estado: string;
-  discipline: { codigoDisciplina: string; nombre: string };
-  grade: { idGrado: number; nombre: string };
-  schedules: {
-    schedule: {
-      idHorario: string;
-      diaSemana: string;
-      horaInicio: string;
-      horaFin: string;
-    };
-  }[];
-}
-
-interface Discipline {
-  codigoDisciplina: string;
-  nombre: string;
-}
-
-interface Grade {
-  idGrado: number;
-  nombre: string;
-  nivel: string | null;
-}
-
-interface Schedule {
-  idHorario: string;
-  diaSemana: string;
-  horaInicio: string;
-  horaFin: string;
-}
-
-const AVATAR_COLORS = [
-  "bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300",
-  "bg-terracotta-100 text-terracotta-700 dark:bg-terracotta-900 dark:text-terracotta-300",
-  "bg-surface-200 text-surface-700 dark:bg-surface-700 dark:text-surface-200",
-];
-
-function getAvatarColor(id: string) {
-  const index =
-    id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) %
-    AVATAR_COLORS.length;
-  return AVATAR_COLORS[index];
-}
+import type {
+  TeacherWithCount as Teacher,
+  Assignment,
+  Discipline,
+  Grade,
+  Schedule,
+} from "../../types";
 
 export default function AdminTeachers() {
   const navigate = useNavigate();
@@ -343,9 +294,7 @@ export default function AdminTeachers() {
       {/* Cards */}
       <div className="card overflow-hidden p-4">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full" />
-          </div>
+          <Loading />
         ) : teachers.length === 0 ? (
           <div className="text-center py-12 text-sm text-surface-500">
             No se encontraron profesores.
@@ -375,12 +324,13 @@ export default function AdminTeachers() {
                       className={`w-11 h-11 rounded-xl object-cover shrink-0 ${t.estado === "inactivo" ? "opacity-50 grayscale" : ""}`}
                     />
                   ) : (
-                    <div
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 font-semibold text-sm ${getAvatarColor(t.idProfesor)} ${t.estado === "inactivo" ? "opacity-50" : ""}`}
+                    <Avatar
+                      seed={t.idProfesor}
+                      className={`w-11 h-11 rounded-xl ${t.estado === "inactivo" ? "opacity-50" : ""}`}
                     >
                       {t.nombre.charAt(0)}
                       {t.apellido.charAt(0)}
-                    </div>
+                    </Avatar>
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-surface-900 dark:text-surface-100 text-sm truncate group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">
@@ -430,29 +380,12 @@ export default function AdminTeachers() {
           </div>
         )}
 
-        {meta.totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-surface-100 dark:border-surface-800 flex items-center justify-between text-sm">
-            <span className="text-surface-500">
-              {meta.total} resultados · Página {meta.page} de {meta.totalPages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => load(meta.page - 1)}
-                disabled={meta.page <= 1}
-                className="px-3 py-1 rounded-lg border border-surface-200 dark:border-surface-700 disabled:opacity-50 text-sm"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => load(meta.page + 1)}
-                disabled={meta.page >= meta.totalPages}
-                className="px-3 py-1 rounded-lg border border-surface-200 dark:border-surface-700 disabled:opacity-50 text-sm"
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
-        )}
+        <Pagination
+          page={meta.page}
+          totalPages={meta.totalPages}
+          total={meta.total}
+          onPageChange={load}
+        />
       </div>
       {/* Create modal Teaches */}
       {showCreate &&
@@ -541,9 +474,7 @@ export default function AdminTeachers() {
               </div>
 
               {assignmentsLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full" />
-                </div>
+                <Loading message="Cargando asignaciones..." />
               ) : (
                 <>
                   {assignments.length === 0 ? (

@@ -11,33 +11,10 @@ import {
   getAdminSchedules,
 } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
+import { Pagination } from "../../components/common/Pagination";
+import { Loading } from "../../components/common/States";
 import { createPortal } from "react-dom";
-
-interface Assignment {
-  idAsignacion: string;
-  teacher: { idProfesor: string; nombre: string; apellido: string };
-  discipline: { codigoDisciplina: string; nombre: string };
-  grade: { idGrado: number; nombre: string };
-  schedules: {
-    schedule: {
-      idHorario: string;
-      diaSemana: string;
-      horaInicio: string | null;
-      horaFin: string | null;
-      aula: string | null;
-    };
-  }[];
-  esPrincipal: boolean;
-  estado: string;
-}
-
-interface Schedule {
-  idHorario: string;
-  diaSemana: string;
-  horaInicio: string | null;
-  horaFin: string | null;
-  aula: string | null;
-}
+import type { Assignment, Schedule } from "../../types";
 
 const DIAS_CORTO: Record<string, string> = {
   LUNES: "Lun",
@@ -244,9 +221,7 @@ export default function AdminAssignments() {
       {/* Cards */}
       <div className="card overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full" />
-          </div>
+          <Loading />
         ) : (
           <div className="divide-y divide-surface-100 dark:divide-surface-800">
             {assignments.map((a) => {
@@ -338,29 +313,12 @@ export default function AdminAssignments() {
           </div>
         )}
 
-        {meta.totalPages > 1 && (
-          <div className="px-5 py-3 border-t border-surface-100 dark:border-surface-800 flex items-center justify-between text-sm">
-            <span className="text-surface-500">
-              {meta.total} resultados · Página {meta.page} de {meta.totalPages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => load(meta.page - 1)}
-                disabled={meta.page <= 1}
-                className="px-3 py-1 rounded-lg border border-surface-200 dark:border-surface-700 disabled:opacity-50 text-sm"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => load(meta.page + 1)}
-                disabled={meta.page >= meta.totalPages}
-                className="px-3 py-1 rounded-lg border border-surface-200 dark:border-surface-700 disabled:opacity-50 text-sm"
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
-        )}
+        <Pagination
+          page={meta.page}
+          totalPages={meta.totalPages}
+          total={meta.total}
+          onPageChange={load}
+        />
       </div>
 
       {/* Create/Edit modal */}

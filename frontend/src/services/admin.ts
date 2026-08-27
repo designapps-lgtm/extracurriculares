@@ -1,4 +1,15 @@
 import { api } from "./api";
+import type {
+  ApiResponse,
+  PaginatedResponse,
+  Student,
+  Teacher,
+  TeacherWithCount,
+  Grade,
+  Discipline,
+  Schedule,
+  Assignment,
+} from "../types";
 
 export interface AdminUser {
   id: string;
@@ -20,50 +31,50 @@ export interface DashboardStats {
 }
 
 export async function login(email: string, password: string): Promise<{ admin: AdminUser }> {
-  const res = await api.post<{ success: boolean; data: { admin: AdminUser } }>("/api/admin/auth/login", { email, password });
+  const res = await api.post<ApiResponse<{ admin: AdminUser }>>("/api/admin/auth/login", { email, password });
   return res.data;
 }
 
 export async function logout(): Promise<void> {
-  await api.post("/api/admin/auth/logout");
+  await api.post<ApiResponse<null>>("/api/admin/auth/logout");
 }
 
 export async function getMe(): Promise<AdminUser> {
-  const res = await api.get<{ success: boolean; data: AdminUser }>("/api/admin/auth/me");
+  const res = await api.get<ApiResponse<AdminUser>>("/api/admin/auth/me");
   return res.data;
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const res = await api.get<{ success: boolean; data: DashboardStats }>("/api/admin/dashboard/stats");
+  const res = await api.get<ApiResponse<DashboardStats>>("/api/admin/dashboard/stats");
   return res.data;
 }
 
 export async function getAdminStudents(params?: Record<string, string>) {
-  return api.get<{ success: boolean; data: any[]; meta: any }>("/api/admin/students", params);
+  return api.get<PaginatedResponse<Student>>("/api/admin/students", params);
 }
 
 export async function getAdminStudent(codigo: string) {
-  return api.get<{ success: boolean; data: any }>(`/api/admin/students/${codigo}`);
+  return api.get<ApiResponse<Student>>(`/api/admin/students/${codigo}`);
 }
 
 export async function updateAdminStudent(codigo: string, data: Record<string, unknown>) {
-  return api.patch<{ success: boolean; data: any }>(`/api/admin/students/${codigo}`, data);
+  return api.patch<ApiResponse<Student>>(`/api/admin/students/${codigo}`, data);
 }
 
 export async function getAdminTeachers(params?: Record<string, string>) {
-  return api.get<{ success: boolean; data: any[]; meta: any }>("/api/admin/teachers", params);
+  return api.get<PaginatedResponse<TeacherWithCount>>("/api/admin/teachers", params);
 }
 
 export async function createAdminTeacher(data: { nombre: string; apellido: string; correo?: string; fotoUrl?: string }) {
-  return api.post<{ success: boolean; data: any }>("/api/admin/teachers", data);
+  return api.post<ApiResponse<Teacher>>("/api/admin/teachers", data);
 }
 
 export async function updateAdminTeacher(id: string, data: Record<string, unknown>) {
-  return api.patch<{ success: boolean; data: any }>(`/api/admin/teachers/${id}`, data);
+  return api.patch<ApiResponse<Teacher>>(`/api/admin/teachers/${id}`, data);
 }
 
 export async function getAdminAssignments(params?: Record<string, string>) {
-  return api.get<{ success: boolean; data: any[]; meta: any }>("/api/admin/assignments", params);
+  return api.get<PaginatedResponse<Assignment>>("/api/admin/assignments", params);
 }
 
 export interface AssignmentScheduleInput {
@@ -81,7 +92,7 @@ export async function createAdminAssignment(data: {
   esPrincipal?: boolean;
   schedules?: AssignmentScheduleInput[];
 }) {
-  return api.post<{ success: boolean; data: any }>("/api/admin/assignments", data);
+  return api.post<ApiResponse<Assignment>>("/api/admin/assignments", data);
 }
 
 export async function updateAdminAssignment(id: string, data: {
@@ -89,7 +100,7 @@ export async function updateAdminAssignment(id: string, data: {
   estado?: string;
   schedules?: AssignmentScheduleInput[];
 }) {
-  return api.patch<{ success: boolean; data: any }>(`/api/admin/assignments/${id}`, data);
+  return api.patch<ApiResponse<Assignment>>(`/api/admin/assignments/${id}`, data);
 }
 
 export async function createAdminSchedule(data: {
@@ -98,23 +109,23 @@ export async function createAdminSchedule(data: {
   horaFin?: string | null;
   aula?: string | null;
 }) {
-  return api.post<{ success: boolean; data: any; created: boolean }>("/api/admin/schedules", data);
+  return api.post<ApiResponse<Schedule> & { created: boolean }>("/api/admin/schedules", data);
 }
 
 export async function deleteAdminAssignment(id: string) {
-  return api.delete<{ success: boolean; data: any }>(`/api/admin/assignments/${id}`);
+  return api.delete<ApiResponse<Assignment>>(`/api/admin/assignments/${id}`);
 }
 
 export async function getAdminDisciplines(params?: Record<string, string>) {
-  return api.get<{ success: boolean; data: any[]; meta: any }>("/api/admin/disciplines", params);
+  return api.get<PaginatedResponse<Discipline>>("/api/admin/disciplines", params);
 }
 
 export async function getAdminGrades() {
-  return api.get<{ success: boolean; data: any[] }>("/api/admin/grades");
+  return api.get<{ success: boolean; data: Grade[] }>("/api/admin/grades");
 }
 
 export async function getAdminSchedules(params?: Record<string, string>) {
-  return api.get<{ success: boolean; data: any[]; meta: any }>("/api/admin/schedules", params);
+  return api.get<PaginatedResponse<Schedule>>("/api/admin/schedules", params);
 }
 
 // Admin user management
@@ -140,9 +151,9 @@ export async function updateAdminUser(id: string, data: Record<string, unknown>)
 }
 
 export async function resetAdminPassword(id: string, password: string) {
-  return api.patch<{ success: boolean; data: any }>(`/api/admin/admins/${id}/reset-password`, { password });
+  return api.patch<ApiResponse<{ id: string }>>(`/api/admin/admins/${id}/reset-password`, { password });
 }
 
 export async function deleteAdminUser(id: string) {
-  return api.delete<{ success: boolean; data: any }>(`/api/admin/admins/${id}`);
+  return api.delete<ApiResponse<{ id: string }>>(`/api/admin/admins/${id}`);
 }
