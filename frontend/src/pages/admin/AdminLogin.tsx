@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { login } from "../../services/admin";
 
 export default function AdminLogin() {
@@ -79,6 +79,28 @@ export default function AdminLogin() {
             {loading ? "Ingresando..." : "Ingresar"}
           </button>
         </form>
+
+        <p className="text-center mt-6">
+          <Link
+            to="/"
+            className="text-sm text-surface-500 dark:text-surface-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors inline-flex items-center gap-1"
+          >
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            Volver al acceso de profesores
+          </Link>
+        </p>
       </div>
     </div>
   );
