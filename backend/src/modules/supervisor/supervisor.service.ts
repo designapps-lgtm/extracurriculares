@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import * as XLSX from "xlsx";
 import prisma from "../../config/prisma";
 import { parsePagination } from "../../utils/pagination";
 import { param } from "../../utils/reqParams";
@@ -16,16 +17,19 @@ function dayEnd(date: Date): Date {
   return new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1);
 }
 
-export async function getSupervisorSessions(req: Request, res: Response) {
-  const pagination = parsePagination(req.query as Record<string, string>);
-  const { fecha, disciplina, profesor } = req.query as Record<string, string>;
-
-  const fechaStart = parseDateFilter(fecha);
-
+function buildSessionWhere(query: Record<string, string>): Record<string, unknown> {
+  const { fecha, disciplina, profesor } = query;
   const where: Record<string, unknown> = { estado: "finalizada" };
   if (disciplina) where.assignment = { codigoDisciplina: disciplina };
   if (profesor) where.idProfesor = profesor;
+  const fechaStart = parseDateFilter(fecha);
   if (fechaStart) where.fecha = { gte: fechaStart, lte: dayEnd(fechaStart) };
+  return where;
+}
+
+export async function getSupervisorSessions(req: Request, res: Response) {
+  const pagination = parsePagination(req.query as Record<string, string>);
+  const where = buildSessionWhere(req.query as Record<string, string>);
 
   const [data, total] = await Promise.all([
     prisma.classSession.findMany({
@@ -123,4 +127,106 @@ export async function getSupervisorSessionAttendance(req: Request, res: Response
       })),
     },
   });
+}
+
+export async function getSupervisorFilters(req: Request, res: Response) {
+  const [disciplines, assignments, teachers] = await Promise.all([
+    prisma.discipline.findMany({
+      select: { codigoDisciplina: true, nombre: true },
+      orderBy: { nombre: "asc" },
+    }),
+    prisma.extracurricularAssignment.findMany({
+      select: {
+        codigoDisciplina: true,
+        grade: { select: { nombre: true } },
+      },
+    }),
+    prisma.teacher.findMany({
+      where: { estado: "activo" },
+      select: { idProfesor: true, nombre: true, apellido: true },
+      orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
+    }),
+  ]);
+
+  const gradeNamesByCode = new Map<string, Set<string>>();
+  for (const a of assignments) {
+    const set = gradeNamesByCode.get(a.codigoDisciplina) ?? new Set<string>();
+    set.add(a.grade.nombre);
+    gradeNamesByCode.set(a.codigoDisciplina, set);
+  }
+
+  const disciplinas = disciplines.map((d) => ({
+    codigoDisciplina: d.codigoDisciplina,
+    nombre: d.nombre,
+    grados: [...(gradeNamesByCode.get(d.codigoDisciplina) ?? [])].sort((a, b) => {
+      const na = parseInt(a, 10);
+      const nb = parseInt(b, 10);
+      if (Number.isNaN(na) || Number.isNaN(nb)) return a.localeCompare(b);
+      return na - nb;
+    }),
+  }));
+
+  res.json({ success: true, data: { disciplinas, profesores: teachers } });
+}
+
+const ESTADO_ASISTENCIA_LABEL: Record<string, string> = {
+  presente: "Presente",
+  ausente: "Ausente",
+  justificado: "Justificado",
+};
+
+export async function exportSupervisorAttendance(req: Request, res: Response) {
+  const where = buildSessionWhere(req.query as Record<string, string>);
+
+  const sessions = await prisma.classSession.findMany({
+    where,
+    include: {
+      assignment: {
+        include: {
+          discipline: { select: { codigoDisciplina: true, nombre: true } },
+          grade: { select: { idGrado: true, nombre: true } },
+        },
+      },
+      schedule: true,
+      teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
+      attendances: {
+        include: {
+          student: {
+            select: { codigoEstudiante: true, nombre: true, apellido: true, grupo: true },
+          },
+        },
+        orderBy: [{ student: { apellido: "asc" } }, { student: { nombre: "asc" } }],
+      },
+    },
+    orderBy: [{ fecha: "desc" }, { updatedAt: "desc" }],
+  });
+
+  const rows: Record<string, string>[] = [];
+  for (const s of sessions) {
+    for (const a of s.attendances) {
+      rows.push({
+        Fecha: s.fecha.toISOString().slice(0, 10),
+        "Día": s.schedule?.diaSemana ?? "",
+        "Hora inicio": s.schedule?.horaInicio ?? "",
+        "Hora fin": s.schedule?.horaFin ?? "",
+        Disciplina: s.assignment.discipline.nombre,
+        Grado: s.assignment.grade.nombre,
+        Profesor: `${s.teacher.nombre} ${s.teacher.apellido}`,
+        "Código": a.student.codigoEstudiante,
+        "Nombre del estudiante": a.student.nombre,
+        Apellido: a.student.apellido,
+        Grupo: a.student.grupo ?? "",
+        Estado: ESTADO_ASISTENCIA_LABEL[a.estado] ?? a.estado,
+      });
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, "Asistencias");
+
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", 'attachment; filename="asistencias.xlsx"');
+  res.send(buffer);
 }

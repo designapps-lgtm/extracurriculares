@@ -33,3 +33,27 @@ export async function getSupervisorSession(sessionId: string): Promise<Superviso
   const res = await api.get<ApiResponse<SupervisorSessionDetail>>(`/api/supervisor/sessions/${sessionId}`);
   return res.data;
 }
+
+export interface SupervisorFilterData {
+  disciplinas: {
+    codigoDisciplina: string;
+    nombre: string;
+    grados: string[];
+  }[];
+  profesores: {
+    idProfesor: string;
+    nombre: string;
+    apellido: string;
+  }[];
+}
+
+export async function getSupervisorFilters(): Promise<SupervisorFilterData> {
+  const res = await api.get<ApiResponse<{ disciplinas: SupervisorFilterData["disciplinas"]; profesores: SupervisorFilterData["profesores"] }>>(
+    "/api/supervisor/filters",
+  );
+  return res.data;
+}
+
+export async function exportSupervisorAttendance(params?: Record<string, string>): Promise<Blob> {
+  return api.download("/api/supervisor/sessions/export", params);
+}

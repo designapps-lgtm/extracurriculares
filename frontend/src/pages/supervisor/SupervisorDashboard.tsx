@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { getSupervisorSessions, supervisorMe, supervisorLogout } from "../../services/supervisor";
-import { getDisciplines } from "../../services/disciplines";
-import { getTeachers } from "../../services/teachers";
+import {
+  getSupervisorSessions,
+  getSupervisorFilters,
+  exportSupervisorAttendance,
+  supervisorMe,
+  supervisorLogout,
+  type SupervisorFilterData,
+} from "../../services/supervisor";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import { Pagination } from "../../components/common/Pagination";
 import type {
   Supervisor,
   SupervisorSessionItem,
-  Discipline,
-  Teacher,
 } from "../../types";
 
 function formatFecha(iso: string): string {
@@ -28,12 +31,12 @@ export default function SupervisorDashboard() {
   const [supervisor, setSupervisor] = useState<Supervisor | null>(null);
   const [sessions, setSessions] = useState<SupervisorSessionItem[]>([]);
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [filterData, setFilterData] = useState<SupervisorFilterData | null>(null);
   const [fecha, setFecha] = useState("");
   const [disciplina, setDisciplina] = useState("");
   const [profesor, setProfesor] = useState("");
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
   const notify = useNotify();
 
@@ -74,14 +77,35 @@ export default function SupervisorDashboard() {
   }, []);
 
   useEffect(() => {
-    Promise.all([
-      getDisciplines({ limit: 200 }).catch(() => null),
-      getTeachers({ limit: 200 }).catch(() => null),
-    ]).then(([dRes, tRes]) => {
-      if (dRes) setDisciplines(dRes.data);
-      if (tRes) setTeachers(tRes.data);
-    });
-  }, []);
+    getSupervisorFilters()
+      .then(setFilterData)
+      .catch(() => notify.error("No se pudieron cargar los filtros"));
+  }, [notify]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params: Record<string, string> = {};
+      if (fecha) params.fecha = fecha;
+      if (disciplina) params.disciplina = disciplina;
+      if (profesor) params.profesor = profesor;
+
+      const blob = await exportSupervisorAttendance(params);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `asistencias_${fecha || "todas"}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      notify.success("Excel generado");
+    } catch (err: any) {
+      notify.error(err.message || "Error al exportar");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleLogout = async () => {
     await supervisorLogout();
@@ -124,9 +148,9 @@ export default function SupervisorDashboard() {
                 className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">Todas</option>
-                {disciplines.map((d) => (
+                {(filterData?.disciplinas ?? []).map((d) => (
                   <option key={d.codigoDisciplina} value={d.codigoDisciplina}>
-                    {d.nombre}
+                    {d.grados.length > 0 ? `${d.nombre} — ${d.grados.length > 1 ? "Grados " : "Grado "}${d.grados.join(", ")}` : d.nombre}
                   </option>
                 ))}
               </select>
@@ -139,7 +163,7 @@ export default function SupervisorDashboard() {
                 className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">Todos</option>
-                {teachers.map((t) => (
+                {(filterData?.profesores ?? []).map((t) => (
                   <option key={t.idProfesor} value={t.idProfesor}>
                     {t.nombre} {t.apellido}
                   </option>
@@ -147,12 +171,21 @@ export default function SupervisorDashboard() {
               </select>
             </div>
           </div>
-          <button
-            onClick={() => load(1)}
-            className="mt-3 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
-          >
-            Filtrar
-          </button>
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            <button
+              onClick={() => load(1)}
+              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+            >
+              Filtrar
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="px-4 py-2 border border-brand-600 text-brand-600 dark:text-brand-400 text-sm font-medium rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20 disabled:opacity-50"
+            >
+              {exporting ? "Generando..." : "Exportar a Excel"}
+            </button>
+          </div>
         </div>
 
         <div className="card overflow-hidden p-4">

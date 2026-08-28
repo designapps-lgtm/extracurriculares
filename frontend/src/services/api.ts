@@ -105,6 +105,38 @@ export class ApiClient {
     return res.json();
   }
 
+  async download(path: string, params?: Record<string, string>): Promise<Blob> {
+    const res = await this.sendRaw(() =>
+      fetch(this.buildUrl(path, params), { headers: this.buildHeaders(), credentials: "include" }),
+      path,
+    );
+    return res.blob();
+  }
+
+  private async sendRaw(send: () => Promise<Response>, path: string): Promise<Response> {
+    const res = await send();
+    if (!res.ok) {
+      if (res.status === 401 && !isAuthPath(path)) {
+        const role = roleForPath(path);
+        if (role) {
+          const refreshed = await runRefresh(refreshUrlForRole(role));
+          if (refreshed) {
+            const retryRes = await send();
+            if (retryRes.ok) return retryRes;
+            throw new ApiRequestError(
+              retryRes.status,
+              (await retryRes.json().catch(() => null))?.error?.code || "HTTP_ERROR",
+              `Error ${retryRes.status}`
+            );
+          }
+        }
+      }
+      const body = await res.json().catch(() => null);
+      throw new ApiRequestError(res.status, body?.error?.code || "HTTP_ERROR", body?.error?.message || `Error ${res.status}`);
+    }
+    return res;
+  }
+
   private buildHeaders(contentType?: string): HeadersInit {
     const headers: Record<string, string> = {};
     if (contentType) headers["Content-Type"] = contentType;
