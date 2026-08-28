@@ -1,6 +1,8 @@
 import { useParams, Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getStudentProfile } from "../services/students";
+import { updateAdminStudent } from "../services/admin";
+import { useNotify } from "../components/common/Notify";
 import { Loading, ErrorMessage } from "../components/common/States";
 import type { StudentProfile as StudentProfileType } from "../types";
 
@@ -35,6 +37,55 @@ export default function StudentProfile() {
   const [profile, setProfile] = useState<StudentProfileType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const notify = useNotify();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    nombre: "",
+    apellido: "",
+    grupo: "",
+    correo: "",
+    estado: "activo",
+    fotoUrl: "",
+  });
+
+  const openEdit = () => {
+    if (!profile) return;
+    setForm({
+      nombre: profile.student.nombre,
+      apellido: profile.student.apellido,
+      grupo: profile.student.grupo || "",
+      correo: profile.student.correo || "",
+      estado: profile.student.estado,
+      fotoUrl: profile.student.fotoUrl || "",
+    });
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    if (!codigo) return;
+    setSaving(true);
+    try {
+      await updateAdminStudent(codigo, {
+        nombre: form.nombre,
+        apellido: form.apellido,
+        grupo: form.grupo || undefined,
+        correo: form.correo || undefined,
+        estado: form.estado,
+        fotoUrl: form.fotoUrl || undefined,
+      });
+      setEditing(false);
+      notify.success("Estudiante actualizado");
+      setProfile(null);
+      setLoading(true);
+      load();
+    } catch (err: any) {
+      notify.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const load = () => {
     if (!codigo) return;
@@ -124,7 +175,40 @@ export default function StudentProfile() {
               <p className="text-brand-200 text-sm break-words">
                 {student.grupo || student.grade.nombre} · {student.grade.nivel || "Secundaria"}
               </p>
+              <div className="flex items-center gap-2 mt-3">
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    student.estado === "activo"
+                      ? "bg-green-500/20 text-green-100"
+                      : "bg-red-500/20 text-red-100"
+                  }`}
+                >
+                  {student.estado}
+                </span>
+                {student.correo && (
+                  <a
+                    href={`mailto:${student.correo}`}
+                    className="inline-flex items-center gap-1 text-xs text-brand-100/90 hover:text-white transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                    </svg>
+                    {student.correo}
+                  </a>
+                )}
+              </div>
             </div>
+            {isAdmin && (
+              <button
+                onClick={openEdit}
+                className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-medium rounded-xl transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                </svg>
+                Editar
+              </button>
+            )}
           </div>
         </div>
 
@@ -236,6 +320,117 @@ export default function StudentProfile() {
           </div>
         )}
       </div>
+
+      {/* Edit modal */}
+      {editing && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setEditing(false)}
+        >
+          <div
+            className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">
+              Editar estudiante
+            </h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-surface-500 mb-1">
+                  Nombre
+                </label>
+                <input
+                  value={form.nombre}
+                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-surface-500 mb-1">
+                  Apellido
+                </label>
+                <input
+                  value={form.apellido}
+                  onChange={(e) => setForm({ ...form, apellido: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-surface-500 mb-1">
+                  Grupo
+                </label>
+                <input
+                  value={form.grupo}
+                  onChange={(e) => setForm({ ...form, grupo: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-surface-500 mb-1">
+                  Correo
+                </label>
+                <input
+                  value={form.correo}
+                  onChange={(e) => setForm({ ...form, correo: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-surface-500 mb-1">
+                  Estado
+                </label>
+                <select
+                  value={form.estado}
+                  onChange={(e) => setForm({ ...form, estado: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+                >
+                  <option value="activo">Activo</option>
+                  <option value="inactivo">Inactivo</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-surface-500 mb-1">
+                  Foto (URL)
+                </label>
+                <input
+                  value={form.fotoUrl}
+                  onChange={(e) => setForm({ ...form, fotoUrl: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
+                />
+                {form.fotoUrl && (
+                  <div className="mt-2">
+                    <img
+                      src={form.fotoUrl}
+                      alt="Vista previa"
+                      className="w-16 h-16 rounded-xl object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.opacity = "0.3";
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="flex-1 px-4 py-2.5 border border-surface-200 dark:border-surface-700 rounded-xl text-sm font-medium hover:bg-surface-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+              >
+                {saving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

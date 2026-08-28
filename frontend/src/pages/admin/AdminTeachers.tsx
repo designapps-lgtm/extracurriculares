@@ -336,7 +336,7 @@ export default function AdminTeachers() {
                     <p className="font-medium text-surface-900 dark:text-surface-100 text-sm truncate group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">
                       {t.nombre} {t.apellido}
                     </p>
-                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 truncate">
+                    <p className="text-xs text-[#707070] dark:text-surface-400 mt-0.5 truncate">
                       {t.correo || "Sin correo"}
                     </p>
                   </div>

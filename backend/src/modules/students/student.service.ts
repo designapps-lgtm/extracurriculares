@@ -141,6 +141,8 @@ export async function getStudentProfile(codigo: string) {
       apellido: student.apellido,
       grupo: student.grupo,
       grade: student.grade,
+      correo: student.correo,
+      estado: student.estado,
       fotoUrl: student.fotoUrl,
     },
     extracurricular: extracurricular.length > 0 ? extracurricular : null,

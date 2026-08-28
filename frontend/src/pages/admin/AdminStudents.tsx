@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { getAdminStudents, updateAdminStudent, getAdminGrades, getAdminDisciplines } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
 import { Pagination } from "../../components/common/Pagination";
@@ -20,15 +21,20 @@ export default function AdminStudents() {
   const [grades, setGrades] = useState<Grade[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const initialInscrito = () => {
+    const v = new URLSearchParams(window.location.search).get("inscrito");
+    return v === "true" || v === "false" ? v : "";
+  };
   const [search, setSearch] = useState("");
   const [filterGrado, setFilterGrado] = useState("");
-  const [filterInscrito, setFilterInscrito] = useState("");
+  const [filterInscrito, setFilterInscrito] = useState(initialInscrito);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Student | null>(null);
   const [editForm, setEditForm] = useState<Partial<Student>>({});
   const [editSchedules, setEditSchedules] = useState<Record<string, string>>({});
 
   const notify = useNotify();
+  const navigate = useNavigate();
 
   const load = (page = 1, overrides?: { search?: string; filtroGrado?: string; filtroInscrito?: string }) => {
     setLoading(true);
@@ -151,8 +157,19 @@ export default function AdminStudents() {
               </thead>
               <tbody className="divide-y divide-surface-50 dark:divide-surface-800">
                 {students.map((s) => (
-                  <tr key={s.codigoEstudiante} className="hover:bg-surface-50 dark:hover:bg-surface-800">
-                    <td className="px-4 py-3 font-mono text-xs text-surface-600 dark:text-surface-400">{s.codigoEstudiante}</td>
+                  <tr
+                    key={s.codigoEstudiante}
+                    onClick={() => navigate(`/admin/students/${s.codigoEstudiante}`)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        navigate(`/admin/students/${s.codigoEstudiante}`);
+                      }
+                    }}
+                    className="cursor-pointer hover:bg-brand-50/60 dark:hover:bg-brand-950/40 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-mono text-surface-600 dark:text-surface-400">{s.codigoEstudiante}</td>
                     <td className="px-4 py-3 font-medium text-surface-900 dark:text-surface-100">{s.nombre} {s.apellido}</td>
                     <td className="px-4 py-3"><span className="badge-neutral">{s.grade.nombre}</span></td>
                     <td className="px-4 py-3">
@@ -165,10 +182,21 @@ export default function AdminStudents() {
                         {s.studentSchedules.length > 0 ? "Inscrito" : "No inscrito"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <button onClick={() => handleEdit(s)} className="text-brand-600 hover:text-brand-700 text-sm font-medium">
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(s);
+                        }}
+                        className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 text-sm font-medium"
+                      >
                         Editar
                       </button>
+                      <span className="inline-flex items-center ml-3 text-surface-300 dark:text-surface-600">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </span>
                     </td>
                   </tr>
                 ))}
