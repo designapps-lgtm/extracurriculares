@@ -25,11 +25,17 @@ import { adminScheduleRouter } from "./modules/admin/scheduleAdmin.routes";
 import { adminGradeRouter } from "./modules/admin/gradeAdmin.routes";
 import { adminUserRouter } from "./modules/admin/adminUser.routes";
 import { adminDashboardRouter } from "./modules/admin/dashboardAdmin.routes";
+import { adminSupervisorRouter } from "./modules/admin/supervisorAdmin.routes";
 
 // Teacher routes
 import { teacherAuthRouter } from "./modules/teacher/auth.routes";
 import { teacherDashboardRouter } from "./modules/teacher/teacher.routes";
 import { authenticateTeacher, requireActiveTeacher } from "./middlewares/teacherAuth";
+
+// Supervisor routes
+import { supervisorAuthRouter } from "./modules/supervisor/auth.routes";
+import { supervisorDashboardRouter } from "./modules/supervisor/supervisor.routes";
+import { authenticateSupervisor, requireActiveSupervisor } from "./middlewares/supervisorAuth";
 
 const app = express();
 
@@ -79,12 +85,19 @@ app.use("/api/admin/disciplines", authenticate, requireAdmin, adminDisciplineRou
 app.use("/api/admin/schedules", authenticate, requireAdmin, adminScheduleRouter);
 app.use("/api/admin/grades", authenticate, requireAdmin, adminGradeRouter);
 app.use("/api/admin/admins", authenticate, requireAdmin, adminUserRouter);
+app.use("/api/admin/supervisors", authenticate, requireAdmin, adminSupervisorRouter);
 
 // Teacher auth (login/logout don't need auth)
 app.use("/api/teacher/auth", authLimiter, teacherAuthRouter);
 
 // Protected teacher routes
 app.use("/api/teacher", authenticateTeacher, requireActiveTeacher, teacherDashboardRouter);
+
+// Supervisor auth (login/logout don't need auth)
+app.use("/api/supervisor/auth", authLimiter, supervisorAuthRouter);
+
+// Protected supervisor routes
+app.use("/api/supervisor", authenticateSupervisor, requireActiveSupervisor, supervisorDashboardRouter);
 
 // 404 + error handler
 app.use(notFound);

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { teacherLogin, teacherMe, teacherLogout } from "../../services/teacher";
+import { supervisorLogin, supervisorMe, supervisorLogout } from "../../services/supervisor";
 
-export default function TeacherLogin() {
+export default function SupervisorLogin() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -10,14 +10,14 @@ export default function TeacherLogin() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    teacherMe()
-      .then((t) => setExisting(t))
+    supervisorMe()
+      .then((s) => setExisting(s))
       .catch(() => setExisting(null));
   }, []);
 
-  const handleSessionContinue = () => navigate("/teacher/dashboard");
+  const handleSessionContinue = () => navigate("/supervisor/dashboard");
   const handleSessionLogout = async () => {
-    await teacherLogout();
+    await supervisorLogout();
     setExisting(null);
   };
 
@@ -27,8 +27,8 @@ export default function TeacherLogin() {
     setLoading(true);
     setError("");
     try {
-      await teacherLogin(email);
-      navigate("/teacher/dashboard");
+      await supervisorLogin(email);
+      navigate("/supervisor/dashboard");
     } catch (err: any) {
       setError(err.message || "Correo no registrado");
     } finally {
@@ -40,19 +40,19 @@ export default function TeacherLogin() {
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-terracotta-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           </div>
           <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">Extracurriculares</h1>
-          <p className="text-surface-500 text-sm mt-1">Portal del profesor</p>
+          <p className="text-surface-500 text-sm mt-1">Portal de supervisión</p>
         </div>
 
         {existing && (
           <div className="card p-4 mb-4 space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-brand-100 dark:bg-brand-900 rounded-full flex items-center justify-center text-brand-700 dark:text-brand-300 font-bold">
+              <div className="w-10 h-10 bg-terracotta-100 dark:bg-terracotta-900 rounded-full flex items-center justify-center text-terracotta-700 dark:text-terracotta-300 font-bold">
                 {existing.nombre[0]}
               </div>
               <div className="flex-1 min-w-0">
@@ -65,7 +65,7 @@ export default function TeacherLogin() {
             <div className="flex gap-2">
               <button
                 onClick={handleSessionContinue}
-                className="flex-1 px-3 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+                className="flex-1 px-3 py-2 bg-terracotta-600 text-white text-sm font-medium rounded-xl hover:bg-terracotta-700"
               >
                 Continuar
               </button>
@@ -92,8 +92,8 @@ export default function TeacherLogin() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="tu@colegio.edu.co"
+              className="w-full px-3 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-500"
+              placeholder="supervisora@colegio.edu.co"
               autoComplete="email"
             />
           </div>
@@ -101,24 +101,20 @@ export default function TeacherLogin() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            className="w-full px-4 py-2.5 bg-terracotta-600 text-white rounded-xl text-sm font-medium hover:bg-terracotta-700 disabled:opacity-50"
           >
             {loading ? "Verificando..." : "Ingresar"}
           </button>
 
           <p className="text-xs text-surface-400 text-center">
-            El sistema validará tu correo y te mostrará tus clases.
+            El sistema validará tu correo y te mostrará las asistencias registradas.
           </p>
         </form>
 
         <p className="text-center text-xs text-surface-400 mt-6">
           ¿Sos administrador?{" "}
-          <Link to="/admin/login" className="text-brand-600 dark:text-brand-400 font-medium hover:underline">
+          <Link to="/admin/login" className="text-terracotta-600 dark:text-terracotta-400 font-medium hover:underline">
             Panel administrativo
-          </Link>{" "}
-          · ¿Supervisás?{" "}
-          <Link to="/supervisor/login" className="text-brand-600 dark:text-brand-400 font-medium hover:underline">
-            Portal de supervisión
           </Link>
         </p>
       </div>

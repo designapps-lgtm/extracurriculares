@@ -5,20 +5,25 @@ export interface ApiRequestOptions {
   [key: string]: unknown;
 }
 
-type AuthRole = "admin" | "teacher";
+type AuthRole = "admin" | "teacher" | "supervisor";
 
 function isAuthPath(path: string): boolean {
-  return path.startsWith("/api/admin/auth") || path.startsWith("/api/teacher/auth");
+  return path.startsWith("/api/admin/auth") || path.startsWith("/api/teacher/auth") || path.startsWith("/api/supervisor/auth");
 }
 
 function roleForPath(path: string): AuthRole | null {
   if (path.startsWith("/api/admin/")) return "admin";
   if (path.startsWith("/api/teacher/")) return "teacher";
+  if (path.startsWith("/api/supervisor/")) return "supervisor";
   return null;
 }
 
 function refreshUrlForRole(role: AuthRole): string {
-  return role === "admin" ? "/api/admin/auth/refresh" : "/api/teacher/auth/refresh";
+  return role === "admin"
+    ? "/api/admin/auth/refresh"
+    : role === "teacher"
+      ? "/api/teacher/auth/refresh"
+      : "/api/supervisor/auth/refresh";
 }
 
 let pendingRefresh: { url: string; promise: Promise<boolean> } | null = null;

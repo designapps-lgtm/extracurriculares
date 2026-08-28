@@ -155,6 +155,39 @@ model AssignmentSchedule {
   @@index([idHorario])
 }
 
+model Supervisor {
+  idSupervisor     String   @id @default(uuid())
+  codigoSupervisor String?  @unique
+  nombre           String
+  apellido         String
+  correo           String?  @unique
+  fotoUrl          String?
+  estado           String   @default("activo")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  refreshTokens SupervisorRefreshToken[]
+
+  @@index([codigoSupervisor])
+  @@index([nombre, apellido])
+}
+
+model SupervisorRefreshToken {
+  id           String    @id @default(uuid())
+  supervisorId String
+  tokenHash    String    @unique
+  familyId     String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime  @default(now())
+
+  supervisor Supervisor @relation(fields: [supervisorId], references: [idSupervisor], onDelete: Cascade)
+
+  @@index([supervisorId])
+  @@index([familyId])
+}
+
 model AdminUser {
   id           String   @id @default(uuid())
   email        String   @unique

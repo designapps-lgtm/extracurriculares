@@ -82,6 +82,8 @@ export interface StudentProfile {
     apellido: string;
     grupo: string | null;
     grade: Grade;
+    correo: string | null;
+    estado: string;
     fotoUrl: string | null;
   };
   extracurricular: {
@@ -177,4 +179,57 @@ export interface AttendanceResponse {
   assignment: Assignment;
   schedule: Schedule;
   students: AttendanceStudent[];
+}
+
+export interface Supervisor {
+  idSupervisor: string;
+  codigoSupervisor: string | null;
+  nombre: string;
+  apellido: string;
+  correo: string | null;
+  fotoUrl: string | null;
+  estado: string;
+}
+
+export interface SupervisorSessionItem {
+  id: string;
+  fecha: string;
+  estado: string;
+  assignment: {
+    idAsignacion: string;
+    codigoDisciplina: string;
+    idGrado: number;
+    discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
+    grade: Pick<Grade, "idGrado" | "nombre">;
+  };
+  schedule: Pick<Schedule, "idHorario" | "diaSemana" | "horaInicio" | "horaFin" | "aula">;
+  teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
+  counts: {
+    total: number;
+    presente: number;
+    ausente: number;
+    justificado: number;
+  };
+}
+
+export interface SupervisorSessionDetail {
+  id: string;
+  fecha: string;
+  estado: string;
+  assignment: {
+    idAsignacion: string;
+    codigoDisciplina: string;
+    idGrado: number;
+    discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
+    grade: Pick<Grade, "idGrado" | "nombre">;
+  };
+  schedule: Pick<Schedule, "idHorario" | "diaSemana" | "horaInicio" | "horaFin" | "aula">;
+  teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
+  records: {
+    codigoEstudiante: string;
+    nombre: string;
+    apellido: string;
+    grupo: string | null;
+    estado: string;
+  }[];
 }

@@ -13,7 +13,7 @@ interface RefreshModel {
 }
 
 interface RefreshServiceOptions {
-  userIdField: "teacherId" | "adminId";
+  userIdField: "teacherId" | "adminId" | "supervisorId";
   refreshModel: any;
   buildAccessToken: (identity: { id: string; email: string }) => string;
 }
@@ -35,7 +35,11 @@ export function createRefreshService({
   buildAccessToken,
 }: RefreshServiceOptions) {
   const userIdWhere = (userId: string) =>
-    userIdField === "teacherId" ? { teacherId: userId } : { adminId: userId };
+    userIdField === "teacherId"
+      ? { teacherId: userId }
+      : userIdField === "adminId"
+        ? { adminId: userId }
+        : { supervisorId: userId };
 
   const issue = async (userId: string, email: string): Promise<IssueResult> => {
     const token = generateRefreshToken();

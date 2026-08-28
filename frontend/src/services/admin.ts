@@ -9,6 +9,7 @@ import type {
   Discipline,
   Schedule,
   Assignment,
+  Supervisor,
 } from "../types";
 
 export interface AdminUser {
@@ -160,4 +161,21 @@ export async function resetAdminPassword(id: string, password: string) {
 
 export async function deleteAdminUser(id: string) {
   return api.delete<ApiResponse<{ id: string }>>(`/api/admin/admins/${id}`);
+}
+
+// Supervisor management
+export async function getAdminSupervisors(params?: Record<string, string>) {
+  return api.get<PaginatedResponse<Supervisor>>("/api/admin/supervisors", params);
+}
+
+export async function createAdminSupervisor(data: { codigoSupervisor?: string; nombre: string; apellido: string; correo?: string; fotoUrl?: string }) {
+  return api.post<ApiResponse<Supervisor>>("/api/admin/supervisors", data);
+}
+
+export async function updateAdminSupervisor(id: string, data: Record<string, unknown>) {
+  return api.patch<ApiResponse<Supervisor>>(`/api/admin/supervisors/${id}`, data);
+}
+
+export async function deleteAdminSupervisor(id: string) {
+  return api.delete<ApiResponse<{ id: string }>>(`/api/admin/supervisors/${id}`);
 }

@@ -19,6 +19,14 @@ import TeacherLogin from "./pages/teacher/TeacherLogin";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import TeacherAttendance from "./pages/teacher/TeacherAttendance";
 
+// Supervisor
+import SupervisorLogin from "./pages/supervisor/SupervisorLogin";
+import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
+import SupervisorSession from "./pages/supervisor/SupervisorSession";
+
+// Admin
+import AdminSupervisors from "./pages/admin/AdminSupervisors";
+
 function App() {
   return (
     <Routes>
@@ -28,6 +36,11 @@ function App() {
       {/* Teacher routes */}
       <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
       <Route path="/teacher/session/:sessionId" element={<TeacherAttendance />} />
+
+      {/* Supervisor routes */}
+      <Route path="/supervisor/login" element={<SupervisorLogin />} />
+      <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
+      <Route path="/supervisor/session/:sessionId" element={<SupervisorSession />} />
 
       {/* Admin login (no layout) */}
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -43,6 +56,7 @@ function App() {
         <Route path="teachers-view/:id" element={<TeacherDetail />} />
         <Route path="teachers" element={<AdminTeachers />} />
         <Route path="teachers/:id" element={<TeacherDetail />} />
+        <Route path="supervisors" element={<AdminSupervisors />} />
         <Route path="assignments" element={<AdminAssignments />} />
         <Route path="admins" element={<AdminUsers />} />
       </Route>
