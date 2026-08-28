@@ -6,7 +6,7 @@ import { config } from "./config";
 import { errorHandler, notFound } from "./middlewares/errorHandler";
 import { requestLogger } from "./middlewares/requestLogger";
 import { authenticate, requireAdmin } from "./middlewares/auth";
-import { apiLimiter, authLimiter } from "./middlewares/rateLimiter";
+import { apiLimiter } from "./middlewares/rateLimiter";
 import { healthRouter } from "./modules/health/healthRouter";
 import { studentRouter } from "./modules/students/student.routes";
 import { disciplineRouter } from "./modules/disciplines/discipline.routes";
@@ -73,8 +73,8 @@ app.use("/api/grades", apiLimiter, gradeRouter);
 app.use("/api/assignments", apiLimiter, assignmentRouter);
 app.use("/api/schedules", apiLimiter, scheduleRouter);
 
-// Admin auth (login/logout don't need auth)
-app.use("/api/admin/auth", authLimiter, adminAuthRouter);
+// Auth routes (login/logout cuentan contra authLimiter por ruta; refresh no)
+app.use("/api/admin/auth", adminAuthRouter);
 
 // Protected admin routes   
 app.use("/api/admin/dashboard", authenticate, requireAdmin, adminDashboardRouter);
@@ -88,13 +88,13 @@ app.use("/api/admin/admins", authenticate, requireAdmin, adminUserRouter);
 app.use("/api/admin/supervisors", authenticate, requireAdmin, adminSupervisorRouter);
 
 // Teacher auth (login/logout don't need auth)
-app.use("/api/teacher/auth", authLimiter, teacherAuthRouter);
+app.use("/api/teacher/auth", teacherAuthRouter);
 
 // Protected teacher routes
 app.use("/api/teacher", authenticateTeacher, requireActiveTeacher, teacherDashboardRouter);
 
 // Supervisor auth (login/logout don't need auth)
-app.use("/api/supervisor/auth", authLimiter, supervisorAuthRouter);
+app.use("/api/supervisor/auth", supervisorAuthRouter);
 
 // Protected supervisor routes
 app.use("/api/supervisor", authenticateSupervisor, requireActiveSupervisor, supervisorDashboardRouter);
