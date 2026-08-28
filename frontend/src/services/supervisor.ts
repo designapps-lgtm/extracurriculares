@@ -57,3 +57,7 @@ export async function getSupervisorFilters(): Promise<SupervisorFilterData> {
 export async function exportSupervisorAttendance(params?: Record<string, string>): Promise<Blob> {
   return api.download("/api/supervisor/sessions/export", params);
 }
+
+export async function exportSupervisorSession(sessionId: string): Promise<Blob> {
+  return api.download(`/api/supervisor/sessions/${sessionId}/export`);
+}

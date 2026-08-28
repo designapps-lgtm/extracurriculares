@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { getSupervisorSession } from "../../services/supervisor";
+import { getSupervisorSession, exportSupervisorSession } from "../../services/supervisor";
+import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import type { SupervisorSessionDetail } from "../../types";
 
@@ -19,7 +20,9 @@ export default function SupervisorSession() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [data, setData] = useState<SupervisorSessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
+  const notify = useNotify();
 
   useEffect(() => {
     if (!sessionId) return;
@@ -32,6 +35,27 @@ export default function SupervisorSession() {
       })
       .finally(() => setLoading(false));
   }, [sessionId, navigate]);
+
+  const handleExport = async () => {
+    if (!sessionId || exporting) return;
+    setExporting(true);
+    try {
+      const blob = await exportSupervisorSession(sessionId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "asistencia.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      notify.success("Excel generado");
+    } catch (err: any) {
+      notify.error(err.message || "Error al exportar");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -83,6 +107,13 @@ export default function SupervisorSession() {
             Profesor: {data.teacher.nombre} {data.teacher.apellido}
           </p>
           <p className="text-xs text-surface-400 mt-1">{formatFecha(data.fecha)}</p>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="mt-3 px-4 py-2 border border-brand-600 text-brand-600 dark:text-brand-400 text-sm font-medium rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20 disabled:opacity-50"
+          >
+            {exporting ? "Generando..." : "Exportar a Excel"}
+          </button>
           <div className="flex flex-wrap gap-2 mt-3">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400">
               Presentes: {counts.presente || 0}

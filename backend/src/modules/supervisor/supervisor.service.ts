@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as XLSX from "xlsx";
 import prisma from "../../config/prisma";
+import type { Prisma } from "@prisma/client";
 import { parsePagination } from "../../utils/pagination";
 import { param } from "../../utils/reqParams";
 import { AppError } from "../../middlewares/errorHandler";
@@ -175,52 +176,56 @@ const ESTADO_ASISTENCIA_LABEL: Record<string, string> = {
   justificado: "Justificado",
 };
 
-export async function exportSupervisorAttendance(req: Request, res: Response) {
-  const where = buildSessionWhere(req.query as Record<string, string>);
-
-  const sessions = await prisma.classSession.findMany({
-    where,
+const SESSION_INCLUDE = {
+  assignment: {
     include: {
-      assignment: {
-        include: {
-          discipline: { select: { codigoDisciplina: true, nombre: true } },
-          grade: { select: { idGrado: true, nombre: true } },
-        },
-      },
-      schedule: true,
-      teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-      attendances: {
-        include: {
-          student: {
-            select: { codigoEstudiante: true, nombre: true, apellido: true, grupo: true },
-          },
-        },
-        orderBy: [{ student: { apellido: "asc" } }, { student: { nombre: "asc" } }],
+      discipline: { select: { codigoDisciplina: true, nombre: true } },
+      grade: { select: { idGrado: true, nombre: true } },
+    },
+  },
+  schedule: true,
+  teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
+  attendances: {
+    include: {
+      student: {
+        select: { codigoEstudiante: true, nombre: true, apellido: true, grupo: true },
       },
     },
-    orderBy: [{ fecha: "desc" }, { updatedAt: "desc" }],
-  });
+    orderBy: [{ student: { apellido: "asc" } }, { student: { nombre: "asc" } }],
+  },
+} satisfies Prisma.ClassSessionInclude;
 
-  const rows: Record<string, string>[] = [];
-  for (const s of sessions) {
-    for (const a of s.attendances) {
-      rows.push({
-        Fecha: s.fecha.toISOString().slice(0, 10),
-        "Día": s.schedule?.diaSemana ?? "",
-        "Hora inicio": s.schedule?.horaInicio ?? "",
-        "Hora fin": s.schedule?.horaFin ?? "",
-        Disciplina: s.assignment.discipline.nombre,
-        Grado: s.assignment.grade.nombre,
-        Profesor: `${s.teacher.nombre} ${s.teacher.apellido}`,
-        "Código": a.student.codigoEstudiante,
-        "Nombre del estudiante": a.student.nombre,
-        Apellido: a.student.apellido,
-        Grupo: a.student.grupo ?? "",
-        Estado: ESTADO_ASISTENCIA_LABEL[a.estado] ?? a.estado,
-      });
-    }
-  }
+const SESSION_ORDER: Prisma.ClassSessionOrderByWithRelationInput[] = [
+  { fecha: "desc" },
+  { updatedAt: "desc" },
+];
 
+type AttendSession = Prisma.ClassSessionGetPayload<{ include: typeof SESSION_INCLUDE }>;
+type AttendRecord = AttendSession["attendances"][number];
+
+function dateOnly(d: Date): string {
+  const tz = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return tz.toISOString().slice(0, 10);
+}
+
+function attendanceRow(s: AttendSession, a: AttendRecord): Record<string, string> {
+  return {
+    Fecha: s.fecha.toISOString().slice(0, 10),
+    "Día": s.schedule?.diaSemana ?? "",
+    "Hora inicio": s.schedule?.horaInicio ?? "",
+    "Hora fin": s.schedule?.horaFin ?? "",
+    Disciplina: s.assignment.discipline.nombre,
+    Grado: s.assignment.grade.nombre,
+    Profesor: `${s.teacher.nombre} ${s.teacher.apellido}`,
+    "Código": a.student.codigoEstudiante,
+    "Nombre del estudiante": a.student.nombre,
+    Apellido: a.student.apellido,
+    Grupo: a.student.grupo ?? "",
+    Estado: ESTADO_ASISTENCIA_LABEL[a.estado] ?? a.estado,
+  };
+}
+
+function sendWorkbook(res: Response, rows: Record<string, string>[]): void {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, ws, "Asistencias");
@@ -229,4 +234,37 @@ export async function exportSupervisorAttendance(req: Request, res: Response) {
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", 'attachment; filename="asistencias.xlsx"');
   res.send(buffer);
+}
+
+export async function exportSupervisorAttendance(req: Request, res: Response) {
+  const where = buildSessionWhere(req.query as Record<string, string>);
+
+  const sessions = await prisma.classSession.findMany({
+    where,
+    include: SESSION_INCLUDE,
+    orderBy: SESSION_ORDER,
+  });
+
+  const rows: Record<string, string>[] = [];
+  for (const s of sessions) {
+    for (const a of s.attendances) rows.push(attendanceRow(s, a));
+  }
+
+  sendWorkbook(res, rows);
+}
+
+export async function exportSupervisorSessionAttendance(req: Request, res: Response) {
+  const sessionId = param(req, "sessionId");
+
+  const session = await prisma.classSession.findUnique({
+    where: { id: sessionId },
+    include: SESSION_INCLUDE,
+  });
+
+  if (!session) {
+    throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
+  }
+
+  const rows = session.attendances.map((a) => attendanceRow(session, a));
+  sendWorkbook(res, rows);
 }
