@@ -20,6 +20,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    command: npm run dev
     restart: unless-stopped
     ports:
       - "3000:3000"
