@@ -23,12 +23,13 @@
 
   /* iOS Safari hace zoom al enfocar un input con font-size < 16px y lo deja
      pegado. Forzar 16px en campos en pantallas táctiles evita ese auto-zoom
-     sin deshabilitar el pinch-to-zoom (mejor para accesibilidad). */
+     sin deshabilitar el pinch-to-zoom (mejor para accesibilidad).
+     !important: gana sobre text-sm de Tailwind (capa utilities > base). */
   @media (max-width: 767px) {
     input,
     select,
     textarea {
-      font-size: 16px;
+      font-size: 16px !important;
     }
   }
 }
