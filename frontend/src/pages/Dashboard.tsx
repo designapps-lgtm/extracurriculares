@@ -126,72 +126,73 @@ export default function Dashboard() {
         </div>
 
         {/* Search + enrollment filter */}
-        <div className="relative mt-8 max-w-xl">
-          <label htmlFor="dashboard-search" className="sr-only">
-            Buscar estudiante
-          </label>
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <svg
-              className="h-5 w-5 text-brand-400 dark:text-brand-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        <div className="mt-8 max-w-xl">
+          <div className="flex flex-col sm:flex-row gap-2.5 sm:items-stretch">
+            <div className="relative flex-1">
+              <label htmlFor="dashboard-search" className="sr-only">
+                Buscar estudiante
+              </label>
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <svg
+                  className="h-5 w-5 text-brand-400 dark:text-brand-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+              <input
+                id="dashboard-search"
+                type="text"
+                placeholder="Buscar por código, nombre o apellido..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-white dark:bg-surface-900 border border-brand-200 dark:border-brand-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent shadow-sm placeholder:text-surface-400"
               />
-            </svg>
-          </div>
-          <div className="flex flex-col xs:flex-row gap-2 sm:gap-2.5">
-            <input
-              id="dashboard-search"
-              type="text"
-              placeholder="Buscar por código, nombre o apellido..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 pl-11 pr-4 py-3 bg-white dark:bg-surface-900 border border-brand-200 dark:border-brand-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent shadow-sm placeholder:text-surface-400"
-            />
+              {searching && (
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                  <svg
+                    className="animate-spin h-4 w-4 text-brand-500"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                </div>
+              )}
+            </div>
             <select
               aria-label="Filtrar por inscripción"
               value={inscrito}
               onChange={(e) => setInscrito(e.target.value as "" | "true" | "false")}
-              className="px-3 py-3 bg-white dark:bg-surface-900 border border-brand-200 dark:border-brand-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent shadow-sm text-surface-700 dark:text-surface-300"
+              className="px-3 py-3 bg-white dark:bg-surface-900 border border-brand-200 dark:border-brand-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent shadow-sm text-surface-700 dark:text-surface-300 sm:w-44"
             >
               <option value="">Todos</option>
               <option value="true">Inscritos</option>
               <option value="false">No inscritos</option>
             </select>
           </div>
-          {searching && (
-            <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
-              <svg
-                className="animate-spin h-4 w-4 text-brand-500"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-            </div>
-          )}
-        </div>
 
-        {/* Search results dropdown */}
-        {debouncedSearch.trim() && (
+          {/* Search results dropdown */}
+          {debouncedSearch.trim() && (
           <div className="relative mt-3 max-w-xl">
             {searchError && <ErrorMessage message={searchError} />}
             {!searching && results.length === 0 && !searchError && (
@@ -232,7 +233,8 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Stats — varied cards with left border accent */}
