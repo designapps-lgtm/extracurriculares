@@ -73,9 +73,11 @@ DATABASE_URL="postgresql://USER:PASS@HOST/neondb?sslmode=require" npx prisma db 
 ### 4.1 Variables de entorno
 | Variable | Valor |
 |----------|-------|
-| `VITE_API_URL` | `https://TU-BACKEND.onrender.com` (URL del backend en Render) |
+| `VITE_API_URL` | **Ya no se usa en producción.** El frontend llama a `/api/*` por el mismo dominio y `vercel.json` proxya hacia Render (para que las cookies sean first-party y funcionen en móvil). Solo hace falta para desarrollo local (docker usa `http://localhost:3000`). |
 
-> `VITE_API_URL` se embebe en el build. Si cambia, hay que rebuildear.
+> `vercel.json` contiene el rewrite `/api/* → https://extracurriculares-gi.onrender.com/api/*`.
+> Si cambia el backend de Render, actualizar esa URL. Sin el proxy, los navegadores
+> móviles bloquean las cookies `SameSite=None` (third-party) y la sesión se pierde.
 
 ### 4.2 Deploy
 - Vercel auto-detecta Vite. Configura el **Root Directory** a `frontend/`.

@@ -1,4 +1,10 @@
-const BASE_URL = import.meta.env.API_URL || import.meta.env.VITE_API_URL || "http://localhost:3000";
+// El backend se proxya via vercel.json (/api/* -> onrender.com) para que el
+// navegador siempre hable con el MISMO dominio y las cookies sean first-party
+// (SameSite=None no se bloquea). En producción usamos ruta relativa. En dev
+// (docker o vite) apuntamos directo al backend local.
+const BASE_URL = import.meta.env.PROD
+  ? ""
+  : import.meta.env.API_URL || import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export interface ApiRequestOptions {
   retry?: boolean;
