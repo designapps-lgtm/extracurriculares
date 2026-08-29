@@ -143,66 +143,123 @@ export default function AdminStudents() {
         ) : students.length === 0 ? (
           <div className="text-center py-12 text-surface-500">No se encontraron estudiantes</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-surface-100 dark:border-surface-800">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Código</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Nombre</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Grado</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Estado</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Inscrito</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-surface-500 uppercase">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-50 dark:divide-surface-800">
-                {students.map((s) => (
-                  <tr
-                    key={s.codigoEstudiante}
-                    onClick={() => navigate(`/admin/students/${s.codigoEstudiante}`)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        navigate(`/admin/students/${s.codigoEstudiante}`);
-                      }
-                    }}
-                    className="cursor-pointer hover:bg-brand-50/60 dark:hover:bg-brand-950/40 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-mono text-surface-600 dark:text-surface-400">{s.codigoEstudiante}</td>
-                    <td className="px-4 py-3 font-medium text-surface-900 dark:text-surface-100">{s.nombre} {s.apellido}</td>
-                    <td className="px-4 py-3"><span className="badge-neutral">{s.grade.nombre}</span></td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.estado === "activo" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                        {s.estado}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.studentSchedules.length > 0 ? "bg-blue-100 text-blue-800" : "bg-surface-100 text-surface-600"}`}>
-                        {s.studentSchedules.length > 0 ? "Inscrito" : "No inscrito"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(s);
-                        }}
-                        className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 text-sm font-medium"
-                      >
-                        Editar
-                      </button>
-                      <span className="inline-flex items-center ml-3 text-surface-300 dark:text-surface-600">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </span>
-                    </td>
+          <>
+            {/* Mobile: cards */}
+            <div className="md:hidden divide-y divide-surface-100 dark:divide-surface-800">
+              {students.map((s) => (
+                <div
+                  key={s.codigoEstudiante}
+                  onClick={() => navigate(`/admin/students/${s.codigoEstudiante}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      navigate(`/admin/students/${s.codigoEstudiante}`);
+                    }
+                  }}
+                  className="p-4 cursor-pointer hover:bg-brand-50/60 dark:hover:bg-brand-950/40 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-surface-900 dark:text-surface-100 break-words">
+                        {s.nombre} {s.apellido}
+                      </p>
+                      <p className="text-xs font-mono text-surface-500 mt-0.5">
+                        {s.codigoEstudiante} · {s.grade.nombre}
+                      </p>
+                    </div>
+                    <span className="shrink-0 mt-0.5 text-surface-300 dark:text-surface-600">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                    <span className="badge-neutral">{s.grade.nombre}</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.estado === "activo" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                      {s.estado}
+                    </span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.studentSchedules.length > 0 ? "bg-blue-100 text-blue-800" : "bg-surface-100 text-surface-600"}`}>
+                      {s.studentSchedules.length > 0 ? "Inscrito" : "No inscrito"}
+                    </span>
+                  </div>
+                  <div className="mt-2.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(s);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium text-brand-600 hover:text-brand-700 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-950"
+                    >
+                      Editar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-100 dark:border-surface-800">
+                    <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Código</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Nombre</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Grado</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Estado</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Inscrito</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium text-surface-500 uppercase">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-surface-50 dark:divide-surface-800">
+                  {students.map((s) => (
+                    <tr
+                      key={s.codigoEstudiante}
+                      onClick={() => navigate(`/admin/students/${s.codigoEstudiante}`)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          navigate(`/admin/students/${s.codigoEstudiante}`);
+                        }
+                      }}
+                      className="cursor-pointer hover:bg-brand-50/60 dark:hover:bg-brand-950/40 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-mono text-surface-600 dark:text-surface-400">{s.codigoEstudiante}</td>
+                      <td className="px-4 py-3 font-medium text-surface-900 dark:text-surface-100">{s.nombre} {s.apellido}</td>
+                      <td className="px-4 py-3"><span className="badge-neutral">{s.grade.nombre}</span></td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.estado === "activo" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                          {s.estado}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.studentSchedules.length > 0 ? "bg-blue-100 text-blue-800" : "bg-surface-100 text-surface-600"}`}>
+                          {s.studentSchedules.length > 0 ? "Inscrito" : "No inscrito"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(s);
+                          }}
+                          className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 text-sm font-medium"
+                        >
+                          Editar
+                        </button>
+                        <span className="inline-flex items-center ml-3 text-surface-300 dark:text-surface-600">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* Pagination */}

@@ -207,13 +207,13 @@ export default function AdminAssignments() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">
           Oferta Extracurricular
         </h1>
         <button
           onClick={openCreate}
-          className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+          className="self-start sm:self-auto px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
         >
           + Nueva asignación
         </button>
@@ -231,7 +231,7 @@ export default function AdminAssignments() {
                   key={a.idAsignacion}
                   className="p-5 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-surface-900 dark:text-surface-100">
@@ -279,24 +279,24 @@ export default function AdminAssignments() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1 flex-wrap shrink-0">
                       <button
                         onClick={() => openEdit(a)}
-                        className="text-brand-600 hover:text-brand-700 text-sm font-medium"
+                        className="px-2.5 py-1.5 text-brand-600 hover:text-brand-700 hover:bg-brand-50 dark:hover:bg-brand-950 rounded-lg text-sm font-medium"
                       >
                         Editar
                       </button>
                       {a.estado === "inactivo" && (
                         <button
                           onClick={() => handleActivate(a)}
-                          className="text-green-600 hover:text-green-700 text-sm font-medium"
+                          className="px-2.5 py-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950 rounded-lg text-sm font-medium"
                         >
                           Activar
                         </button>
                       )}
                       <button
                         onClick={() => handleDelete(a.idAsignacion)}
-                        className="text-red-600 hover:text-red-700 text-sm font-medium"
+                        className="px-2.5 py-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg text-sm font-medium"
                       >
                         {a.estado === "activo" ? "Desactivar" : "Eliminar"}
                       </button>

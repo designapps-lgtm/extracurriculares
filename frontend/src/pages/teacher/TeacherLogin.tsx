@@ -37,7 +37,7 @@ export default function TeacherLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
+    <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4">

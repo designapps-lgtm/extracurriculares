@@ -99,7 +99,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center">
               <svg
-                className="w-4.5 h-4.5 text-white"
+                className="w-5 h-5 text-white"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -183,7 +183,7 @@ export default function Dashboard() {
               aria-label="Filtrar por inscripción"
               value={inscrito}
               onChange={(e) => setInscrito(e.target.value as "" | "true" | "false")}
-              className="px-3 py-3 bg-white dark:bg-surface-900 border border-brand-200 dark:border-brand-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent shadow-sm text-surface-700 dark:text-surface-300 sm:w-44"
+              className="w-full sm:w-44 px-3 py-3 bg-white dark:bg-surface-900 border border-brand-200 dark:border-brand-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent shadow-sm text-surface-700 dark:text-surface-300"
             >
               <option value="">Todos</option>
               <option value="true">Inscritos</option>

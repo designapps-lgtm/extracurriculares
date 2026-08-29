@@ -25,7 +25,7 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
+    <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">

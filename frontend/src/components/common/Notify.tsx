@@ -161,7 +161,7 @@ function Toast({ notification }: { notification: Notification }) {
   };
 
   return (
-    <div className={`pointer-events-auto animate-in slide-in-from-right-5 duration-300 border rounded-xl shadow-lg px-4 py-3 flex items-center gap-3 min-w-[280px] max-w-sm ${bg[notification.type]}`}>
+    <div className={`pointer-events-auto animate-in slide-in-from-right-5 duration-300 border rounded-xl shadow-lg px-4 py-3 flex items-center gap-3 w-[calc(100vw-2rem)] sm:w-auto min-w-[min(280px,calc(100vw-2rem))] max-w-sm ${bg[notification.type]}`}>
       {icons[notification.type]}
       <p className="text-sm text-surface-700 dark:text-surface-300">{notification.message}</p>
     </div>

@@ -65,12 +65,12 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">Administradores</h1>
           <p className="text-sm text-surface-500 mt-1">Gestiona los correos con acceso al panel</p>
         </div>
-        <button onClick={() => { setShowCreate(true); setFormEmail(""); setFormNombre(""); setFormApellido(""); setFormPassword(""); }} className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700">
+        <button onClick={() => { setShowCreate(true); setFormEmail(""); setFormNombre(""); setFormApellido(""); setFormPassword(""); }} className="self-start sm:self-auto px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700">
           + Agregar admin
         </button>
       </div>
@@ -102,14 +102,14 @@ export default function AdminUsers() {
                     </td>
                     <td className="px-4 py-3 text-xs text-surface-500">{new Date(a.createdAt).toLocaleDateString("es-CO")}</td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => { setShowReset(a.id); setFormPassword(""); }} className="text-brand-600 hover:text-brand-700 text-sm font-medium">
+                      <div className="flex items-center justify-end gap-1 flex-wrap">
+                        <button onClick={() => { setShowReset(a.id); setFormPassword(""); }} className="px-1.5 py-1 text-brand-600 hover:text-brand-700 hover:bg-brand-50 dark:hover:bg-brand-950 text-sm font-medium rounded-lg">
                           Reset pass
                         </button>
-                        <button onClick={() => handleToggle(a)} className="text-surface-600 hover:text-surface-700 text-sm font-medium">
+                        <button onClick={() => handleToggle(a)} className="px-1.5 py-1 text-surface-600 hover:text-surface-700 hover:bg-surface-50 text-sm font-medium rounded-lg">
                           {a.estado === "activo" ? "Desactivar" : "Activar"}
                         </button>
-                        <button onClick={() => handleDelete(a.id)} className="text-red-600 hover:text-red-700 text-sm font-medium">
+                        <button onClick={() => handleDelete(a.id)} className="px-1.5 py-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 text-sm font-medium rounded-lg">
                           Eliminar
                         </button>
                       </div>
@@ -125,7 +125,7 @@ export default function AdminUsers() {
       {/* Create modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
-          <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">Agregar administrador</h2>
             <div className="space-y-4">
               <div>
@@ -158,7 +158,7 @@ export default function AdminUsers() {
       {/* Reset password modal */}
       {showReset && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowReset(null)}>
-          <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-1">Restablecer contraseña</h2>
             <p className="text-sm text-surface-500 mb-4">Admin: {admins.find((a) => a.id === showReset)?.email}</p>
             <div>

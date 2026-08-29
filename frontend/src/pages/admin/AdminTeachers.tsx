@@ -258,7 +258,7 @@ export default function AdminTeachers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">
           Profesores
         </h1>
@@ -267,21 +267,21 @@ export default function AdminTeachers() {
             setShowCreate(true);
             setForm({ nombre: "", apellido: "", correo: "", fotoUrl: "" });
           }}
-          className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+          className="self-start sm:self-auto px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
         >
           + Nuevo profesor
         </button>
       </div>
       {/* Search */}
       <div className="card p-4">
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && load(1)}
             placeholder="Buscar por nombre o correo..."
-            className="flex-1 px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="flex-1 min-w-[0] px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
           <button
             onClick={() => load(1)}
@@ -336,7 +336,7 @@ export default function AdminTeachers() {
                     <p className="font-medium text-surface-900 dark:text-surface-100 text-sm truncate group-hover:text-brand-700 dark:group-hover:text-brand-400 transition-colors">
                       {t.nombre} {t.apellido}
                     </p>
-                    <p className="text-xs text-[#707070] dark:text-surface-400 mt-0.5 truncate">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 truncate">
                       {t.correo || "Sin correo"}
                     </p>
                   </div>
@@ -346,30 +346,30 @@ export default function AdminTeachers() {
                     {t.estado}
                   </span>
                 </div>
-                <div className="px-5 py-2.5 border-t border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-800/50 flex items-center justify-between gap-2">
+                <div className="px-5 py-2.5 border-t border-surface-100 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-800/50 flex flex-wrap items-center justify-between gap-y-2 gap-x-2">
                   <span className="text-xs text-surface-500 dark:text-surface-400">
                     {t._count.assignments}{" "}
                     {t._count.assignments === 1 ? "asignación" : "asignaciones"}
                   </span>
                   <div
-                    className="flex items-center gap-3"
+                    className="flex items-center gap-2 flex-wrap"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
                       onClick={() => openAssignments(t)}
-                      className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+                      className="px-2 py-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-950"
                     >
                       Asignaciones
                     </button>
                     <button
                       onClick={() => openEdit(t)}
-                      className="text-xs font-medium text-surface-600 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-200"
+                      className="px-2 py-1.5 text-xs font-medium text-surface-600 hover:text-surface-800 dark:text-surface-400 dark:hover:text-surface-200 rounded-lg hover:bg-surface-50"
                     >
                       Editar
                     </button>
                     <button
                       onClick={() => handleToggleStatus(t)}
-                      className={`text-xs font-medium ${t.estado === "activo" ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"}`}
+                      className={`px-2 py-1.5 text-xs font-medium rounded-lg hover:bg-surface-100 ${t.estado === "activo" ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"}`}
                     >
                       {t.estado === "activo" ? "Desactivar" : "Activar"}
                     </button>
@@ -395,7 +395,7 @@ export default function AdminTeachers() {
             onClick={() => setShowCreate(false)}
           >
             <div
-              className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md shadow-xl"
+              className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">
@@ -418,7 +418,7 @@ export default function AdminTeachers() {
           onClick={() => setEditing(null)}
         >
           <div
-            className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md shadow-xl"
+            className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">
@@ -441,10 +441,10 @@ export default function AdminTeachers() {
             onClick={() => setShowAssignments(null)}
           >
             <div
-              className="bg-white dark:bg-surface-900 rounded-2xl p-8 w-full max-w-5xl max-h-[92vh] overflow-y-auto shadow-2xl mx-4"
+              className="bg-white dark:bg-surface-900 rounded-2xl p-4 sm:p-6 lg:p-8 w-full max-w-5xl max-h-[92vh] overflow-y-auto shadow-2xl mx-4"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
                 <div>
                   <h2 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">
                     Asignaciones
@@ -486,7 +486,7 @@ export default function AdminTeachers() {
                       {assignments.map((a) => (
                         <div
                           key={a.idAsignacion}
-                          className="flex items-center justify-between p-5 rounded-xl border border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-700 transition-colors"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-xl border border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-700 transition-colors"
                         >
                           <div className="flex-1 min-w-0">
                             <p className="text-base font-semibold text-surface-900 dark:text-surface-100">
@@ -511,7 +511,7 @@ export default function AdminTeachers() {
                                 : "Sin horario"}
                             </p>
                           </div>
-                          <div className="flex gap-3 ml-4">
+                          <div className="flex gap-2 sm:ml-4 shrink-0">
                             <button
                               onClick={() => openEditAssignment(a)}
                               className="px-3 py-1.5 text-sm font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 dark:hover:bg-brand-950 rounded-lg transition-colors"

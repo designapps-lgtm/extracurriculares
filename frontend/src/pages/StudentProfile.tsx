@@ -214,24 +214,24 @@ export default function StudentProfile() {
 
         {/* Quick stats */}
         <div className="grid grid-cols-3 divide-x divide-surface-100 dark:divide-surface-800">
-          <div className="px-4 py-3 text-center">
-            <p className="text-lg font-display font-bold text-surface-900 dark:text-surface-100">
+          <div className="px-2 sm:px-4 py-3 text-center min-w-0">
+            <p className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
               {extracurricular?.length || 0}
             </p>
             <p className="text-xs text-surface-500 dark:text-surface-400">
               Actividades
             </p>
           </div>
-          <div className="px-4 py-3 text-center">
-            <p className="text-lg font-display font-bold text-surface-900 dark:text-surface-100">
+          <div className="px-2 sm:px-4 py-3 text-center min-w-0">
+            <p className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
               {groupedByDay.length}
             </p>
             <p className="text-xs text-surface-500 dark:text-surface-400">
               Días ocupados
             </p>
           </div>
-          <div className="px-4 py-3 text-center">
-            <p className="text-lg font-display font-bold text-surface-900 dark:text-surface-100">
+          <div className="px-2 sm:px-4 py-3 text-center min-w-0">
+            <p className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
               {student.grade.nombre}
             </p>
             <p className="text-xs text-surface-500 dark:text-surface-400">

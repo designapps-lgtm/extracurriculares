@@ -59,7 +59,7 @@ export default function SupervisorSession() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
+      <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
         <Loading />
       </div>
     );
@@ -67,7 +67,7 @@ export default function SupervisorSession() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
+      <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
         <div className="card p-8 text-center text-surface-500 text-sm">Sesión no encontrada</div>
       </div>
     );
@@ -82,7 +82,7 @@ export default function SupervisorSession() {
   );
 
   return (
-    <div className="min-h-screen bg-surface-50 dark:bg-surface-950">
+    <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/supervisor/dashboard" className="text-sm text-brand-600 dark:text-brand-400 font-medium hover:underline">
