@@ -181,6 +181,35 @@ export interface AttendanceResponse {
   students: AttendanceStudent[];
 }
 
+export interface Novedad {
+  id: string;
+  novedadId: string;
+  codigoEstudiante: string;
+  archivo: string;
+  descripcion: string | null;
+  seAusentaCon: string | null;
+  seAusentaConOtro: string | null;
+  seAusentaConTipo: string | null;
+  tipoNovedad: string | null;
+  flujoNovedad: string | null;
+  grados: string | null;
+  nombresEstudiantes: string | null;
+  fotoUrls: string | null;
+  fechaHora: string | null;
+  scanCodes: string | null;
+  fechaCreacion: string | null;
+  registradoPor: string | null;
+  procesado: string | null;
+  regresaAlColegio: boolean;
+  horaEstimadaRegreso: string | null;
+  fechaNovedad: string | null;
+}
+
+export interface StudentNovedades {
+  codigoEstudiante: string;
+  novedades: Novedad[];
+}
+
 export interface Supervisor {
   idSupervisor: string;
   codigoSupervisor: string | null;

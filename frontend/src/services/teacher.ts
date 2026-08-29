@@ -4,6 +4,7 @@ import type {
   TeacherClassesResponse,
   Assignment,
   AttendanceResponse,
+  StudentNovedades,
 } from "../types";
 
 export interface TeacherUser {
@@ -68,5 +69,10 @@ export async function saveAttendance(
     `/api/teacher/sessions/${sessionId}/attendance`,
     { records }
   );
+  return res.data;
+}
+
+export async function getNovedadesBatch(codigos: string[]): Promise<StudentNovedades[]> {
+  const res = await api.get<ApiResponse<StudentNovedades[]>>(`/api/teacher/novedades/batch`, { codigos: codigos.join(",") });
   return res.data;
 }

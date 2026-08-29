@@ -269,3 +269,33 @@ model AttendanceRecord {
   @@index([sessionId])
   @@index([codigoEstudiante])
 }
+
+model Novedad {
+  id                  String    @id @default(uuid())
+  novedadId           String
+  archivo             String // nombre del archivo xlsx de origen
+  codigoEstudiante    String
+  descripcion         String? // Novedad_de_Salida_Diaria_M
+  seAusentaCon        String? // Se ausenta con
+  seAusentaConOtro    String? // Se ausenta con Otro
+  seAusentaConTipo    String? // Se_AusentaCon_Tipo_M
+  tipoNovedad         String? // Tipo de Novedad
+  flujoNovedad        String? // Flujo_Novedad
+  grados              String? // Grados
+  nombresEstudiantes  String? // Nombres_Estudiantes
+  fotoUrls            String? // Fotos (urls separadas por coma)
+  fechaHora           DateTime? // FechaHora
+  scanCodes           String? // ScanCode
+  fechaCreacion       DateTime? // Fecha_Creacion
+  registradoPor       String? // RegistradoPor
+  procesado           String? // Procesado
+  regresaAlColegio    Boolean @default(false) // Regresa_Al_Colegio
+  horaEstimadaRegreso String? // Hora_Estimada_Regreso
+  fechaNovedad        DateTime? // Fecha_Novedad
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([codigoEstudiante])
+  @@index([archivo])
+  @@unique([novedadId, codigoEstudiante])
+}
