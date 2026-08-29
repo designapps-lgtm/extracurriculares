@@ -72,7 +72,10 @@ export async function saveAttendance(
   return res.data;
 }
 
-export async function getNovedadesBatch(codigos: string[]): Promise<StudentNovedades[]> {
-  const res = await api.get<ApiResponse<StudentNovedades[]>>(`/api/teacher/novedades/batch`, { codigos: codigos.join(",") });
+export async function getNovedadesBatch(codigos: string[], fecha?: string): Promise<StudentNovedades[]> {
+  const res = await api.get<ApiResponse<StudentNovedades[]>>(`/api/teacher/novedades/batch`, {
+    codigos: codigos.join(","),
+    fecha: fecha || "",
+  });
   return res.data;
 }

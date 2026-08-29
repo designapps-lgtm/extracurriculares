@@ -53,12 +53,12 @@ export default function TeacherDashboard() {
 
   const handleLogout = async () => {
     await teacherLogout();
-    navigate("/teacher/login");
+    navigate("/");
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
+      <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full" />
       </div>
     );
@@ -77,7 +77,7 @@ export default function TeacherDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-surface-50 dark:bg-surface-950">
+    <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
@@ -86,7 +86,7 @@ export default function TeacherDashboard() {
             </h1>
             <p className="text-xs text-surface-500">Hoy es {DIAS_ES[dayName] || dayName} · {date}</p>
           </div>
-          <button onClick={handleLogout} className="text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300">
+          <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
             Salir
           </button>
         </div>
@@ -119,7 +119,7 @@ export default function TeacherDashboard() {
                       const startingKey = starting === key;
                       return (
                         <div key={key} className={`card p-4 ${isToday ? "ring-2 ring-brand-200 dark:ring-brand-800" : ""}`}>
-                          <div className="flex items-start justify-between">
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-surface-900 dark:text-surface-100">
                                 {cls.discipline.nombre}
@@ -136,13 +136,15 @@ export default function TeacherDashboard() {
                               </p>
                             </div>
 
-                            <div className="ml-4 shrink-0">
+                            <div className="sm:ml-4 shrink-0 sm:self-start w-full sm:w-auto">
                               {cls.sessionEstado === "finalizada" ? (
-                                <span className="text-xs text-green-600 font-medium">Finalizada</span>
+                                <span className="inline-flex items-center text-xs text-green-600 font-medium py-2">
+                                  Finalizada
+                                </span>
                               ) : cls.sessionId ? (
                                 <button
                                   onClick={() => navigate(`/teacher/session/${cls.sessionId}`)}
-                                  className="px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600"
+                                  className="w-full sm:w-auto px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600"
                                 >
                                   Continuar
                                 </button>
@@ -150,7 +152,7 @@ export default function TeacherDashboard() {
                                 <button
                                   onClick={() => handleStartSession(cls)}
                                   disabled={starting !== null}
-                                  className={`px-4 py-2 text-white text-sm font-medium rounded-xl disabled:opacity-50 ${
+                                  className={`w-full sm:w-auto px-4 py-2 text-white text-sm font-medium rounded-xl disabled:opacity-50 ${
                                     isToday
                                       ? "bg-brand-600 hover:bg-brand-700"
                                       : "bg-surface-500 hover:bg-surface-600"

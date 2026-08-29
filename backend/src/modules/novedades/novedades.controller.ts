@@ -20,6 +20,38 @@ function isActive(n: { fechaNovedad: Date | null; fechaCreacion: Date | null }):
   return false;
 }
 
+function dayBounds(fechaISO: string): { start: Date; end: Date } | null {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(fechaISO);
+  if (dateOnly) {
+    // Colombia es UTC-5 fijo (sin DST): las 00:00 de Bogotá = 05:00 UTC.
+    const start = new Date(`${fechaISO}T05:00:00.000Z`);
+    if (isNaN(start.getTime())) return null;
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { start, end };
+  }
+
+  const d = new Date(fechaISO);
+  if (isNaN(d.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "0";
+  const start = new Date(`${get("year")}-${get("month")}-${get("day")}T05:00:00.000Z`);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
+function isOnDay(n: { fechaNovedad: Date | null; fechaCreacion: Date | null }, bounds: { start: Date; end: Date }): boolean {
+  const d = n.fechaNovedad || n.fechaCreacion;
+  if (!d) return false;
+  return d >= bounds.start && d < bounds.end;
+}
+
 function serialize(n: any) {
   return {
     id: n.id,
@@ -54,6 +86,7 @@ export async function getNovedadesByCodigo(req: Request, res: Response): Promise
 
 export async function getNovedadesBatch(req: Request, res: Response): Promise<void> {
   const raw = String(req.query.codigos || "");
+  const fechaParam = String(req.query.fecha || "").trim();
   const codigos = raw.split(",").map((c) => c.trim()).filter(Boolean);
   if (codigos.length === 0) {
     res.json({ success: true, data: [] });
@@ -65,9 +98,11 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
     orderBy: [{ fechaNovedad: "desc" }, { fechaCreacion: "desc" }],
   });
 
+  const bounds = fechaParam ? dayBounds(fechaParam) : null;
   const activas: Record<string, any[]> = {};
   for (const r of rows) {
-    if (!isActive(r)) continue;
+    const match = bounds ? isOnDay(r, bounds) : isActive(r);
+    if (!match) continue;
     (activas[r.codigoEstudiante] = activas[r.codigoEstudiante] || []).push(serialize(r));
   }
 

@@ -109,11 +109,11 @@ export default function SupervisorDashboard() {
 
   const handleLogout = async () => {
     await supervisorLogout();
-    navigate("/supervisor/login");
+    navigate("/");
   };
 
   return (
-    <div className="min-h-screen bg-surface-50 dark:bg-surface-950">
+    <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="min-w-0">
@@ -122,7 +122,7 @@ export default function SupervisorDashboard() {
             </h1>
             <p className="text-xs text-surface-500">Asistencias registradas por los profesores</p>
           </div>
-          <button onClick={handleLogout} className="text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 shrink-0">
+          <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 shrink-0">
             Salir
           </button>
         </div>

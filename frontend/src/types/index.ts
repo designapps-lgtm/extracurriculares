@@ -179,6 +179,11 @@ export interface AttendanceResponse {
   assignment: Assignment;
   schedule: Schedule;
   students: AttendanceStudent[];
+  session?: {
+    id: string;
+    estado: string;
+    fecha: string;
+  };
 }
 
 export interface Novedad {

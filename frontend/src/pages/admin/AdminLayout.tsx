@@ -27,9 +27,13 @@ export default function AdminLayout() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
+      <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full" />
       </div>
     );
@@ -41,13 +45,13 @@ export default function AdminLayout() {
 
   const handleLogout = async () => {
     await logout();
-    navigate("/admin/login");
+    navigate("/");
   };
 
   return (
-    <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex">
+    <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex">
       {/* Sidebar - desktop */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-surface-900 dark:bg-surface-950 text-surface-100">
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-surface-900 dark:bg-surface-950 text-surface-100 shrink-0">
         <div className="px-6 py-5 border-b border-surface-800">
           <Link to="/admin/dashboard" className="font-display font-bold text-lg text-white">
             Admin Panel
@@ -92,13 +96,17 @@ export default function AdminLayout() {
       </aside>
 
       {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 inset-x-0 z-50 bg-surface-900 text-white px-4 py-3 flex items-center justify-between">
-        <Link to="/admin/dashboard" className="font-display font-bold">Admin</Link>
-        <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1">
+      <div className="lg:hidden fixed top-0 inset-x-0 z-50 bg-surface-900 text-white pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] py-3 flex items-center gap-3">
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label={sidebarOpen ? "Cerrar menú" : "Abrir menú"}
+          className="p-2.5 -ml-2.5 rounded-lg hover:bg-surface-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d={sidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
           </svg>
         </button>
+        <Link to="/admin/dashboard" className="font-display font-bold">Admin</Link>
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -108,10 +116,10 @@ export default function AdminLayout() {
 
       {/* Mobile sidebar */}
       {sidebarOpen && (
-        <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-surface-900 text-surface-100 flex flex-col">
-          <div className="px-6 py-5 border-b border-surface-800 flex items-center justify-between">
+        <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 bg-surface-900 text-surface-100 flex flex-col max-w-[85vw]">
+          <div className="px-6 py-5 border-b border-surface-800 pl-[max(1.5rem,env(safe-area-inset-left))] flex items-center justify-between">
             <span className="font-display font-bold text-lg text-white">Admin Panel</span>
-            <button onClick={() => setSidebarOpen(false)} className="text-surface-400 hover:text-white">
+            <button onClick={() => setSidebarOpen(false)} className="text-surface-400 hover:text-white p-1.5 rounded-lg hover:bg-surface-800">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -152,9 +160,11 @@ export default function AdminLayout() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 lg:ml-0 pt-14 lg:pt-0 min-h-screen">
-        <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-          <Outlet />
+      <main className="flex-1 min-w-0 lg:ml-0 pt-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] lg:pt-0">
+        <div className="min-h-[100dvh]">
+          <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>

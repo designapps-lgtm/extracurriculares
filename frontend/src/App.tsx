@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import RoleSelect from "./pages/RoleSelect";
 import Dashboard from "./pages/Dashboard";
 import StudentProfile from "./pages/StudentProfile";
 import Disciplines from "./pages/Disciplines";
@@ -18,6 +19,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import TeacherLogin from "./pages/teacher/TeacherLogin";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import TeacherAttendance from "./pages/teacher/TeacherAttendance";
+import TeacherNovedad from "./pages/teacher/TeacherNovedad";
 
 // Supervisor
 import SupervisorLogin from "./pages/supervisor/SupervisorLogin";
@@ -30,12 +32,14 @@ import AdminSupervisors from "./pages/admin/AdminSupervisors";
 function App() {
   return (
     <Routes>
-      {/* Root = Teacher login */}
-      <Route path="/" element={<TeacherLogin />} />
+      {/* Root = Role selector */}
+      <Route path="/" element={<RoleSelect />} />
 
       {/* Teacher routes */}
+      <Route path="/teacher/login" element={<TeacherLogin />} />
       <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
       <Route path="/teacher/session/:sessionId" element={<TeacherAttendance />} />
+      <Route path="/teacher/novedad/:codigoEstudiante" element={<TeacherNovedad />} />
 
       {/* Supervisor routes */}
       <Route path="/supervisor/login" element={<SupervisorLogin />} />
