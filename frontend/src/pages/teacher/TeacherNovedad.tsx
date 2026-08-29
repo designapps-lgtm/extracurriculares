@@ -1,6 +1,7 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getNovedadesBatch } from "../../services/teacher";
+import Logo from "../../components/common/Logo";
 import type { Novedad } from "../../types";
 
 interface State {
@@ -48,15 +49,18 @@ export default function TeacherNovedad() {
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 pb-10">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <button
-            onClick={() => navigate(backTo)}
-            className="inline-flex items-center gap-1.5 text-sm text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Volver a la asistencia
-          </button>
+          <div className="flex items-center gap-3 min-w-0">
+            <Logo chip alt="Extracurriculares" className="h-8 w-auto shrink-0" />
+            <button
+              onClick={() => navigate(backTo)}
+              className="inline-flex items-center gap-1.5 text-sm text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              Volver a la asistencia
+            </button>
+          </div>
           {loading && <span className="text-xs text-surface-400">Cargando...</span>}
         </div>
       </header>

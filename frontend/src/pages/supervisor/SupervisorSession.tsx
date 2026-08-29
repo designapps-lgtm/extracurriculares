@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { getSupervisorSession, exportSupervisorSession } from "../../services/supervisor";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
+import Logo from "../../components/common/Logo";
 import type { SupervisorSessionDetail } from "../../types";
 
 function formatFecha(iso: string): string {
@@ -85,9 +86,12 @@ export default function SupervisorSession() {
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/supervisor/dashboard" className="text-sm text-brand-600 dark:text-brand-400 font-medium hover:underline">
-            ← Volver
-          </Link>
+          <div className="flex items-center gap-2 min-w-0">
+            <Logo chip alt="Extracurriculares" className="h-8 w-auto shrink-0" />
+            <Link to="/supervisor/dashboard" className="text-sm text-brand-600 dark:text-brand-400 font-medium hover:underline">
+              ← Volver
+            </Link>
+          </div>
           <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">Asistencia</h1>
           <button onClick={() => navigate("/supervisor/dashboard")} className="text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300">
             Salir

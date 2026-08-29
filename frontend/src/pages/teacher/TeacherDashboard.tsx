@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getTeacherClasses, teacherLogout, startSession } from "../../services/teacher";
 import { useNotify } from "../../components/common/Notify";
 import type { TeacherClass } from "../../types";
+import Logo from "../../components/common/Logo";
 
 const DIAS_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 const DIAS_ES: Record<string, string> = {
@@ -80,11 +81,14 @@ export default function TeacherDashboard() {
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100">
-              {teacher?.nombre} {teacher?.apellido}
-            </h1>
-            <p className="text-xs text-surface-500">Hoy es {DIAS_ES[dayName] || dayName} · {date}</p>
+          <div className="flex items-center gap-3 min-w-0">
+            <Logo chip alt="Extracurriculares" className="h-9 w-auto" />
+            <div className="min-w-0">
+              <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
+                {teacher?.nombre} {teacher?.apellido}
+              </h1>
+              <p className="text-xs text-surface-500 truncate">Hoy es {DIAS_ES[dayName] || dayName} · {date}</p>
+            </div>
           </div>
           <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
             Salir

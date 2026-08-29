@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../../services/admin";
+import Logo from "../../components/common/Logo";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -28,6 +29,9 @@ export default function AdminLogin() {
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <Logo chip alt="Extracurriculares" className="h-16 w-auto" />
+          </div>
           <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">
             Panel Administrativo
           </h1>

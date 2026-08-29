@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation, Navigate, useNavigate } from "react-router-d
 import { useState, useEffect } from "react";
 import { getMe, logout } from "../../services/admin";
 import type { AdminUser } from "../../services/admin";
+import Logo from "../../components/common/Logo";
 
 const NAV_ITEMS = [
   { path: "/admin/dashboard", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
@@ -53,8 +54,9 @@ export default function AdminLayout() {
       {/* Sidebar - desktop */}
       <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-surface-900 dark:bg-surface-950 text-surface-100 shrink-0">
         <div className="px-6 py-5 border-b border-surface-800">
-          <Link to="/admin/dashboard" className="font-display font-bold text-lg text-white">
-            Admin Panel
+          <Link to="/admin/dashboard" className="inline-flex items-center gap-2">
+            <Logo chip alt="Extracurriculares" className="h-8 w-auto" />
+            <span className="font-display font-bold text-lg text-white">Admin Panel</span>
           </Link>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -106,7 +108,10 @@ export default function AdminLayout() {
             <path strokeLinecap="round" strokeLinejoin="round" d={sidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
           </svg>
         </button>
-        <Link to="/admin/dashboard" className="font-display font-bold">Admin</Link>
+        <Link to="/admin/dashboard" className="font-display font-bold inline-flex items-center gap-2">
+          <Logo chip alt="Extracurriculares" className="h-7 w-auto" />
+          <span>Admin</span>
+        </Link>
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -118,7 +123,10 @@ export default function AdminLayout() {
       {sidebarOpen && (
         <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 bg-surface-900 text-surface-100 flex flex-col max-w-[85vw]">
           <div className="px-6 py-5 border-b border-surface-800 pl-[max(1.5rem,env(safe-area-inset-left))] flex items-center justify-between">
-            <span className="font-display font-bold text-lg text-white">Admin Panel</span>
+            <span className="inline-flex items-center gap-2">
+              <Logo chip alt="Extracurriculares" className="h-8 w-auto" />
+              <span className="font-display font-bold text-lg text-white">Admin Panel</span>
+            </span>
             <button onClick={() => setSidebarOpen(false)} className="text-surface-400 hover:text-white p-1.5 rounded-lg hover:bg-surface-800">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

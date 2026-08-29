@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { teacherLogin, teacherMe, teacherLogout, teacherGoogleLogin } from "../../services/teacher";
+import Logo from "../../components/common/Logo";
 
 declare global {
   interface Window {
@@ -13,30 +14,17 @@ declare global {
         };
       };
     };
-    googleRendered?: boolean;
   }
 }
 
 const GOOGLE_CLIENT_ID = import.meta.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-
-function loadGoogleScript(): Promise<void> {
-  return new Promise((resolve) => {
-    if (window.google?.accounts?.id) return resolve();
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => resolve();
-    document.head.appendChild(script);
-  });
-}
 
 export default function TeacherLogin() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [existing, setExisting] = useState<{ nombre: string; apellido: string } | null>(null);
+  const googleRendered = useRef(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,28 +32,39 @@ export default function TeacherLogin() {
       .then((t) => setExisting(t))
       .catch(() => setExisting(null));
 
-    // StrictMode en dev monta dos veces el effect: solo renderizamos el botón una vez.
-    let cancelled = false;
-    if (GOOGLE_CLIENT_ID) {
-      const container = document.getElementById("google-signin-btn");
-      const alreadyRendered = container?.querySelector("iframe, div[role='button']");
-      loadGoogleScript().then(() => {
-        if (cancelled || alreadyRendered || window.googleRendered) return;
-        const gid = window.google?.accounts?.id;
-        if (!gid) return;
-        gid.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: (resp) => handleGoogleCredential(resp.credential),
-        });
-        const node = document.getElementById("google-signin-btn");
-        if (node) {
-          gid.renderButton(node, { theme: "outline", size: "large", shape: "rectangular", width: 320 });
-          window.googleRendered = true;
-        }
-      });
+    if (!GOOGLE_CLIENT_ID) {
+      if (import.meta.env.DEV) console.warn("[login] GOOGLE_CLIENT_ID no está definido — sin botón de Google");
+      return;
     }
+
+    let cancelled = false;
+
+    const renderGoogleButton = () => {
+      if (cancelled || googleRendered.current) return;
+      const gid = window.google?.accounts?.id;
+      const node = document.getElementById("google-signin-btn");
+      if (!gid || !node) return;
+
+      // El iframe de GIS no debe exceder el ancho de la tarjeta (responsive en pantallas chicas).
+      const width = Math.max(200, Math.min(320, node.clientWidth - 16));
+
+      googleRendered.current = true;
+      gid.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: (resp) => handleGoogleCredential(resp.credential),
+      });
+      gid.renderButton(node, { theme: "outline", size: "large", shape: "rectangular", width });
+    };
+
+    // El script vive en index.html; pueden cargar antes o después del mount.
+    renderGoogleButton();
+    const interval = window.setInterval(renderGoogleButton, 150);
+    const timeout = window.setTimeout(() => window.clearInterval(interval), 6000);
+
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -108,10 +107,8 @@ export default function TeacherLogin() {
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+          <div className="flex justify-center mb-4">
+            <Logo chip alt="Extracurriculares" className="h-16 w-auto" />
           </div>
           <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">Extracurriculares</h1>
           <p className="text-surface-500 text-sm mt-1">Portal del profesor</p>

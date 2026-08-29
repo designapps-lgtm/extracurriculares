@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getAttendanceList, saveAttendance, getNovedadesBatch } from "../../services/teacher";
 import { useNotify } from "../../components/common/Notify";
+import Logo from "../../components/common/Logo";
 import type { AttendanceStudent as Student, Schedule, Assignment, Novedad } from "../../types";
 
 export default function TeacherAttendance() {
@@ -85,16 +86,19 @@ export default function TeacherAttendance() {
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <button onClick={() => navigate("/teacher/dashboard")} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
-              ← Volver
-            </button>
-            <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 break-words">
-              {assignment?.discipline?.nombre} — {assignment?.grade?.nombre}
-            </h1>
-            <p className="text-xs text-surface-500">
-              {schedule?.diaSemana} {schedule?.horaInicio} - {schedule?.horaFin}
-            </p>
+          <div className="flex items-center gap-3 min-w-0">
+            <Logo chip alt="Extracurriculares" className="h-9 w-auto shrink-0" />
+            <div className="min-w-0">
+              <button onClick={() => navigate("/teacher/dashboard")} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
+                ← Volver
+              </button>
+              <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 break-words">
+                {assignment?.discipline?.nombre} — {assignment?.grade?.nombre}
+              </h1>
+              <p className="text-xs text-surface-500">
+                {schedule?.diaSemana} {schedule?.horaInicio} - {schedule?.horaFin}
+              </p>
+            </div>
           </div>
           <div className="text-right text-xs text-surface-500">
             <p>{presentCount} presentes</p>
