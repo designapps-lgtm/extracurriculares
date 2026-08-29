@@ -82,28 +82,28 @@ export default function AdminSupervisors() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">Supervisoras</h1>
           <p className="text-sm text-surface-500 mt-1">Gestiona los correos con acceso al panel de supervisión</p>
         </div>
         <button
           onClick={() => { setShowCreate(true); resetForm(); }}
-          className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+          className="self-start sm:self-auto px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
         >
           + Nueva supervisora
         </button>
       </div>
 
       <div className="card p-4">
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && load(1)}
             placeholder="Buscar por nombre o correo..."
-            className="flex-1 px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="flex-1 min-w-[0] px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
           <button onClick={() => load(1)} className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700">
             Buscar
@@ -134,17 +134,17 @@ export default function AdminSupervisors() {
                     {s.estado}
                   </span>
                 </div>
-                <div className="mt-4 flex items-center gap-3 text-xs font-medium">
-                  <button onClick={() => openEdit(s)} className="text-brand-600 hover:text-brand-700 dark:text-brand-400">
+                <div className="mt-4 flex items-center gap-2 flex-wrap">
+                  <button onClick={() => openEdit(s)} className="px-2.5 py-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-950">
                     Editar
                   </button>
                   <button
                     onClick={() => handleToggleStatus(s)}
-                    className={s.estado === "activo" ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"}
+                    className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:bg-surface-100 ${s.estado === "activo" ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"}`}
                   >
                     {s.estado === "activo" ? "Desactivar" : "Activar"}
                   </button>
-                  <button onClick={() => handleDelete(s)} className="text-red-600 hover:text-red-700">
+                  <button onClick={() => handleDelete(s)} className="px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:text-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950">
                     Eliminar
                   </button>
                 </div>
@@ -158,7 +158,7 @@ export default function AdminSupervisors() {
 
       {showCreate && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
-          <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">Nueva supervisora</h2>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -186,7 +186,7 @@ export default function AdminSupervisors() {
 
       {editing && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setEditing(null)}>
-          <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">Editar supervisora</h2>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
