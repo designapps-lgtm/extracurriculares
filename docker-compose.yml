@@ -35,6 +35,8 @@ services:
       GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
       GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID:-}
       NOVEDADES_SYNC_MINUTES: ${NOVEDADES_SYNC_MINUTES:-10}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_INSTITUTION_DOMAIN: ${GOOGLE_INSTITUTION_DOMAIN:-gi.edu.co}
     volumes:
       - ./backend/src:/app/src
       - ./backend/prisma:/app/prisma
@@ -51,6 +53,7 @@ services:
       - "5173:5173"
     environment:
       VITE_API_URL: http://localhost:3000
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/index.html:/app/index.html

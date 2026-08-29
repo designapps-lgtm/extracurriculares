@@ -1,6 +1,36 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { teacherLogin, teacherMe, teacherLogout } from "../../services/teacher";
+import { teacherLogin, teacherMe, teacherLogout, teacherGoogleLogin } from "../../services/teacher";
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (config: { client_id: string; callback: (resp: { credential: string }) => void }) => void;
+          renderButton: (parent: HTMLElement, options: { theme: string; size: string; shape: string; width?: number }) => void;
+          cancel: () => void;
+        };
+      };
+    };
+    googleRendered?: boolean;
+  }
+}
+
+const GOOGLE_CLIENT_ID = import.meta.env.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+
+function loadGoogleScript(): Promise<void> {
+  return new Promise((resolve) => {
+    if (window.google?.accounts?.id) return resolve();
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => resolve();
+    document.head.appendChild(script);
+  });
+}
 
 export default function TeacherLogin() {
   const [email, setEmail] = useState("");
@@ -13,12 +43,50 @@ export default function TeacherLogin() {
     teacherMe()
       .then((t) => setExisting(t))
       .catch(() => setExisting(null));
+
+    // StrictMode en dev monta dos veces el effect: solo renderizamos el botón una vez.
+    let cancelled = false;
+    if (GOOGLE_CLIENT_ID) {
+      const container = document.getElementById("google-signin-btn");
+      const alreadyRendered = container?.querySelector("iframe, div[role='button']");
+      loadGoogleScript().then(() => {
+        if (cancelled || alreadyRendered || window.googleRendered) return;
+        const gid = window.google?.accounts?.id;
+        if (!gid) return;
+        gid.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (resp) => handleGoogleCredential(resp.credential),
+        });
+        const node = document.getElementById("google-signin-btn");
+        if (node) {
+          gid.renderButton(node, { theme: "outline", size: "large", shape: "rectangular", width: 320 });
+          window.googleRendered = true;
+        }
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSessionContinue = () => navigate("/teacher/dashboard");
   const handleSessionLogout = async () => {
     await teacherLogout();
     setExisting(null);
+  };
+
+  const handleGoogleCredential = async (credential: string) => {
+    if (!credential) return setError("No se recibió la credencial de Google");
+    setLoading(true);
+    setError("");
+    try {
+      await teacherGoogleLogin(credential);
+      navigate("/teacher/dashboard");
+    } catch (err: any) {
+      setError(err.message || "No se pudo iniciar sesión con Google");
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,37 +147,72 @@ export default function TeacherLogin() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="card p-6 space-y-4">
-          {error && (
-            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">
-              {error}
+        {GOOGLE_CLIENT_ID ? (
+          <div className="card p-6 space-y-4">
+            {error && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">
+                {error}
+              </div>
+            )}
+            <div id="google-signin-btn" className="flex justify-center" />
+            <div className="relative text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-surface-200 dark:border-surface-800" />
+              </div>
+              <span className="relative px-3 bg-white dark:bg-surface-900 text-xs text-surface-400">o con tu correo</span>
             </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-medium text-surface-500 mb-1">Correo</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="tu@colegio.edu.co"
-              autoComplete="email"
-            />
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-surface-500 mb-1">Correo</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  className="w-full px-3 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  placeholder="tu@gi.edu.co"
+                  autoComplete="email"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+              >
+                {loading ? "Verificando..." : "Ingresar"}
+              </button>
+            </form>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-          >
-            {loading ? "Verificando..." : "Ingresar"}
-          </button>
-
-          <p className="text-xs text-surface-400 text-center">
-            El sistema validará tu correo y te mostrará tus clases.
-          </p>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="card p-6 space-y-4">
+            {error && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">
+                {error}
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-medium text-surface-500 mb-1">Correo</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="tu@gi.edu.co"
+                autoComplete="email"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            >
+              {loading ? "Verificando..." : "Ingresar"}
+            </button>
+            <p className="text-xs text-surface-400 text-center">
+              El sistema validará tu correo y te mostrará tus clases.
+            </p>
+          </form>
+        )}
 
         <p className="text-center text-xs text-surface-400 mt-6">
           ¿Sos administrador?{" "}

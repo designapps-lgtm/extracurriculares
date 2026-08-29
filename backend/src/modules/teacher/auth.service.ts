@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 import prisma from "../../config/prisma";
 import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
@@ -31,6 +32,68 @@ export async function teacherLogin(req: Request, res: Response) {
     throw new AppError(403, "TEACHER_INACTIVE", "La cuenta está desactivada");
   }
 
+  const { accessToken, refreshToken } = await teacherRefresh.issue(
+    teacher.idProfesor,
+    teacher.correo || ""
+  );
+
+  setAuthCookies(res, "teacher", accessToken, refreshToken);
+
+  res.json({
+    success: true,
+    data: {
+      teacher: {
+        idProfesor: teacher.idProfesor,
+        nombre: teacher.nombre,
+        apellido: teacher.apellido,
+        email: teacher.correo,
+      },
+    },
+  });
+}
+
+export async function teacherGoogleLogin(req: Request, res: Response) {
+  const { credential } = req.body;
+
+  if (!credential) {
+    throw new AppError(400, "VALIDATION_ERROR", "Credencial de Google requerida");
+  }
+
+  if (!config.googleClientId) {
+    throw new AppError(503, "GOOGLE_AUTH_NOT_CONFIGURED", "El inicio con Google no está configurado");
+  }
+
+  const client = new OAuth2Client(config.googleClientId);
+  let payload;
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: config.googleClientId,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    throw new AppError(401, "INVALID_GOOGLE_TOKEN", "La credencial de Google es inválida o expiró");
+  }
+
+  if (!payload || payload.email_verified !== true) {
+    throw new AppError(403, "GOOGLE_EMAIL_NOT_VERIFIED", "La cuenta de Google no tiene el correo verificado");
+  }
+
+  const email = payload.email?.toLowerCase() || "";
+  if (payload.hd && payload.hd.toLowerCase() !== config.googleInstitutionDomain.toLowerCase()) {
+    throw new AppError(403, "GOOGLE_DOMAIN_NOT_ALLOWED", `La cuenta debe ser de la institución (${config.googleInstitutionDomain})`);
+  }
+
+  const teacher = await prisma.teacher.findUnique({ where: { correo: email } });
+  if (!teacher) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Correo no registrado como profesor");
+  }
+
+  if (teacher.estado !== "activo") {
+    throw new AppError(403, "TEACHER_INACTIVE", "La cuenta está desactivada");
+  }
+
+  // Reutiliza el mismo flujo de sesión (cookies).
   const { accessToken, refreshToken } = await teacherRefresh.issue(
     teacher.idProfesor,
     teacher.correo || ""
