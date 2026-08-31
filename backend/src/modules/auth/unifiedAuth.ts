@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { OAuth2Client } from "google-auth-library";
-import prisma from "../../config/prisma";
+import { googleOAuthClient } from "../../utils/googleOAuth";
+import { sql, first } from "../../config/db";
 import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { createRefreshService } from "./refreshTokens";
@@ -11,7 +11,7 @@ type Role = "admin" | "teacher" | "supervisor";
 
 const teacherRefresh = createRefreshService({
   userIdField: "teacherId",
-  refreshModel: prisma.teacherRefreshToken as any,
+  tableName: "TeacherRefreshToken",
   buildAccessToken: ({ id, email }) =>
     jwt.sign({ teacherId: id, email }, config.jwtSecret, {
       expiresIn: config.accessTokenExpiresIn,
@@ -20,7 +20,7 @@ const teacherRefresh = createRefreshService({
 
 const supervisorRefresh = createRefreshService({
   userIdField: "supervisorId",
-  refreshModel: prisma.supervisorRefreshToken as any,
+  tableName: "SupervisorRefreshToken",
   buildAccessToken: ({ id, email }) =>
     jwt.sign({ supervisorId: id, email }, config.jwtSecret, {
       expiresIn: config.accessTokenExpiresIn,
@@ -29,7 +29,7 @@ const supervisorRefresh = createRefreshService({
 
 const adminRefresh = createRefreshService({
   userIdField: "adminId",
-  refreshModel: prisma.adminRefreshToken as any,
+  tableName: "AdminRefreshToken",
   buildAccessToken: ({ id, email }) =>
     jwt.sign({ adminId: id, email }, config.jwtSecret, {
       expiresIn: config.accessTokenExpiresIn,
@@ -41,7 +41,7 @@ async function verifyGoogleCredential(credential: string): Promise<string> {
     throw new AppError(503, "GOOGLE_AUTH_NOT_CONFIGURED", "El inicio con Google no está configurado");
   }
 
-  const client = new OAuth2Client(config.googleClientId);
+  const client = googleOAuthClient;
   let payload;
   try {
     const ticket = await client.verifyIdToken({
@@ -77,28 +77,30 @@ interface UserIdentity {
 }
 
 async function resolveRoleByEmail(email: string): Promise<UserIdentity> {
-  // Prioridad de rol: si el mismo correo existe en varias tablas, gana el de
-  // mayor jerarquía (admin > supervisor > teacher), para que por ejemplo un
-  // admin que también figura como profesor entre siempre al panel administrativo.
   const matches: Array<{ role: Role; id: string; email: string; nombre: string; apellido: string; estado: string }> = [];
 
-  const admin = await prisma.adminUser.findUnique({
-    where: { email },
-    select: { id: true, email: true, nombre: true, apellido: true, estado: true },
-  });
-  if (admin) matches.push({ role: "admin", id: admin.id, email: admin.email, nombre: admin.nombre, apellido: admin.apellido, estado: admin.estado });
+  // Las 3 búsquedas son independientes: se ejecutan en paralelo (1 round-trip
+  // HTTP de Neón en vez de 3 secuenciales).
+  const [adminRows, supRows, teacherRows] = await Promise.all([
+    sql`SELECT "id", "email", "nombre", "apellido", "estado" FROM "AdminUser" WHERE "email" = ${email} LIMIT 1`,
+    sql`SELECT "idSupervisor", "correo", "nombre", "apellido", "estado" FROM "Supervisor" WHERE "correo" = ${email} LIMIT 1`,
+    sql`SELECT "idProfesor", "correo", "nombre", "apellido", "estado" FROM "Teacher" WHERE "correo" = ${email} LIMIT 1`,
+  ]);
 
-  const supervisor = await prisma.supervisor.findUnique({
-    where: { correo: email },
-    select: { idSupervisor: true, correo: true, nombre: true, apellido: true, estado: true },
-  });
-  if (supervisor) matches.push({ role: "supervisor", id: supervisor.idSupervisor, email: supervisor.correo || email, nombre: supervisor.nombre, apellido: supervisor.apellido, estado: supervisor.estado });
+  if (adminRows.length > 0) {
+    const a = adminRows[0];
+    matches.push({ role: "admin", id: a.id, email: a.email, nombre: a.nombre, apellido: a.apellido, estado: a.estado });
+  }
 
-  const teacher = await prisma.teacher.findUnique({
-    where: { correo: email },
-    select: { idProfesor: true, correo: true, nombre: true, apellido: true, estado: true },
-  });
-  if (teacher) matches.push({ role: "teacher", id: teacher.idProfesor, email: teacher.correo || email, nombre: teacher.nombre, apellido: teacher.apellido, estado: teacher.estado });
+  if (supRows.length > 0) {
+    const s = supRows[0];
+    matches.push({ role: "supervisor", id: s.idSupervisor, email: s.correo || email, nombre: s.nombre, apellido: s.apellido, estado: s.estado });
+  }
+
+  if (teacherRows.length > 0) {
+    const t = teacherRows[0];
+    matches.push({ role: "teacher", id: t.idProfesor, email: t.correo || email, nombre: t.nombre, apellido: t.apellido, estado: t.estado });
+  }
 
   const priority: Record<Role, number> = { admin: 0, supervisor: 1, teacher: 2 };
   matches.sort((a, b) => priority[a.role] - priority[b.role]);
@@ -182,9 +184,6 @@ const refreshMap: Record<Role, string> = {
 };
 
 export async function me(req: Request, res: Response) {
-  // Misma prioridad que googleLogin (admin > supervisor > teacher): si quedaron
-  // cookies de varios roles en el dispositivo, continuar siempre en el de mayor
-  // jerarquía para no entrar a un panel distinto del que entrega el login.
   for (const role of ["admin", "supervisor", "teacher"] as Role[]) {
     const cookie = req.cookies?.[refreshMap[role]];
     if (!cookie) continue;
@@ -196,26 +195,20 @@ export async function me(req: Request, res: Response) {
 
       let identity: UserIdentity | null = null;
       if (role === "teacher") {
-        const t = await prisma.teacher.findUnique({
-          where: { idProfesor: userId },
-          select: { idProfesor: true, correo: true, nombre: true, apellido: true, estado: true },
-        });
+        const rows = await sql`SELECT "idProfesor", "correo", "nombre", "apellido", "estado" FROM "Teacher" WHERE "idProfesor" = ${userId} LIMIT 1`;
+        const t = rows[0] ?? null;
         if (t && t.estado === "activo") {
           identity = { role: "teacher", id: t.idProfesor, email: t.correo || "", nombre: t.nombre, apellido: t.apellido };
         }
       } else if (role === "supervisor") {
-        const s = await prisma.supervisor.findUnique({
-          where: { idSupervisor: userId },
-          select: { idSupervisor: true, correo: true, nombre: true, apellido: true, estado: true },
-        });
+        const rows = await sql`SELECT "idSupervisor", "correo", "nombre", "apellido", "estado" FROM "Supervisor" WHERE "idSupervisor" = ${userId} LIMIT 1`;
+        const s = rows[0] ?? null;
         if (s && s.estado === "activo") {
           identity = { role: "supervisor", id: s.idSupervisor, email: s.correo || "", nombre: s.nombre, apellido: s.apellido };
         }
       } else {
-        const a = await prisma.adminUser.findUnique({
-          where: { id: userId },
-          select: { id: true, email: true, nombre: true, apellido: true, estado: true },
-        });
+        const rows = await sql`SELECT "id", "email", "nombre", "apellido", "estado" FROM "AdminUser" WHERE "id" = ${userId} LIMIT 1`;
+        const a = rows[0] ?? null;
         if (a && a.estado === "activo") {
           identity = { role: "admin", id: a.id, email: a.email, nombre: a.nombre, apellido: a.apellido };
         }
@@ -232,7 +225,6 @@ export async function me(req: Request, res: Response) {
         return;
       }
     } catch {
-      // Token de refresh inválido/expirado para este rol → intentar el siguiente.
       continue;
     }
   }

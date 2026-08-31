@@ -110,6 +110,84 @@ DATABASE_URL="..." npx ts-node src/import/cli/importOffer.ts
 
 ---
 
+## 5.5 Backend en Cloudflare Workers (alternativa a Render)
+
+> ✅ Estado: **código migrado y compila** (`wrangler deploy --dry-run` exit 0 + typecheck).
+> ⚠️ **Importante**: este es un punto de partida experimental, ver documentación
+> de Cloudflare antes de depender de él en producción.
+
+### Archivos creados
+| Archivo | Qué es |
+|---------|--------|
+| `backend/worker/worker.ts` | Entrypoint Workers: `fetch` (envuelve Express con `httpServerHandler`) + `scheduled` (cron de novedades) |
+| `backend/worker/env.ts` | Puebla `process.env` desde los bindings de Workers (se importa primero) |
+| `backend/worker/wrangler.toml` | Config de deploy: cron `*/10 * * * *`, compat flags, variables |
+| `backend/worker/package.json` | Wrangler + dependencias de build del worker |
+| `backend/worker/tsconfig.json` | Typecheck del worker (usa `types: ["node"]`) |
+
+### Cambios en `src/`
+| Archivo | Cambio |
+|---------|--------|
+| `src/config/prisma.ts` | Usa `Pool` + `PrismaNeon` (adapter serverless de Neon) para correr en edge. Sigue funcionando en Node/Render. |
+| `prisma/schema.prisma` | Agregado `previewFeatures = ["driverAdapters"]` + `prisma generate` |
+| `src/utils/tokens.ts` | `import crypto from "node:crypto"` (compat tipos) |
+
+### Por qué NO se usa `server.ts`
+`server.ts` llama `app.listen()` + `setInterval` (sync de novedades). En Workers:
+- No hay proceso continuo: `setInterval` no corre.
+- El cron lo maneja Cloudflare con el trigger `scheduled`.
+
+Por eso `worker.ts` importa `app.ts` directamente y define su propio `scheduled`.
+
+### Variables de entorno
+Las **no secretas** van en `wrangler.toml` → `[vars]`. Las **secretas** (DB, JWT, Google)
+NO van en el repo; se setean con wrangler:
+
+```bash
+cd backend/worker
+npx wrangler login
+
+# Secretos (uno por línea; wrangler pide el valor)
+npx wrangler secret put DATABASE_URL
+npx wrangler secret put JWT_SECRET
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
+npx wrangler secret put GOOGLE_DRIVE_FOLDER_ID
+```
+
+> `GOOGLE_DRIVE_FOLDER_ID` está en `[vars]` como placeholder vacío; si preferís
+> como secreto, quitalo de `[vars]` y dale `wrangler secret put`.
+
+### Probar en local
+```bash
+cd backend/worker
+npx wrangler login          # una sola vez
+npx wrangler dev            # http://localhost:8787
+```
+
+### Deploy
+```bash
+cd backend/worker
+npx wrangler deploy         # → https://extracurriculares-api.<tu-sub>.workers.dev
+```
+
+Después de deployar, actualizá el rewrite del frontend en `frontend/vercel.json`
+de `/api/*` → la URL de tu Worker (en vez de Render).
+
+### ⚠️ Limitaciones conocidas (leer antes de producción)
+1. **Plan Free = 10ms de CPU por request.** Express + Prisma + bcrypt pueden
+   superar ese límite (especialmente bcrypt en login de admin y parseo de xlsx).
+   Si en runtime se quedan en "timeout insuficiente de CPU", hay que migrar al
+   plan pagado (~$5/mes, 50ms) o quitar código pesado.
+2. **Transacciones en edge**: el sync de novedades usa `prisma.$transaction`. En
+   Workers las conexiones WebSocket viven solo dentro de la request; verificar en
+   runtime que el cron `scheduled` complete las transacciones. Puede requerir
+   ajustar a queries no transaccionales o a `PrismaNeonHttp`.
+3. **Cold starts**: la primera request tras enfriarse puede tardar unos segundos
+   (arranca Express completo).
+
+---
+
 ## 6. Verificación final
 
 1. Login admin en `<vercel>/admin/login` → dashboard.

@@ -1,0 +1,24 @@
+name = "extracurriculares-api"
+main = "./worker.ts"
+compatibility_date = "2026-08-04"
+compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
+
+# URL gratuita de prueba: <nombre>.workers.dev
+workers_dev = true
+
+# Cron: corre el sync de Google Drive. Ajustalo si querés otra frecuencia.
+# Formato Cloudflare: "*/10 * * * *" = cada 10 minutos.
+[triggers]
+crons = ["*/10 * * * *"]
+
+# Variables de entorno no secretas.
+# Las secretas (DATABASE_URL, JWT_SECRET, GOOGLE_*) NO van acá: se setean con
+# `wrangler secret put <NOMBRE>` para que no queden en el repo.
+[vars]
+NODE_ENV = "production"
+PORT = "3000"
+FRONTEND_URL = "https://extracurriculares-gi.vercel.app"
+ACCESS_TOKEN_EXPIRES_IN = "15m"
+REFRESH_TOKEN_EXPIRES_IN_DAYS = "7"
+GOOGLE_INSTITUTION_DOMAIN = "gi.edu.co"
+NOVEDADES_SYNC_MINUTES = "10"

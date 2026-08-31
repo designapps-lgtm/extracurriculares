@@ -1,6 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { sql, first } from "../../config/db";
 
 // ==========================================
 // TEACHERS
@@ -18,12 +16,9 @@ const TEACHERS = [
   { nombre: "Yamid", apellido: "Gómez" },
   { nombre: "Anderson", apellido: "Buitrago" },
   { nombre: "Vanessa", apellido: "Castellanos" },
-  // TODO: Confirmar con usuario si "Carlos Pinillo" y "Carlos Pinillos" son la misma persona.
-  // Usando "Carlos Pinillo" como nombre canónico.
   { nombre: "Carlos", apellido: "Pinillo" },
   { nombre: "Cristian", apellido: "Mosquera" },
   { nombre: "Sebastián", apellido: "Saldarriaga" },
-  // Nuevos (hojas KINDER/PRIMARIA/SECUNDARIA)
   { nombre: "Juan Carlos", apellido: "Ortiz" },
   { nombre: "Luisa", apellido: "Granada" },
   { nombre: "Alejandra", apellido: "Ramírez" },
@@ -50,168 +45,132 @@ const SCHEDULES: Record<string, { diaSemana: string; horaInicio: string | null; 
   S8:  { diaSemana: "LUNES",      horaInicio: "15:30", horaFin: "17:30" },
   S9:  { diaSemana: "JUEVES",     horaInicio: "15:30", horaFin: "17:30" },
   S10: { diaSemana: "MIERCOLES",  horaInicio: "14:20", horaFin: "16:20" },
-  S11: { diaSemana: "SABADO",     horaInicio: null,    horaFin: null },     // "Según programación de partidos"
-  S12: { diaSemana: "LUNES",      horaInicio: "15:15", horaFin: "17:15" },  // Robótica, Olimpiadas, Artes, Técnica Vocal, Banda TR
-  S13: { diaSemana: "JUEVES",     horaInicio: "15:15", horaFin: "17:15" },  // Des. Instrumental, Danza, Pequeños Científicos, Robótica LEGO, Banda Horizon, Artes SEC
-  S14: { diaSemana: "MARTES",     horaInicio: "14:30", horaFin: "16:00" },  // Iniciación Musical K5 / Danzas K4
-  S15: { diaSemana: "VIERNES",    horaInicio: "14:30", horaFin: "16:00" },  // Danzas K5 / Iniciación Musical K4
+  S11: { diaSemana: "SABADO",     horaInicio: null,    horaFin: null },
+  S12: { diaSemana: "LUNES",      horaInicio: "15:15", horaFin: "17:15" },
+  S13: { diaSemana: "JUEVES",     horaInicio: "15:15", horaFin: "17:15" },
+  S14: { diaSemana: "MARTES",     horaInicio: "14:30", horaFin: "16:00" },
+  S15: { diaSemana: "VIERNES",    horaInicio: "14:30", horaFin: "16:00" },
 };
 
 // ==========================================
 // OFFER: each entry = teacher + discipline + grade + schedule keys
 // ==========================================
 interface OfferEntry {
-  teacher: string;          // "Nombre Apellido"
-  discipline: string;       // codigoDisciplina
-  grade: string;            // Grade.nombre
-  scheduleKeys: string[];   // ["S4", "S5", "S6"]
+  teacher: string;
+  discipline: string;
+  grade: string;
+  scheduleKeys: string[];
 }
 
 const OFFER: OfferEntry[] = [
   // ========== KINDER (hoja KINDER) ==========
-
-  // K4 Fútbol (Mié 1:00-2:30)
   { teacher: "Javier Morales",      discipline: "XC_K4_Futbol",        grade: "K4", scheduleKeys: ["S1"] },
   { teacher: "Cristian Echeverry",  discipline: "XC_K4_Futbol",        grade: "K4", scheduleKeys: ["S1"] },
-  // K4 Polimotor (Mié 1:00-2:30)
   { teacher: "Isaí Toro",           discipline: "XC_K4_Polimotor",     grade: "K4", scheduleKeys: ["S1"] },
   { teacher: "Stefania Tabares",    discipline: "XC_K4_Polimotor",     grade: "K4", scheduleKeys: ["S1"] },
-  // K4 Iniciación a Danzas (Mar 2:30-4)
   { teacher: "Luisa Granada",       discipline: "XC_K4_IniciaDanzas",  grade: "K4", scheduleKeys: ["S14"] },
-  // K4 Iniciación Musical (Vie 2:30-4)
   { teacher: "Juan Carlos Ortiz",   discipline: "XC_K4_IniciaMusical", grade: "K4", scheduleKeys: ["S15"] },
-  // K5 Fútbol (Lun + Jue 2:30-4)
   { teacher: "Javier Morales",      discipline: "XC_K5_Futbol",        grade: "K5", scheduleKeys: ["S2", "S3"] },
   { teacher: "Andrés Gómez",        discipline: "XC_K5_Futbol",        grade: "K5", scheduleKeys: ["S2", "S3"] },
-  // K5 Polimotor (Lun + Jue 2:30-4)
   { teacher: "Isaí Toro",           discipline: "XC_K5_Polimotor",     grade: "K5", scheduleKeys: ["S2", "S3"] },
   { teacher: "Stefania Tabares",    discipline: "XC_K5_Polimotor",     grade: "K5", scheduleKeys: ["S2", "S3"] },
-  // K5 Iniciación Musical (Mar 2:30-4)
   { teacher: "Juan Carlos Ortiz",   discipline: "XC_K5_IniciaMusical", grade: "K5", scheduleKeys: ["S14"] },
-  // K5 Iniciación a Danzas (Vie 2:30-4)
   { teacher: "Luisa Granada",       discipline: "XC_K5_IniciaDanzas",  grade: "K5", scheduleKeys: ["S15"] },
 
   // ========== PRIMARIA (hoja PRIMARIA) ==========
-
-  // Entrenamiento olimpiadas Matemáticas 4-5 (Lun 3:15-5:15)
   { teacher: "Alejandra Ramírez",   discipline: "XC_45_OlympMath",  grade: "4",  scheduleKeys: ["S12"] },
   { teacher: "Alejandra Ramírez",   discipline: "XC_45_OlympMath",  grade: "5",  scheduleKeys: ["S12"] },
-  // Artes plásticas 1-5 (Lun 3:15-5:15) — 3 profesores × 5 grados
   ...["1", "2", "3", "4", "5"].flatMap((g) => [
     { teacher: "Liliana Niño",      discipline: "XC_EL_ArtesPlasticas", grade: g, scheduleKeys: ["S12"] },
     { teacher: "Mateo Brito",       discipline: "XC_EL_ArtesPlasticas", grade: g, scheduleKeys: ["S12"] },
     { teacher: "Jazmín López",      discipline: "XC_EL_ArtesPlasticas", grade: g, scheduleKeys: ["S12"] },
   ]),
-  // Técnica Vocal 1-5 (Lun 3:15-5:15)
   ...["1", "2", "3", "4", "5"].map((g) => (
     { teacher: "Juan Carlos Ortiz", discipline: "XC_EL_TecVocal",       grade: g, scheduleKeys: ["S12"] }
   )),
-  // 1° Fútbol (Mar/vie/sáb 3:15-5:15)
   { teacher: "Javier Morales",      discipline: "XC_1_Futbol_M",        grade: "1",  scheduleKeys: ["S4", "S5", "S6"] },
-  // 2-3° Fútbol (Mar/vie/sáb)
   { teacher: "Sebastián Echeverry", discipline: "XC_23_Futbol_M",       grade: "2",  scheduleKeys: ["S4", "S5", "S6"] },
   { teacher: "Luis Eduardo Martínez", discipline: "XC_23_Futbol_M",     grade: "3",  scheduleKeys: ["S4", "S5", "S6"] },
-  // 4° Fútbol
   { teacher: "Andrés Gómez",        discipline: "XC_4_Futbol_M",        grade: "4",  scheduleKeys: ["S4", "S5", "S6"] },
-  // 5° Fútbol
   { teacher: "Javier Morales",      discipline: "XC_5_Futbol_M",        grade: "5",  scheduleKeys: ["S4", "S5", "S6"] },
-  // Fútbol femenino 1-5 (Mar/vie/sáb)
   ...["1", "2", "3", "4", "5"].map((g) => (
     { teacher: "Óscar López",       discipline: "XC_EL_Futbol_F",       grade: g, scheduleKeys: ["S4", "S5", "S6"] }
   )),
-  // Baloncesto 1-3 (Mar/vie/sáb)
   ...["1", "2", "3"].map((g) => (
     { teacher: "Mauricio Lozano",   discipline: "XC_123_Basquetbol",    grade: g, scheduleKeys: ["S4", "S5", "S6"] }
   )),
-  // Baloncesto 4-5 (Mar/vie/sáb)
   ...["4", "5"].map((g) => (
     { teacher: "Yamid Gómez",       discipline: "XC_45_Basquetbol",     grade: g, scheduleKeys: ["S4", "S5", "S6"] }
   )),
-  // 1° Voleibol (Mar/vie/sáb)
   { teacher: "Anderson Buitrago",   discipline: "XC_1_Voleibol",        grade: "1",  scheduleKeys: ["S4", "S5", "S6"] },
-  // 2-3° Voleibol (Mar/vie/sáb)
   ...["2", "3"].map((g) => (
     { teacher: "Vanessa Castellanos", discipline: "XC_23_Voleibol",     grade: g, scheduleKeys: ["S4", "S5", "S6"] }
   )),
-  // 4-5° Voleibol (Mar/vie/sáb)
   ...["4", "5"].map((g) => (
     { teacher: "Carlos Pinillo",    discipline: "XC_45_Voleibol",       grade: g, scheduleKeys: ["S4", "S5", "S6"] }
   )),
-  // Porrismo 1-5 (Mar, Mié 2:00-4, Vie) — 2 profesores × 5 grados
   ...["1", "2", "3", "4", "5"].flatMap((g) => [
     { teacher: "Isaí Toro",         discipline: "XC_EL_Porras",         grade: g, scheduleKeys: ["S4", "S5", "S7"] },
     { teacher: "Stefania Tabares",  discipline: "XC_EL_Porras",         grade: g, scheduleKeys: ["S4", "S5", "S7"] },
   ]),
-  // Taekwondo 1-5 (Mar, Mié 2:00-4, Vie)
   ...["1", "2", "3", "4", "5"].map((g) => (
     { teacher: "Cristian Mosquera", discipline: "XC_EL_Taekwondo",      grade: g, scheduleKeys: ["S4", "S5", "S7"] }
   )),
-  // Desarrollo Instrumental 1-5 (Jue 3:15-5:15) — Juan Carlos Ortiz + Juan David Calvo
   ...["1", "2", "3", "4", "5"].flatMap((g) => [
     { teacher: "Juan Carlos Ortiz", discipline: "XC_EL_DesaInstrumental", grade: g, scheduleKeys: ["S13"] },
     { teacher: "Juan David Calvo",  discipline: "XC_EL_DesaInstrumental", grade: g, scheduleKeys: ["S13"] },
   ]),
-  // Danza Moderna 1-5 (Jue 3:15-5:15)
   ...["1", "2", "3", "4", "5"].map((g) => (
     { teacher: "Luisa Granada",     discipline: "XC_EL_DanzaModerna",   grade: g, scheduleKeys: ["S13"] }
   )),
-  // Pequeños científicos 1° y 3° (Jue 3:15-5:15)
   { teacher: "Julián Vargas",       discipline: "XC_EL_PequenosCientificos", grade: "1", scheduleKeys: ["S13"] },
   { teacher: "Julián Vargas",       discipline: "XC_EL_PequenosCientificos", grade: "3", scheduleKeys: ["S13"] },
-  // Robótica y LEGO 4-5 (Jue 3:15-5:15)
   ...["4", "5"].map((g) => (
     { teacher: "Juan José Ramírez", discipline: "XC_Robo_Lego",         grade: g, scheduleKeys: ["S13"] }
   )),
 
   // ========== SECUNDARIA (hoja SECUNDARIA) ==========
-
-  // Robótica 6° y 12° (Lun 3:15-5:15) — solo grados 6 y 12
   { teacher: "Juan José Ramírez", discipline: "XC_SEC_ProgRobot",     grade: "6",  scheduleKeys: ["S12"] },
   { teacher: "Juan José Ramírez", discipline: "XC_SEC_ProgRobot",     grade: "12", scheduleKeys: ["S12"] },
-  // Banda Thunder Rock 8° (Lun 3:15-5:15)
   { teacher: "Mauricio Porras",     discipline: "XC_MS_BandaTR",        grade: "8",  scheduleKeys: ["S12"] },
-  // Banda Fireworks 7° (Mar 3:15-5:15)
   { teacher: "Mauricio Porras",     discipline: "XC_SEC_BandaFW",       grade: "7",  scheduleKeys: ["S4"] },
-  // Olimpiadas Matemáticas 6° y 12° (Mar 3:15-5:15) — solo grados 6 y 12
   { teacher: "Alejandra Ramírez", discipline: "XC_SEC_OlympMath", grade: "6",  scheduleKeys: ["S4"] },
   { teacher: "Alejandra Ramírez", discipline: "XC_SEC_OlympMath", grade: "12", scheduleKeys: ["S4"] },
-  // MS Fútbol 6-8 (Lun 3:30-5:30, Mié 2:20-4:20, Jue 3:30-5:30, Sáb partidos)
   ...["6", "7", "8"].map((g) => (
     { teacher: "Luis Eduardo Martínez", discipline: "XC_MS_Futbol_M",   grade: g, scheduleKeys: ["S8", "S10", "S9", "S11"] }
   )),
-  // HS Fútbol 9-12 (mismos días)
   ...["9", "10", "11", "12"].map((g) => (
     { teacher: "Sebastián Saldarriaga", discipline: "XC_HS_Futbol_M",   grade: g, scheduleKeys: ["S8", "S10", "S9", "S11"] }
   )),
-  // Fútbol Femenino 6-12 (mismos días)
   ...["6", "7", "8", "9", "10", "11", "12"].map((g) => (
     { teacher: "Óscar López",       discipline: "XC_SEC_Futbol_F",      grade: g, scheduleKeys: ["S8", "S10", "S9", "S11"] }
   )),
-  // MS Voleibol 6-8 (mismos días)
   ...["6", "7", "8"].map((g) => (
     { teacher: "Vanessa Castellanos", discipline: "XC_MS_Voleibol_F",   grade: g, scheduleKeys: ["S8", "S10", "S9", "S11"] }
   )),
-  // HS Voleibol 9-12 (mismos días)
   ...["9", "10", "11", "12"].map((g) => (
     { teacher: "Carlos Pinillo",    discipline: "XC_HS_Voleibol_F",     grade: g, scheduleKeys: ["S8", "S10", "S9", "S11"] }
   )),
-  // SEC Baloncesto 6-12 (mismos días)
   ...["6", "7", "8", "9", "10", "11", "12"].map((g) => (
     { teacher: "Yamid Gómez",       discipline: "XC_SEC_Basquetbol",    grade: g, scheduleKeys: ["S8", "S10", "S9", "S11"] }
   )),
-  // Banda Horizon 9-10 (Jue 3:15-5:15)
   ...["9", "10"].map((g) => (
     { teacher: "Mauricio Porras",   discipline: "XC_90_BandaHorz",      grade: g, scheduleKeys: ["S13"] }
   )),
-  // Artes plásticas 6-12 (Jue 3:15-5:15)
   ...["6", "7", "8", "9", "10", "11", "12"].map((g) => (
     { teacher: "Liliana Niño",      discipline: "XC_SEC_ArtesPlasticas", grade: g, scheduleKeys: ["S13"] }
   )),
-  // Banda Inside (Vie 3:15-5:15) — "HS" = 9-12
   ...["9", "10", "11", "12"].map((g) => (
     { teacher: "Juan David Calvo",  discipline: "XC_HS_BandaInside",    grade: g, scheduleKeys: ["S5"] }
   )),
 ];
+
+interface GradeRow { idGrado: number; nombre: string }
+interface DisciplineRow { codigoDisciplina: string }
+interface TeacherRow { idProfesor: string }
+interface ScheduleRow { idHorario: string }
+interface AssignmentRow { idAsignacion: string; estado: string }
+interface AssignmentLinkRow { idAsignacion: string }
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
@@ -222,12 +181,12 @@ async function main() {
 
   // 0. Validate offer (grades + disciplines) BEFORE writing anything
   console.log("0. Validando oferta (grados y disciplinas):");
-  const gradeMap = new Map<string, number>(); // "K4" → idGrado
+  const gradeMap = new Map<string, number>();
   const uniqueGrades = [...new Set(OFFER.map((o) => o.grade))];
   const missingGrades: string[] = [];
 
   for (const g of uniqueGrades) {
-    const grade = await prisma.grade.findFirst({ where: { nombre: g } });
+    const grade = await first<GradeRow>(await sql`SELECT "idGrado", "nombre" FROM "Grade" WHERE "nombre" = ${g} LIMIT 1`);
     if (grade) {
       gradeMap.set(g, grade.idGrado);
       console.log(`   ✓ ${g} → idGrado ${grade.idGrado}`);
@@ -237,11 +196,11 @@ async function main() {
   }
 
   const disciplineSet = new Set(OFFER.map((o) => o.discipline));
-  const disciplineMap = new Map<string, boolean>(); // code → exists
+  const disciplineMap = new Map<string, boolean>();
   const missingDisciplines: string[] = [];
 
   for (const d of disciplineSet) {
-    const disc = await prisma.discipline.findFirst({ where: { codigoDisciplina: d } });
+    const disc = await first<DisciplineRow>(await sql`SELECT "codigoDisciplina" FROM "Discipline" WHERE "codigoDisciplina" = ${d} LIMIT 1`);
     if (disc) {
       disciplineMap.set(d, true);
       console.log(`   ✓ ${d}`);
@@ -259,29 +218,25 @@ async function main() {
 
   // 1. Create teachers
   console.log("\n1. Profesores:");
-  const teacherMap = new Map<string, string>(); // "Nombre Apellido" → idProfesor
+  const teacherMap = new Map<string, string>();
   let teachersCreated = 0;
   let teachersExisting = 0;
 
   for (const t of TEACHERS) {
     const fullName = `${t.nombre} ${t.apellido}`;
-    const existing = await prisma.teacher.findFirst({
-      where: { nombre: t.nombre, apellido: t.apellido },
-    });
+    const existing = await first<TeacherRow>(await sql`SELECT "idProfesor" FROM "Teacher" WHERE "nombre" = ${t.nombre} AND "apellido" = ${t.apellido} LIMIT 1`);
 
     if (existing) {
       teacherMap.set(fullName, existing.idProfesor);
       teachersExisting++;
       console.log(`   ✓ ${fullName} (ya existe)`);
     } else if (!dryRun) {
-      const created = await prisma.teacher.create({
-        data: { nombre: t.nombre, apellido: t.apellido },
-      });
+      const rows = await sql`INSERT INTO "Teacher" ("nombre", "apellido") VALUES (${t.nombre}, ${t.apellido}) RETURNING "idProfesor"`;
+      const created = rows[0] as unknown as TeacherRow;
       teacherMap.set(fullName, created.idProfesor);
       teachersCreated++;
       console.log(`   + ${fullName}`);
     } else {
-      // In dry-run, create a placeholder entry so offer validation works
       teacherMap.set(fullName, `dry-run-${fullName}`);
       console.log(`   ~ ${fullName} (dry-run)`);
     }
@@ -289,30 +244,24 @@ async function main() {
 
   // 2. Create schedules
   console.log("\n2. Horarios:");
-  const scheduleMap = new Map<string, string>(); // S1 → idHorario
+  const scheduleMap = new Map<string, string>();
   let schedulesCreated = 0;
   let schedulesExisting = 0;
 
   for (const [key, sched] of Object.entries(SCHEDULES)) {
-    const existing = await prisma.schedule.findFirst({
-      where: {
-        diaSemana: sched.diaSemana,
-        horaInicio: sched.horaInicio,
-        horaFin: sched.horaFin,
-      },
-    });
+    const existing = await first<ScheduleRow>(await sql`SELECT "idHorario" FROM "Schedule" WHERE "diaSemana" = ${sched.diaSemana} AND "horaInicio" IS NOT DISTINCT FROM ${sched.horaInicio} AND "horaFin" IS NOT DISTINCT FROM ${sched.horaFin} LIMIT 1`);
 
     if (existing) {
       scheduleMap.set(key, existing.idHorario);
       schedulesExisting++;
       console.log(`   ✓ ${key}: ${sched.diaSemana} ${sched.horaInicio || "NULL"}-${sched.horaFin || "NULL"} (ya existe)`);
     } else if (!dryRun) {
-      const created = await prisma.schedule.create({ data: sched });
+      const rows = await sql`INSERT INTO "Schedule" ("diaSemana", "horaInicio", "horaFin") VALUES (${sched.diaSemana}, ${sched.horaInicio}, ${sched.horaFin}) RETURNING "idHorario"`;
+      const created = rows[0] as unknown as ScheduleRow;
       scheduleMap.set(key, created.idHorario);
       schedulesCreated++;
       console.log(`   + ${key}: ${sched.diaSemana} ${sched.horaInicio || "NULL"}-${sched.horaFin || "NULL"}`);
     } else {
-      // In dry-run, create a placeholder entry so offer validation works
       scheduleMap.set(key, `dry-run-${key}`);
       console.log(`   ~ ${key}: ${sched.diaSemana} ${sched.horaInicio || "NULL"}-${sched.horaFin || "NULL"} (dry-run)`);
     }
@@ -351,42 +300,26 @@ async function main() {
     }
 
     try {
-      // Upsert assignment (idempotent via @@unique)
-      const existing = await prisma.extracurricularAssignment.findFirst({
-        where: {
-          idProfesor: teacherId,
-          codigoDisciplina: entry.discipline,
-          idGrado: gradeId,
-        },
-      });
+      const existing = await first<AssignmentRow>(await sql`SELECT "idAsignacion", "estado" FROM "ExtracurricularAssignment" WHERE "idProfesor" = ${teacherId} AND "codigoDisciplina" = ${entry.discipline} AND "idGrado" = ${gradeId} LIMIT 1`);
 
       let assignmentId: string;
       if (existing) {
         assignmentId = existing.idAsignacion;
         if (existing.estado === "inactivo") {
-          await prisma.extracurricularAssignment.update({
-            where: { idAsignacion: existing.idAsignacion },
-            data: { estado: "activo" },
-          });
+          await sql`UPDATE "ExtracurricularAssignment" SET "estado" = 'activo' WHERE "idAsignacion" = ${existing.idAsignacion}`;
           assignmentsReactivated++;
           console.log(`   ↻ ${entry.teacher} + ${entry.discipline} + G${entry.grade} (reactivada)`);
         } else {
           skipped++;
         }
       } else {
-        const created = await prisma.extracurricularAssignment.create({
-          data: {
-            idProfesor: teacherId,
-            codigoDisciplina: entry.discipline,
-            idGrado: gradeId,
-          },
-        });
+        const rows = await sql`INSERT INTO "ExtracurricularAssignment" ("idProfesor", "codigoDisciplina", "idGrado") VALUES (${teacherId}, ${entry.discipline}, ${gradeId}) RETURNING "idAsignacion"`;
+        const created = rows[0] as unknown as { idAsignacion: string };
         assignmentId = created.idAsignacion;
         assignmentsCreated++;
         console.log(`   + ${entry.teacher} + ${entry.discipline} + G${entry.grade}`);
       }
 
-      // Link schedules
       for (const sKey of entry.scheduleKeys) {
         const horarioId = scheduleMap.get(sKey);
         if (!horarioId) {
@@ -394,15 +327,10 @@ async function main() {
           continue;
         }
 
-        // Idempotent via @@unique([idAsignacion, idHorario])
-        const existingLink = await prisma.assignmentSchedule.findFirst({
-          where: { idAsignacion: assignmentId, idHorario: horarioId },
-        });
+        const existingLink = await first<AssignmentLinkRow>(await sql`SELECT "idAsignacion" FROM "AssignmentSchedule" WHERE "idAsignacion" = ${assignmentId} AND "idHorario" = ${horarioId} LIMIT 1`);
 
         if (!existingLink) {
-          await prisma.assignmentSchedule.create({
-            data: { idAsignacion: assignmentId, idHorario: horarioId },
-          });
+          await sql`INSERT INTO "AssignmentSchedule" ("idAsignacion", "idHorario") VALUES (${assignmentId}, ${horarioId})`;
           assignmentSchedulesCreated++;
         }
       }

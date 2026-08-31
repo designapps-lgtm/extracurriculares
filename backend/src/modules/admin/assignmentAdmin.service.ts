@@ -1,97 +1,74 @@
-import prisma from "../../config/prisma";
+import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
-import { getOr404 } from "../../utils/getOr404";
 import { PaginationParams, paginatedResult } from "../../utils/pagination";
-import { assignmentInclude } from "../../utils/prismaIncludes";
-import { Prisma } from "@prisma/client";
+import { ASSIGNMENT_SELECT, buildAssignmentList, AssignmentRow } from "../../utils/assignmentQueries";
 
 export async function getAssignments(query: {
   disciplina?: string;
   grado?: string;
   profesor?: string;
 }, pagination: PaginationParams) {
-  const where: Prisma.ExtracurricularAssignmentWhereInput = {};
-  if (query.disciplina) where.codigoDisciplina = query.disciplina;
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let idx = 0;
+  const next = (v: any): string => { idx++; params.push(v); return `$${idx}`; };
+
+  if (query.disciplina) conditions.push(`ea."codigoDisciplina" = ${next(query.disciplina)}`);
+  if (query.profesor) conditions.push(`ea."idProfesor" = ${next(query.profesor)}`);
   if (query.grado) {
-    const grade = await prisma.grade.findFirst({ where: { nombre: query.grado } });
-    if (grade) where.idGrado = grade.idGrado;
+    const gradeRow = await first<{ idGrado: number }>(
+      await sql`SELECT "idGrado" FROM "Grade" WHERE "nombre" = ${query.grado} LIMIT 1` as any[]
+    );
+    if (gradeRow) conditions.push(`ea."idGrado" = ${next(gradeRow.idGrado)}`);
   }
-  if (query.profesor) where.idProfesor = query.profesor;
 
-  const [data, total] = await Promise.all([
-    prisma.extracurricularAssignment.findMany({
-      where,
-      include: assignmentInclude,
-      skip: (pagination.page - 1) * pagination.limit,
-      take: pagination.limit,
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.extracurricularAssignment.count({ where }),
-  ]);
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const countRows = await sql(`SELECT COUNT(*)::int AS total FROM "ExtracurricularAssignment" ea ${where}`, params) as any[];
+  const total = countRows[0]?.total ?? 0;
 
+  const offset = (pagination.page - 1) * pagination.limit;
+  const lim = params.length + 1;
+  const off = params.length + 2;
+  const dataParams = [...params, pagination.limit, offset];
+
+  const rows = await sql(
+    `SELECT ${ASSIGNMENT_SELECT},
+            t."nombre" AS "profesorNombre", t."apellido" AS "profesorApellido",
+            d."nombre" AS "disciplinaNombre",
+            g."nombre" AS "gradoNombre"
+     FROM "ExtracurricularAssignment" ea
+     LEFT JOIN "Teacher" t ON t."idProfesor" = ea."idProfesor"
+     LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+     LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+     ${where}
+     ORDER BY ea."createdAt" ASC
+     LIMIT $${lim} OFFSET $${off}`,
+    dataParams
+  ) as unknown as AssignmentRow[];
+
+  const data = await buildAssignmentList(rows);
   return paginatedResult(data, total, pagination);
 }
 
 export async function getAssignmentById(id: string) {
-  return getOr404(
-    prisma.extracurricularAssignment.findUnique({
-      where: { idAsignacion: id },
-      include: assignmentInclude,
-    }),
-    "ASSIGNMENT_NOT_FOUND",
-    "No se encontró la asignación",
+  const row = await first<AssignmentRow>(
+    await sql(
+      `SELECT ${ASSIGNMENT_SELECT},
+              t."nombre" AS "profesorNombre", t."apellido" AS "profesorApellido",
+              d."nombre" AS "disciplinaNombre",
+              g."nombre" AS "gradoNombre"
+       FROM "ExtracurricularAssignment" ea
+       LEFT JOIN "Teacher" t ON t."idProfesor" = ea."idProfesor"
+       LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+       LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+       WHERE ea."idAsignacion" = $1 LIMIT 1`,
+      [id]
+    ) as unknown as AssignmentRow[]
   );
-}
+  if (!row) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
 
-export async function createAssignment(data: {
-  codigoDisciplina: string;
-  idGrado: number;
-  idProfesor: string;
-  esPrincipal?: boolean;
-  schedules?: any[];
-}) {
-  const { codigoDisciplina, idGrado, idProfesor, esPrincipal, schedules } = data;
-
-  // Validate required fields
-  if (!codigoDisciplina || !idGrado || !idProfesor) {
-    throw new AppError(400, "VALIDATION_ERROR", "codigoDisciplina, idGrado e idProfesor son requeridos");
-  }
-
-  // Validate discipline exists
-  const discipline = await prisma.discipline.findUnique({ where: { codigoDisciplina } });
-  if (!discipline) throw new AppError(400, "INVALID_DISCIPLINE", "Disciplina no válida");
-
-  // Validate grade exists
-  const grade = await prisma.grade.findUnique({ where: { idGrado } });
-  if (!grade) throw new AppError(400, "INVALID_GRADE", "Grado no válido");
-
-  // Validate teacher exists and is active
-  const teacher = await prisma.teacher.findUnique({ where: { idProfesor } });
-  if (!teacher) throw new AppError(400, "INVALID_TEACHER", "Profesor no válido");
-  if (teacher.estado !== "activo") throw new AppError(400, "TEACHER_INACTIVE", "El profesor está inactivo");
-
-  // Check duplicate
-  const existing = await prisma.extracurricularAssignment.findUnique({
-    where: { idProfesor_codigoDisciplina_idGrado: { idProfesor, codigoDisciplina, idGrado } },
-  });
-  if (existing) throw new AppError(409, "DUPLICATE_ASSIGNMENT", "Ya existe esta asignación");
-
-  // Resolve schedules: each entry may be { idHorario } (existing) or {} with diaSemana/horaInicio/horaFin (create/find)
-  const scheduleLinks = await resolveScheduleLinks(schedules);
-
-  // Create assignment with schedules
-  return prisma.extracurricularAssignment.create({
-    data: {
-      idProfesor,
-      codigoDisciplina,
-      idGrado,
-      esPrincipal: esPrincipal || false,
-      schedules: scheduleLinks.length > 0 ? {
-        create: scheduleLinks,
-      } : undefined,
-    },
-    include: assignmentInclude,
-  });
+  const [result] = await buildAssignmentList([row]);
+  return result;
 }
 
 async function resolveScheduleLinks(schedules: any): Promise<{ idHorario: string }[]> {
@@ -101,15 +78,15 @@ async function resolveScheduleLinks(schedules: any): Promise<{ idHorario: string
 
   const links: { idHorario: string }[] = [];
   for (const s of schedules) {
-    // Existing schedule by id
     if (s.idHorario) {
-      const schedule = await prisma.schedule.findUnique({ where: { idHorario: s.idHorario } });
+      const schedule = await first<any>(
+        await sql`SELECT "idHorario" FROM "Schedule" WHERE "idHorario" = ${s.idHorario} LIMIT 1` as any[]
+      );
       if (!schedule) throw new AppError(400, "INVALID_SCHEDULE", `Horario no válido: ${s.idHorario}`);
       links.push({ idHorario: s.idHorario });
       continue;
     }
 
-    // New schedule: diaSemana + horaInicio + horaFin (+ aula)
     const { diaSemana, horaInicio, horaFin, aula } = s;
     if (!diaSemana || !DIAS_VALIDOS.includes(diaSemana)) {
       throw new AppError(400, "INVALID_DAY", `Día inválido. Use uno de: ${DIAS_VALIDOS.join(", ")}`);
@@ -126,73 +103,109 @@ async function resolveScheduleLinks(schedules: any): Promise<{ idHorario: string
     const hi = normalizeTime(horaInicio);
     const hf = normalizeTime(horaFin);
 
-    // Find-or-create (same day + time pattern → same schedule)
-    const existing = await prisma.schedule.findFirst({ where: { diaSemana, horaInicio: hi, horaFin: hf } });
+    const existing = await first<any>(
+      await sql`SELECT "idHorario" FROM "Schedule" WHERE "diaSemana" = ${diaSemana} AND "horaInicio" = ${hi} AND "horaFin" = ${hf} LIMIT 1` as any[]
+    );
     if (existing) {
       links.push({ idHorario: existing.idHorario });
     } else {
-      const created = await prisma.schedule.create({ data: { diaSemana, horaInicio: hi, horaFin: hf, aula } });
-      links.push({ idHorario: created.idHorario });
+      const rows = await sql`INSERT INTO "Schedule" ("idHorario", "diaSemana", "horaInicio", "horaFin", "aula") VALUES (gen_random_uuid(), ${diaSemana}, ${hi}, ${hf}, ${aula || null}) RETURNING "idHorario"` as any[];
+      links.push({ idHorario: rows[0].idHorario });
     }
   }
 
   return links;
 }
 
+export async function createAssignment(data: {
+  codigoDisciplina: string;
+  idGrado: number;
+  idProfesor: string;
+  esPrincipal?: boolean;
+  schedules?: any[];
+}) {
+  const { codigoDisciplina, idGrado, idProfesor, esPrincipal, schedules } = data;
+
+  if (!codigoDisciplina || !idGrado || !idProfesor) {
+    throw new AppError(400, "VALIDATION_ERROR", "codigoDisciplina, idGrado e idProfesor son requeridos");
+  }
+
+  const discipline = await first<any>(
+    await sql`SELECT "codigoDisciplina" FROM "Discipline" WHERE "codigoDisciplina" = ${codigoDisciplina} LIMIT 1` as any[]
+  );
+  if (!discipline) throw new AppError(400, "INVALID_DISCIPLINE", "Disciplina no válida");
+
+  const grade = await first<any>(
+    await sql`SELECT "idGrado" FROM "Grade" WHERE "idGrado" = ${idGrado} LIMIT 1` as any[]
+  );
+  if (!grade) throw new AppError(400, "INVALID_GRADE", "Grado no válido");
+
+  const teacher = await first<any>(
+    await sql`SELECT "idProfesor", "estado" FROM "Teacher" WHERE "idProfesor" = ${idProfesor} LIMIT 1` as any[]
+  );
+  if (!teacher) throw new AppError(400, "INVALID_TEACHER", "Profesor no válido");
+  if (teacher.estado !== "activo") throw new AppError(400, "TEACHER_INACTIVE", "El profesor está inactivo");
+
+  const scheduleLinks = await resolveScheduleLinks(schedules);
+
+  const idRows = await sql`SELECT gen_random_uuid() AS id` as any[];
+  const newId = idRows[0].id;
+
+  await sql.transaction((tx) => [
+    tx`INSERT INTO "ExtracurricularAssignment" ("idAsignacion", "idProfesor", "codigoDisciplina", "idGrado", "esPrincipal") VALUES (${newId}, ${idProfesor}, ${codigoDisciplina}, ${idGrado}, ${esPrincipal || false})`,
+    ...scheduleLinks.map((link) =>
+      tx`INSERT INTO "AssignmentSchedule" ("id", "idAsignacion", "idHorario") VALUES (gen_random_uuid(), ${newId}, ${link.idHorario})`
+    ),
+  ]);
+
+  return getAssignmentById(newId);
+}
+
 export async function updateAssignment(id: string, data: { esPrincipal?: boolean; estado?: string; schedules?: any[] }) {
   const { esPrincipal, estado, schedules } = data;
 
-  await getOr404(prisma.extracurricularAssignment.findUnique({ where: { idAsignacion: id } }), "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
+  const existing = await first<any>(
+    await sql`SELECT "idAsignacion" FROM "ExtracurricularAssignment" WHERE "idAsignacion" = ${id} LIMIT 1` as any[]
+  );
+  if (!existing) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
 
-  // Update assignment fields
-  await prisma.extracurricularAssignment.update({
-    where: { idAsignacion: id },
-    data: {
-      ...(esPrincipal !== undefined && { esPrincipal }),
-      ...(estado !== undefined && { estado }),
-    },
-  });
+  const sets: string[] = [];
+  const vals: any[] = [];
+  let idx = 0;
+  const add = (v: any) => { idx++; vals.push(v); return `$${idx}`; };
 
-  // Update schedules if provided
+  if (esPrincipal !== undefined) sets.push(`"esPrincipal" = ${add(esPrincipal)}`);
+  if (estado !== undefined) sets.push(`"estado" = ${add(estado)}`);
+
+  if (sets.length > 0) {
+    vals.push(id);
+    await sql(`UPDATE "ExtracurricularAssignment" SET ${sets.join(", ")}, "updatedAt" = now() WHERE "idAsignacion" = $${idx + 1}`, vals);
+  }
+
   if (schedules) {
     const linkData = await resolveScheduleLinks(schedules);
-    // Remove existing links
-    await prisma.assignmentSchedule.deleteMany({ where: { idAsignacion: id } });
-    // Create new links
-    if (linkData.length > 0) {
-      await prisma.assignmentSchedule.createMany({
-        data: linkData.map((l) => ({ idAsignacion: id, idHorario: l.idHorario })),
-      });
+    await sql`DELETE FROM "AssignmentSchedule" WHERE "idAsignacion" = ${id}`;
+    for (const link of linkData) {
+      await sql`INSERT INTO "AssignmentSchedule" ("id", "idAsignacion", "idHorario") VALUES (gen_random_uuid(), ${id}, ${link.idHorario})`;
     }
   }
 
-  // Fetch updated assignment
-  const result = await prisma.extracurricularAssignment.findUnique({
-    where: { idAsignacion: id },
-    include: assignmentInclude,
-  });
-
-  return result;
+  return getAssignmentById(id);
 }
 
 export async function deleteAssignment(id: string) {
-  const assignment = await getOr404(prisma.extracurricularAssignment.findUnique({ where: { idAsignacion: id } }), "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
+  const assignment = await first<any>(
+    await sql`SELECT "idAsignacion", "codigoDisciplina" FROM "ExtracurricularAssignment" WHERE "idAsignacion" = ${id} LIMIT 1` as any[]
+  );
+  if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
 
-  // Check if students are enrolled in this discipline
-  const enrolledCount = await prisma.studentSchedule.count({
-    where: { codigoDisciplina: assignment.codigoDisciplina },
-  });
+  const enrolledRows = await sql`SELECT COUNT(*)::int AS count FROM "StudentSchedule" WHERE "codigoDisciplina" = ${assignment.codigoDisciplina}` as any[];
 
-  if (enrolledCount > 0) {
-    // Soft delete
-    await prisma.extracurricularAssignment.update({
-      where: { idAsignacion: id },
-      data: { estado: "inactivo" },
-    });
+  if ((enrolledRows[0]?.count ?? 0) > 0) {
+    await sql`UPDATE "ExtracurricularAssignment" SET "estado" = 'inactivo', "updatedAt" = now() WHERE "idAsignacion" = ${id}`;
     return { message: "Asignación desactivada (tiene estudiantes inscritos)" };
   } else {
-    // Hard delete
-    await prisma.extracurricularAssignment.delete({ where: { idAsignacion: id } });
+    await sql`DELETE FROM "ExtracurricularAssignment" WHERE "idAsignacion" = ${id}`;
     return { message: "Asignación eliminada" };
   }
 }

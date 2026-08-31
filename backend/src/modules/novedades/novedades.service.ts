@@ -1,4 +1,4 @@
-import prisma from "../../config/prisma";
+import { sql, first } from "../../config/db";
 import { config } from "../../config";
 import {
   parseServiceAccount,
@@ -45,36 +45,69 @@ export async function syncNovedadesFromDrive(): Promise<SyncResult> {
       const buffer = await downloadSpreadsheet(file, creds);
       const rows = parseNovedadesSheet(buffer, file.name);
 
-      // Reemplazo completo por archivo: la fuente de verdad es el Drive
       if (rows.length === 0) continue;
 
-      await prisma.$transaction(async (tx) => {
-        await tx.novedad.deleteMany({ where: { archivo: file.name } });
-        await tx.novedad.createMany({
-          data: rows.map((r) => ({
-            novedadId: r.novedadId,
-            archivo: file.name,
-            codigoEstudiante: r.codigoEstudiante,
-            descripcion: r.descripcion || null,
-            seAusentaCon: r.seAusentaCon || null,
-            seAusentaConOtro: r.seAusentaConOtro || null,
-            seAusentaConTipo: r.seAusentaConTipo || null,
-            tipoNovedad: r.tipoNovedad || null,
-            flujoNovedad: r.flujoNovedad || null,
-            grados: r.grados || null,
-            nombresEstudiantes: r.nombresEstudiantes || null,
-            fotoUrls: r.fotoUrls || null,
-            fechaHora: r.fechaHora,
-            scanCodes: r.scanCodes || null,
-            fechaCreacion: r.fechaCreacion,
-            registradoPor: r.registradoPor || null,
-            procesado: r.procesado || null,
-            regresaAlColegio: r.regresaAlColegio,
-            horaEstimadaRegreso: r.horaEstimadaRegreso || null,
-            fechaNovedad: r.fechaNovedad,
-          })),
-        });
-      });
+      // Transacción HTTP batched: el callback DEBE devolver un array de queries.
+      // neon() las ejecuta todas en un solo request HTTP → atomicidad garantizada.
+      // Patrón: DELETE + N×INSERT con ON CONFLICT para upsert.
+      await sql.transaction((tx) => [
+        tx`DELETE FROM "Novedad" WHERE "archivo" = ${file.name}`,
+        ...rows.map((r) => tx(
+          `INSERT INTO "Novedad" (
+            "id", "novedadId", "archivo", "codigoEstudiante", "descripcion",
+            "seAusentaCon", "seAusentaConOtro", "seAusentaConTipo",
+            "tipoNovedad", "flujoNovedad", "grados", "nombresEstudiantes",
+            "fotoUrls", "fechaHora", "scanCodes", "fechaCreacion",
+            "registradoPor", "procesado", "regresaAlColegio",
+            "horaEstimadaRegreso", "fechaNovedad", "updatedAt"
+          ) VALUES (
+            gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, now()
+          ) ON CONFLICT ("novedadId", "codigoEstudiante") DO UPDATE SET
+            "archivo" = EXCLUDED."archivo",
+            "descripcion" = EXCLUDED."descripcion",
+            "seAusentaCon" = EXCLUDED."seAusentaCon",
+            "seAusentaConOtro" = EXCLUDED."seAusentaConOtro",
+            "seAusentaConTipo" = EXCLUDED."seAusentaConTipo",
+            "tipoNovedad" = EXCLUDED."tipoNovedad",
+            "flujoNovedad" = EXCLUDED."flujoNovedad",
+            "grados" = EXCLUDED."grados",
+            "nombresEstudiantes" = EXCLUDED."nombresEstudiantes",
+            "fotoUrls" = EXCLUDED."fotoUrls",
+            "fechaHora" = EXCLUDED."fechaHora",
+            "scanCodes" = EXCLUDED."scanCodes",
+            "fechaCreacion" = EXCLUDED."fechaCreacion",
+            "registradoPor" = EXCLUDED."registradoPor",
+            "procesado" = EXCLUDED."procesado",
+            "regresaAlColegio" = EXCLUDED."regresaAlColegio",
+            "horaEstimadaRegreso" = EXCLUDED."horaEstimadaRegreso",
+            "fechaNovedad" = EXCLUDED."fechaNovedad",
+            "updatedAt" = now()
+          `,
+          [
+            r.novedadId,
+            file.name,
+            r.codigoEstudiante,
+            r.descripcion || null,
+            r.seAusentaCon || null,
+            r.seAusentaConOtro || null,
+            r.seAusentaConTipo || null,
+            r.tipoNovedad || null,
+            r.flujoNovedad || null,
+            r.grados || null,
+            r.nombresEstudiantes || null,
+            r.fotoUrls || null,
+            r.fechaHora,
+            r.scanCodes || null,
+            r.fechaCreacion,
+            r.registradoPor || null,
+            r.procesado || null,
+            r.regresaAlColegio,
+            r.horaEstimadaRegreso || null,
+            r.fechaNovedad,
+          ]
+        )),
+      ]);
 
       totalNovedades += rows.length;
       totalFiles += 1;
@@ -87,21 +120,33 @@ export async function syncNovedadesFromDrive(): Promise<SyncResult> {
 }
 
 export async function getNovedadesForStudent(codigoEstudiante: string): Promise<any[]> {
-  return prisma.novedad.findMany({
-    where: { codigoEstudiante },
-    orderBy: [{ fechaNovedad: "desc" }, { fechaCreacion: "desc" }],
-  });
+  return (await sql`
+    SELECT * FROM "Novedad"
+    WHERE "codigoEstudiante" = ${codigoEstudiante}
+    ORDER BY "fechaNovedad" DESC NULLS LAST, "fechaCreacion" DESC NULLS LAST
+  `) as unknown as any[];
+}
+
+interface GroupByRow {
+  archivo: string;
+  _count_all: number;
+  _max_updated_at: Date | string | null;
 }
 
 export async function getNovedadesStatus(): Promise<{ driveConfigured: boolean; folderId: string | null; archivos: { archivo: string; total: number; ultimaSync: Date }[] }> {
-  const archivos = await prisma.novedad.groupBy({
-    by: ["archivo"],
-    _count: { _all: true },
-    _max: { updatedAt: true },
-  });
+  const archivos = (await sql`
+    SELECT "archivo", COUNT(*)::int AS "_count_all", MAX("updatedAt") AS "_max_updated_at"
+    FROM "Novedad"
+    GROUP BY "archivo"
+  `) as unknown as GroupByRow[];
+
   return {
     driveConfigured: isDriveConfigured(config.googleServiceAccountJson || "", config.googleDriveFolderId || ""),
     folderId: config.googleDriveFolderId || null,
-    archivos: archivos.map((a) => ({ archivo: a.archivo, total: a._count._all, ultimaSync: a._max.updatedAt! })),
+    archivos: archivos.map((a) => ({
+      archivo: a.archivo,
+      total: a._count_all,
+      ultimaSync: new Date(a._max_updated_at!),
+    })),
   };
 }

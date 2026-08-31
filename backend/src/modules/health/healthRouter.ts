@@ -1,11 +1,11 @@
 import { Router, Request, Response } from "express";
-import prisma from "../../config/prisma";
+import { sql } from "../../config/db";
 
 const router = Router();
 
 router.get("/health", async (_req: Request, res: Response) => {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await sql`SELECT 1`;
     res.json({ status: "ok", database: "connected" });
   } catch {
     res.status(503).json({ status: "error", database: "disconnected" });

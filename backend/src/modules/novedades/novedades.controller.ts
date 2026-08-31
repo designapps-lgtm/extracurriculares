@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../../config/prisma";
+import { sql } from "../../config/db";
 import { getNovedadesForStudent } from "./novedades.service";
 
 function todayColombiaStart(): Date {
@@ -23,7 +23,6 @@ function isActive(n: { fechaNovedad: Date | null; fechaCreacion: Date | null }):
 function dayBounds(fechaISO: string): { start: Date; end: Date } | null {
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(fechaISO);
   if (dateOnly) {
-    // Colombia es UTC-5 fijo (sin DST): las 00:00 de Bogotá = 05:00 UTC.
     const start = new Date(`${fechaISO}T05:00:00.000Z`);
     if (isNaN(start.getTime())) return null;
     const end = new Date(start);
@@ -93,10 +92,11 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
     return;
   }
 
-  const rows = await prisma.novedad.findMany({
-    where: { codigoEstudiante: { in: codigos } },
-    orderBy: [{ fechaNovedad: "desc" }, { fechaCreacion: "desc" }],
-  });
+  const rows = (await sql`
+    SELECT * FROM "Novedad"
+    WHERE "codigoEstudiante" = ANY(${codigos})
+    ORDER BY "fechaNovedad" DESC NULLS LAST, "fechaCreacion" DESC NULLS LAST
+  `) as unknown as any[];
 
   const bounds = fechaParam ? dayBounds(fechaParam) : null;
   const activas: Record<string, any[]> = {};

@@ -1,4 +1,18 @@
 import rateLimit from "express-rate-limit";
+import type { RequestHandler } from "express";
+
+// En Cloudflare Workers, ejecutar express-rate-limit en el load-time del módulo
+// (como hace app.ts al importar) dispara un setInterval del MemoryStore en
+// global scope, que el runtime edge PROHÍBE ("Disallowed operation called
+// within global scope"). Además, un store en memoria no tiene sentido en
+// Workers: no persiste entre instancias y hay una instancia por request.
+//
+// En Workers el rate limiting lo hace Cloudflare mismo (a nivel de zona/plan),
+// así que acá exportamos middlewares no-op. En Node/Render se mantiene real.
+// Detección: en Workers (workerd) `WebSocket` es global; en Node no lo es.
+const isWorkersRuntime = typeof WebSocket !== "undefined";
+
+const noopLimiter: RequestHandler = (_req, _res, next) => next();
 
 const rateLimitMessage = (message: string) => ({
   success: false,
@@ -10,27 +24,24 @@ const toInt = (value: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-// Antes: 20/15min compartido entre login + refresh + logout de los 3 roles.
-// Eso rompía en cadena: cuando el access token expira, el frontend hace
-// /refresh, y si el bucket ya estaba agotado por logins (o por el NAT del
-// colegio), daba 429 en TODO. Por eso:
-//   - Solo login/logout cuentan contra authLimiter (refresh nunca).
-//   - El límite es configurable por env, default 100/15min.
-export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: toInt(process.env.AUTH_RATE_LIMIT, 100),
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: rateLimitMessage("Demasiados intentos de acceso. Intentá de nuevo en unos minutos."),
-});
+// En Workers: sin rate limit en app (lo maneja Cloudflare).
+// En Node/Render: real.
+export const authLimiter: RequestHandler = isWorkersRuntime
+  ? noopLimiter
+  : rateLimit({
+      windowMs: 15 * 60 * 1000,
+      limit: toInt(process.env.AUTH_RATE_LIMIT, 100),
+      standardHeaders: "draft-8",
+      legacyHeaders: false,
+      message: rateLimitMessage("Demasiados intentos de acceso. Intentá de nuevo en unos minutos."),
+    });
 
-// Endpoints públicos: compartidos por toda la IP (los profesores/supervisoras
-// del colegio suelen estar detrás del mismo NAT), 300/15min era poco con el
-// dashboard del supervisor (varias requests por carga). Default 1000/15min.
-export const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: toInt(process.env.API_RATE_LIMIT, 1000),
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: rateLimitMessage("Demasiadas solicitudes. Intentá de nuevo en unos minutos."),
-});
+export const apiLimiter: RequestHandler = isWorkersRuntime
+  ? noopLimiter
+  : rateLimit({
+      windowMs: 15 * 60 * 1000,
+      limit: toInt(process.env.API_RATE_LIMIT, 1000),
+      standardHeaders: "draft-8",
+      legacyHeaders: false,
+      message: rateLimitMessage("Demasiadas solicitudes. Intentá de nuevo en unos minutos."),
+    });

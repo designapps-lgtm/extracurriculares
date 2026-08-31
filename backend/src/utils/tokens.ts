@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 
 export function generateRefreshToken(): string {
   return crypto.randomBytes(48).toString("base64url");

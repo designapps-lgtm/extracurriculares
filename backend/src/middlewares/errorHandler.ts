@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import prisma from "../config/prisma";
+import { sql } from "../config/db";
 
 export class AppError extends Error {
   constructor(
@@ -28,20 +28,15 @@ export function asyncHandler(fn: (req: Request, res: Response, next: NextFunctio
       const entidad = extractResourceType(req.originalUrl);
       const entidadId = extractResourceId(req.originalUrl);
 
-      prisma.auditLog.create({
-        data: {
-          adminId: req.admin!.adminId,
-          accion,
-          entidad,
-          entidadId: entidadId || undefined,
-          detalles: JSON.stringify({
-            method: req.method,
-            path: req.originalUrl,
-            statusCode: res.statusCode,
-            body: sanitizeBody(req.body),
-          }),
-        },
-      }).catch((err) => {
+      sql`
+        INSERT INTO "AuditLog" ("id", "adminId", "accion", "entidad", "entidadId", "detalles", "createdAt")
+        VALUES (gen_random_uuid(), ${req.admin!.adminId}, ${accion}, ${entidad}, ${entidadId || null}, ${JSON.stringify({
+          method: req.method,
+          path: req.originalUrl,
+          statusCode: res.statusCode,
+          body: sanitizeBody(req.body),
+        })}::jsonb, now())
+      `.catch((err) => {
         console.error("[AuditLog] Failed to write:", err.message);
       });
 
@@ -68,10 +63,12 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
-  if (isPrismaError(err)) {
-    res.status(prismaStatus(err)).json({
+  // Errores del query-layer de Neon (SQL crudo). Simula los códigos Prisma
+  // que los clientes del frontend ya esperaban (DUPLICATE_EMAIL, NOT_FOUND, ...).
+  if (isDbError(err)) {
+    res.status(dbStatus(err)).json({
       success: false,
-      error: { code: prismaCode(err), message: prismaMessage(err) },
+      error: { code: dbCode(err), message: dbMessage(err) },
     });
     return;
   }
@@ -83,39 +80,47 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
   });
 }
 
-function isPrismaError(err: Error): boolean {
-  return typeof (err as any).code === "string" && ((err as any).code.startsWith("P") || (err as any).meta !== undefined);
+// Un error del driver Neon (NeonDbError) o un error marcado manualmente con
+// `clientCode` (p. ej. "NOT_FOUND" lanzado por `must()`).
+function isDbError(err: Error): boolean {
+  return typeof (err as any).code === "string" || typeof (err as any).clientCode === "string";
 }
 
-function prismaCode(err: Error): string {
+function dbCode(err: Error): string {
+  const clientCode = (err as any).clientCode as string | undefined;
+  if (clientCode === "NOT_FOUND") return "NOT_FOUND";
   const code = (err as any).code as string;
   switch (code) {
-    case "P2002": return "DUPLICATE_EMAIL";
+    case "23505": return "DUPLICATE_EMAIL";
     case "P2025": return "NOT_FOUND";
-    case "P2003": return "REFERENCED_RECORD_MISSING";
-    default: return `PRISMA_${code}`;
+    case "23503": return "REFERENCED_RECORD_MISSING";
+    default: return code ? `DB_${code}` : "INTERNAL_ERROR";
   }
 }
 
-function prismaStatus(err: Error): number {
+function dbStatus(err: Error): number {
+  const clientCode = (err as any).clientCode as string | undefined;
+  if (clientCode === "NOT_FOUND") return 404;
   const code = (err as any).code as string;
   switch (code) {
-    case "P2002": return 409;
+    case "23505": return 409;
     case "P2025": return 404;
-    case "P2003": return 400;
+    case "23503": return 400;
     default: return 500;
   }
 }
 
-function prismaMessage(err: Error): string {
+function dbMessage(err: Error): string {
+  const clientCode = (err as any).clientCode as string | undefined;
+  if (clientCode === "NOT_FOUND") return "El registro solicitado no existe.";
   const code = (err as any).code as string;
   switch (code) {
-    case "P2002": {
-      const target = (err as any).meta?.target;
-      return `Ya existe un registro con ese ${Array.isArray(target) ? target.join(", ") : "valor"}.`;
+    case "23505": {
+      const detail = (err as any).detail as string | undefined;
+      return `Ya existe un registro con ese valor.${detail ? ` ${detail}` : ""}`;
     }
     case "P2025": return "El registro solicitado no existe.";
-    case "P2003": return "Referencia a un registro inexistente.";
+    case "23503": return "Referencia a un registro inexistente.";
     default: return err.message;
   }
 }

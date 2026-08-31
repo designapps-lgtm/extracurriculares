@@ -2,7 +2,12 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const nodeEnv = process.env.NODE_ENV || "development";
+// En Cloudflare Workers, workerd fija process.env.NODE_ENV en "development" de
+// forma inmutable (no se puede cambiar). Como este Worker ES el de producción,
+// detectamos el runtime edge y usamos "production" directamente.
+const isWorkersRuntime = typeof WebSocket !== "undefined";
+
+const nodeEnv = isWorkersRuntime ? "production" : process.env.NODE_ENV || "development";
 
 if (nodeEnv === "production" && !process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET es obligatorio en producción");

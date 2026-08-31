@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { sql, first } from "../../config/db";
 import { MappedStudent } from "./excelMapper";
-
-const prisma = new PrismaClient();
 
 export interface ImportResult {
   processed: number;
@@ -21,6 +19,12 @@ export interface ImportResult {
   errorDetails: { row: number; codigo: string; error: string }[];
   absentStudents: string[];
 }
+
+interface GradeRow { nombre: string }
+interface DisciplineRow { codigoDisciplina: string }
+interface StudentCodeRow { codigoEstudiante: string }
+interface GradeIdRow { idGrado: number }
+interface ScheduleRow { id: string; diaSemana: string; codigoDisciplina: string }
 
 export async function importStudents(students: MappedStudent[], dryRun: boolean): Promise<ImportResult> {
   const result: ImportResult = {
@@ -42,7 +46,6 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
     absentStudents: [],
   };
 
-  // Collect all unique grades and disciplines from the data
   for (const s of students) {
     result.gradeNames.add(s.gradeNombre);
     for (const sched of s.schedules) {
@@ -50,8 +53,7 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
     }
   }
 
-  // Check which grades and disciplines are new
-  const existingGrades = await prisma.grade.findMany({ select: { nombre: true } });
+  const existingGrades = (await sql`SELECT "nombre" FROM "Grade"`) as unknown as GradeRow[];
   const existingGradeNames = new Set(existingGrades.map((g) => g.nombre));
   for (const nombre of result.gradeNames) {
     if (!existingGradeNames.has(nombre)) {
@@ -59,7 +61,7 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
     }
   }
 
-  const existingDisciplines = await prisma.discipline.findMany({ select: { codigoDisciplina: true } });
+  const existingDisciplines = (await sql`SELECT "codigoDisciplina" FROM "Discipline"`) as unknown as DisciplineRow[];
   const existingDisciplineCodes = new Set(existingDisciplines.map((d) => d.codigoDisciplina));
   for (const codigo of result.disciplineCodes) {
     if (!existingDisciplineCodes.has(codigo)) {
@@ -67,32 +69,19 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
     }
   }
 
-  // Create grades and disciplines (skip in dry-run)
   if (!dryRun) {
     for (const nombre of result.newGrades) {
-      await prisma.grade.upsert({
-        where: { nombre },
-        create: { nombre },
-        update: {},
-      });
+      await sql`INSERT INTO "Grade" ("nombre") VALUES (${nombre}) ON CONFLICT ("nombre") DO NOTHING`;
     }
 
     for (const codigo of result.newDisciplines) {
-      await prisma.discipline.upsert({
-        where: { codigoDisciplina: codigo },
-        create: { codigoDisciplina: codigo, nombre: codigo },
-        update: {},
-      });
+      await sql`INSERT INTO "Discipline" ("codigoDisciplina", "nombre") VALUES (${codigo}, ${codigo}) ON CONFLICT ("codigoDisciplina") DO NOTHING`;
     }
   }
 
-  // Find existing students in DB
-  const existingStudents = await prisma.student.findMany({
-    select: { codigoEstudiante: true },
-  });
+  const existingStudents = (await sql`SELECT "codigoEstudiante" FROM "Student"`) as unknown as StudentCodeRow[];
   const existingBarcodes = new Set(existingStudents.map((s) => s.codigoEstudiante));
 
-  // Find students in DB that are NOT in the Excel
   const excelBarcodes = new Set(students.map((s) => s.codigoEstudiante));
   const absentBarcodes: string[] = [];
   for (const barcode of existingBarcodes) {
@@ -103,25 +92,17 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
     }
   }
 
-  // Mark absent students as inactive (they are no longer in the activity list)
   if (!dryRun && absentBarcodes.length > 0) {
-    await prisma.student.updateMany({
-      where: { codigoEstudiante: { in: absentBarcodes } },
-      data: { estado: "inactivo" },
-    });
+    await sql`UPDATE "Student" SET "estado" = 'inactivo' WHERE "codigoEstudiante" = ANY(${absentBarcodes})`;
   }
 
-  // Process each student
   for (const student of students) {
     result.processed++;
 
     try {
-      // Resolve grade
-      const grade = await prisma.grade.findFirst({ where: { nombre: student.gradeNombre } });
+      const grade = await first<GradeIdRow>(await sql`SELECT "idGrado" FROM "Grade" WHERE "nombre" = ${student.gradeNombre} LIMIT 1`);
       if (!grade) {
-        // In dry-run, grade might not exist yet — check if it's a new grade
         if (dryRun && result.newGrades.includes(student.gradeNombre)) {
-          // Grade would be created — treat as new student
           const isExisting = existingBarcodes.has(student.codigoEstudiante);
           if (isExisting) result.updated++;
           else result.created++;
@@ -139,10 +120,10 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
           result.created++;
         }
 
-        // Analyze activities
-        const existingSchedules = await prisma.studentSchedule.findMany({
-          where: { codigoEstudiante: student.codigoEstudiante },
-        });
+        const existingSchedules = (await sql`
+          SELECT "id", "diaSemana", "codigoDisciplina" FROM "StudentSchedule"
+          WHERE "codigoEstudiante" = ${student.codigoEstudiante}
+        `) as unknown as ScheduleRow[];
 
         const existingMap = new Map(existingSchedules.map((s) => [s.diaSemana, s.codigoDisciplina]));
         const newMap = new Map(student.schedules.map((s) => [s.diaSemana, s.codigoDisciplina]));
@@ -164,62 +145,47 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
         continue;
       }
 
-      // Real import: upsert student + sync schedules
-      await prisma.$transaction(async (tx) => {
-        await tx.student.upsert({
-          where: { codigoEstudiante: student.codigoEstudiante },
-          create: {
-            codigoEstudiante: student.codigoEstudiante,
-            nombre: student.nombre,
-            apellido: student.apellido,
-            idGrado: grade.idGrado,
-            grupo: student.grupo,
-            correo: student.correo,
-          },
-          update: {
-            nombre: student.nombre,
-            apellido: student.apellido,
-            idGrado: grade.idGrado,
-            grupo: student.grupo,
-            correo: student.correo,
-          },
-        });
+      // Upsert student (ON CONFLICT para HTTP driver sin transacción)
+      await sql(
+        `INSERT INTO "Student" ("codigoEstudiante", "nombre", "apellido", "idGrado", "grupo", "correo")
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT ("codigoEstudiante") DO UPDATE SET
+           "nombre" = EXCLUDED."nombre",
+           "apellido" = EXCLUDED."apellido",
+           "idGrado" = EXCLUDED."idGrado",
+           "grupo" = EXCLUDED."grupo",
+           "correo" = EXCLUDED."correo"`,
+        [student.codigoEstudiante, student.nombre, student.apellido, grade.idGrado, student.grupo, student.correo]
+      );
 
-        // Sync schedules
-        const existingSchedules = await tx.studentSchedule.findMany({
-          where: { codigoEstudiante: student.codigoEstudiante },
-        });
+      // Read existing schedules (after upsert ensures student exists)
+      const existingSchedules = (await sql`
+        SELECT "id", "diaSemana", "codigoDisciplina" FROM "StudentSchedule"
+        WHERE "codigoEstudiante" = ${student.codigoEstudiante}
+      `) as unknown as ScheduleRow[];
 
-        const existingMap = new Map(existingSchedules.map((s) => [s.diaSemana, s]));
-        const newMap = new Map(student.schedules.map((s) => [s.diaSemana, s]));
+      const existingMap = new Map(existingSchedules.map((s) => [s.diaSemana, s]));
+      const newMap = new Map(student.schedules.map((s) => [s.diaSemana, s]));
 
-        for (const [dia, newEntry] of newMap) {
-          const existing = existingMap.get(dia);
-          if (!existing) {
-            await tx.studentSchedule.create({
-              data: {
-                codigoEstudiante: student.codigoEstudiante,
-                codigoDisciplina: newEntry.codigoDisciplina,
-                diaSemana: dia,
-              },
-            });
-            result.activitiesCreated++;
-          } else if (existing.codigoDisciplina !== newEntry.codigoDisciplina) {
-            await tx.studentSchedule.update({
-              where: { id: existing.id },
-              data: { codigoDisciplina: newEntry.codigoDisciplina },
-            });
-            result.activitiesModified++;
-          }
+      // Insert new schedules
+      for (const [dia, newEntry] of newMap) {
+        const existing = existingMap.get(dia);
+        if (!existing) {
+          await sql`INSERT INTO "StudentSchedule" ("codigoEstudiante", "codigoDisciplina", "diaSemana") VALUES (${student.codigoEstudiante}, ${newEntry.codigoDisciplina}, ${dia})`;
+          result.activitiesCreated++;
+        } else if (existing.codigoDisciplina !== newEntry.codigoDisciplina) {
+          await sql`UPDATE "StudentSchedule" SET "codigoDisciplina" = ${newEntry.codigoDisciplina} WHERE "id" = ${existing.id}`;
+          result.activitiesModified++;
         }
+      }
 
-        for (const [dia, existing] of existingMap) {
-          if (!newMap.has(dia)) {
-            await tx.studentSchedule.delete({ where: { id: existing.id } });
-            result.activitiesDeleted++;
-          }
+      // Delete removed schedules
+      for (const [dia, existing] of existingMap) {
+        if (!newMap.has(dia)) {
+          await sql`DELETE FROM "StudentSchedule" WHERE "id" = ${existing.id}`;
+          result.activitiesDeleted++;
         }
-      });
+      }
 
       if (isExisting) {
         result.updated++;

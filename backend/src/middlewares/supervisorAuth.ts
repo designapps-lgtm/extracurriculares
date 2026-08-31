@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config";
-import prisma from "../config/prisma";
+import { sql } from "../config/db";
 import { SUPERVISOR_ACCESS_COOKIE } from "../utils/authCookies";
 
 import { extractBearerToken } from "./auth";
@@ -41,8 +41,14 @@ export async function requireActiveSupervisor(req: Request, res: Response, next:
     return;
   }
 
-  const supervisor = await prisma.supervisor.findUnique({ where: { idSupervisor: req.supervisor.supervisorId } });
-  if (!supervisor || supervisor.estado !== "activo") {
+  const supervisor = (await sql`
+    SELECT "idSupervisor", "estado"
+    FROM "Supervisor"
+    WHERE "idSupervisor" = ${req.supervisor.supervisorId}
+    LIMIT 1
+  `) as unknown as Array<{ idSupervisor: string; estado: string }>;
+
+  if (supervisor.length === 0 || supervisor[0].estado !== "activo") {
     res.status(403).json({ success: false, error: { code: "FORBIDDEN", message: "Acceso denegado" } });
     return;
   }

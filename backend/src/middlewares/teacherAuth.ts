@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config";
-import prisma from "../config/prisma";
+import { sql } from "../config/db";
 import { TEACHER_ACCESS_COOKIE } from "../utils/authCookies";
 
 import { extractBearerToken } from "./auth";
@@ -41,8 +41,14 @@ export async function requireActiveTeacher(req: Request, res: Response, next: Ne
     return;
   }
 
-  const teacher = await prisma.teacher.findUnique({ where: { idProfesor: req.teacher.teacherId } });
-  if (!teacher || teacher.estado !== "activo") {
+  const teacher = (await sql`
+    SELECT "idProfesor", "estado"
+    FROM "Teacher"
+    WHERE "idProfesor" = ${req.teacher.teacherId}
+    LIMIT 1
+  `) as unknown as Array<{ idProfesor: string; estado: string }>;
+
+  if (teacher.length === 0 || teacher[0].estado !== "activo") {
     res.status(403).json({ success: false, error: { code: "FORBIDDEN", message: "Acceso denegado" } });
     return;
   }

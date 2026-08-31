@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import prisma from "../../config/prisma";
+import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
 import { param } from "../../utils/reqParams";
 
@@ -25,45 +25,71 @@ export async function getTeacherClasses(req: Request, res: Response) {
   const today = nowColombia();
   const todayStr = today.toISOString().split("T")[0];
 
-  const assignments = await prisma.extracurricularAssignment.findMany({
-    where: { idProfesor: teacherId, estado: "activo" },
-    include: {
-      discipline: { select: { codigoDisciplina: true, nombre: true } },
-      grade: { select: { idGrado: true, nombre: true } },
-      schedules: { include: { schedule: true } },
-    },
-  });
+  const assignmentRows = (await sql`
+    SELECT
+      ea."idAsignacion", ea."codigoDisciplina", ea."idGrado",
+      d."nombre" AS "disciplinaNombre",
+      g."idGrado" AS "gradoIdGrado", g."nombre" AS "gradoNombre",
+      sc."idHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula"
+    FROM "ExtracurricularAssignment" ea
+    LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+    LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+    LEFT JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
+    LEFT JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
+    WHERE ea."idProfesor" = ${teacherId} AND ea."estado" = 'activo'
+    ORDER BY sc."diaSemana" ASC
+  `) as unknown as Array<{
+    idAsignacion: string; codigoDisciplina: string; idGrado: number;
+    disciplinaNombre: string; gradoIdGrado: number; gradoNombre: string;
+    idHorario: string | null; diaSemana: string | null; horaInicio: string | null;
+    horaFin: string | null; aula: string | null;
+  }>;
 
   const classesWithStats = await Promise.all(
-    assignments.flatMap((a) =>
-      a.schedules.map(async (as) => {
-        const enrolledCount = await prisma.studentSchedule.count({
-          where: { codigoDisciplina: a.codigoDisciplina, diaSemana: as.schedule.diaSemana },
-        });
+    assignmentRows
+      .filter((a) => a.idHorario !== null)
+      .map(async (a) => {
+        const enrolledCountRow = (await sql`
+          SELECT COUNT(*)::int AS cnt
+          FROM "StudentSchedule"
+          WHERE "codigoDisciplina" = ${a.codigoDisciplina}
+            AND "diaSemana" = ${a.diaSemana!}
+        `) as unknown as Array<{ cnt: number }>;
 
-        const session = await prisma.classSession.findUnique({
-          where: { idAsignacion_idHorario_fecha: { idAsignacion: a.idAsignacion, idHorario: as.schedule.idHorario, fecha: today } },
-          include: { attendances: true },
-        });
+        const sessionRow = await first<{
+          id: string; estado: string; attendanceCount: number;
+        }>((await sql`
+          SELECT cs."id", cs."estado",
+                 COUNT(ar."id")::int AS "attendanceCount"
+          FROM "ClassSession" cs
+          LEFT JOIN "AttendanceRecord" ar ON ar."sessionId" = cs."id"
+          WHERE cs."idAsignacion" = ${a.idAsignacion}
+            AND cs."idHorario" = ${a.idHorario!}
+            AND cs."fecha" = ${todayStr}
+          GROUP BY cs."id", cs."estado"
+        `) as unknown as Array<{ id: string; estado: string; attendanceCount: number }>);
 
         return {
           idAsignacion: a.idAsignacion,
-          discipline: a.discipline,
-          grade: a.grade,
-          schedule: as.schedule,
-          enrolledCount,
-          sessionId: session?.id || null,
-          sessionEstado: session?.estado || null,
-          attendanceCount: session?.attendances.length || 0,
+          discipline: { codigoDisciplina: a.codigoDisciplina, nombre: a.disciplinaNombre },
+          grade: { idGrado: a.gradoIdGrado, nombre: a.gradoNombre },
+          schedule: { idHorario: a.idHorario, diaSemana: a.diaSemana, horaInicio: a.horaInicio, horaFin: a.horaFin, aula: a.aula },
+          enrolledCount: enrolledCountRow[0]?.cnt ?? 0,
+          sessionId: sessionRow?.id ?? null,
+          sessionEstado: sessionRow?.estado ?? null,
+          attendanceCount: sessionRow?.attendanceCount ?? 0,
         };
       })
-    )
   );
 
-  const teacherProfile = await prisma.teacher.findUnique({
-    where: { idProfesor: teacherId },
-    select: { idProfesor: true, nombre: true, apellido: true },
-  });
+  const teacherProfile = await first<{ idProfesor: string; nombre: string; apellido: string }>(
+    (await sql`
+      SELECT "idProfesor", "nombre", "apellido"
+      FROM "Teacher"
+      WHERE "idProfesor" = ${teacherId}
+      LIMIT 1
+    `) as unknown as Array<{ idProfesor: string; nombre: string; apellido: string }>
+  );
 
   res.json({
     success: true,
@@ -79,16 +105,59 @@ export async function getTeacherClasses(req: Request, res: Response) {
 export async function getTeacherAllAssignments(req: Request, res: Response) {
   const teacherId = req.teacher!.teacherId;
 
-  const assignments = await prisma.extracurricularAssignment.findMany({
-    where: { idProfesor: teacherId, estado: "activo" },
-    include: {
-      discipline: { select: { codigoDisciplina: true, nombre: true } },
-      grade: { select: { idGrado: true, nombre: true } },
-      schedules: { include: { schedule: true } },
-    },
-  });
+  const assignments = (await sql`
+    SELECT
+      ea."idAsignacion", ea."idProfesor", ea."codigoDisciplina", ea."idGrado",
+      ea."esPrincipal", ea."estado", ea."createdAt", ea."updatedAt",
+      d."codigoDisciplina" AS "discCodigo", d."nombre" AS "discNombre",
+      g."idGrado" AS "gradoIdGrado", g."nombre" AS "gradoNombre",
+      sc."idHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula"
+    FROM "ExtracurricularAssignment" ea
+    LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+    LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+    LEFT JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
+    LEFT JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
+    WHERE ea."idProfesor" = ${teacherId} AND ea."estado" = 'activo'
+    ORDER BY ea."createdAt" ASC
+  `) as unknown as Array<{
+    idAsignacion: string; idProfesor: string; codigoDisciplina: string; idGrado: number;
+    esPrincipal: boolean; estado: string; createdAt: Date; updatedAt: Date;
+    discCodigo: string; discNombre: string; gradoIdGrado: number; gradoNombre: string;
+    idHorario: string | null; diaSemana: string | null; horaInicio: string | null;
+    horaFin: string | null; aula: string | null;
+  }>;
 
-  res.json({ success: true, data: assignments });
+  const grouped = assignments.reduce<Record<string, any>>((acc, row) => {
+    if (!acc[row.idAsignacion]) {
+      acc[row.idAsignacion] = {
+        idAsignacion: row.idAsignacion,
+        idProfesor: row.idProfesor,
+        codigoDisciplina: row.codigoDisciplina,
+        idGrado: row.idGrado,
+        esPrincipal: row.esPrincipal,
+        estado: row.estado,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        discipline: { codigoDisciplina: row.discCodigo, nombre: row.discNombre },
+        grade: { idGrado: row.gradoIdGrado, nombre: row.gradoNombre },
+        schedules: [],
+      };
+    }
+    if (row.idHorario) {
+      acc[row.idAsignacion].schedules.push({
+        schedule: {
+          idHorario: row.idHorario,
+          diaSemana: row.diaSemana,
+          horaInicio: row.horaInicio,
+          horaFin: row.horaFin,
+          aula: row.aula,
+        },
+      });
+    }
+    return acc;
+  }, {});
+
+  res.json({ success: true, data: Object.values(grouped) });
 }
 
 export async function startSession(req: Request, res: Response) {
@@ -99,34 +168,60 @@ export async function startSession(req: Request, res: Response) {
     throw new AppError(400, "VALIDATION_ERROR", "idAsignacion e idHorario son requeridos");
   }
 
-  const assignment = await prisma.extracurricularAssignment.findUnique({
-    where: { idAsignacion },
-    include: { schedules: { where: { idHorario } } },
-  });
+  const assignment = await first<{ idProfesor: string }>(
+    (await sql`
+      SELECT "idProfesor"
+      FROM "ExtracurricularAssignment"
+      WHERE "idAsignacion" = ${idAsignacion}
+      LIMIT 1
+    `) as unknown as Array<{ idProfesor: string }>
+  );
 
   if (!assignment || assignment.idProfesor !== teacherId) {
     throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Asignación no encontrada");
   }
 
-  if (assignment.schedules.length === 0) {
+  const scheduleLink = await first<{ id: string }>(
+    (await sql`
+      SELECT "id"
+      FROM "AssignmentSchedule"
+      WHERE "idAsignacion" = ${idAsignacion} AND "idHorario" = ${idHorario}
+      LIMIT 1
+    `) as unknown as Array<{ id: string }>
+  );
+
+  if (!scheduleLink) {
     throw new AppError(400, "INVALID_SCHEDULE", "El horario no pertenece a esta asignación");
   }
 
   const today = nowColombia();
 
-  let session = await prisma.classSession.findUnique({
-    where: { idAsignacion_idHorario_fecha: { idAsignacion, idHorario, fecha: today } },
-  });
+  let session = await first<{ id: string; estado: string }>(
+    (await sql`
+      SELECT "id", "estado"
+      FROM "ClassSession"
+      WHERE "idAsignacion" = ${idAsignacion}
+        AND "idHorario" = ${idHorario}
+        AND "fecha" = ${today}
+      LIMIT 1
+    `) as unknown as Array<{ id: string; estado: string }>
+  );
 
   if (!session) {
-    session = await prisma.classSession.create({
-      data: { idAsignacion, idHorario, idProfesor: teacherId, fecha: today, estado: "en_curso" },
-    });
+    const created = (await sql`
+      INSERT INTO "ClassSession" ("id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt")
+      VALUES (gen_random_uuid(), ${idAsignacion}, ${idHorario}, ${teacherId}, ${today}, 'en_curso', now(), now())
+      RETURNING "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt"
+    `) as unknown as Array<any>;
+    session = created[0];
   } else if (session.estado === "programada") {
-    session = await prisma.classSession.update({
-      where: { id: session.id },
-      data: { estado: "en_curso" },
-    });
+    const updated = (await sql`
+      UPDATE "ClassSession"
+      SET "estado" = 'en_curso', "updatedAt" = now()
+      WHERE "id" = ${session.id}
+      RETURNING "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt"
+    `) as unknown as Array<any>;
+    session = updated[0];
   }
 
   res.json({ success: true, data: session });
@@ -136,49 +231,66 @@ export async function getAttendanceList(req: Request, res: Response) {
   const teacherId = req.teacher!.teacherId;
   const sessionId = param(req, "sessionId");
 
-  const session = await prisma.classSession.findUnique({
-    where: { id: sessionId },
-    include: {
-      assignment: {
-        include: {
-          discipline: { select: { codigoDisciplina: true, nombre: true } },
-          grade: { select: { idGrado: true, nombre: true } },
-        },
-      },
-      schedule: true,
-    },
-  });
+  const sessionRow = await first<any>(
+    (await sql`
+      SELECT
+        cs."id", cs."estado", cs."fecha", cs."idProfesor",
+        ea."idAsignacion", ea."codigoDisciplina",
+        d."nombre" AS "discNombre",
+        g."idGrado" AS "gradoIdGrado", g."nombre" AS "gradoNombre",
+        sc."idHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula"
+      FROM "ClassSession" cs
+      LEFT JOIN "ExtracurricularAssignment" ea ON ea."idAsignacion" = cs."idAsignacion"
+      LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+      LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+      LEFT JOIN "Schedule" sc ON sc."idHorario" = cs."idHorario"
+      WHERE cs."id" = ${sessionId}
+      LIMIT 1
+    `) as unknown as Array<any>
+  );
 
-  if (!session || session.idProfesor !== teacherId) {
+  if (!sessionRow || sessionRow.idProfesor !== teacherId) {
     throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
   }
 
-  const enrolledStudents = await prisma.studentSchedule.findMany({
-    where: { codigoDisciplina: session.assignment.codigoDisciplina, diaSemana: session.schedule.diaSemana },
-    include: {
-      student: {
-        select: { codigoEstudiante: true, nombre: true, apellido: true, grupo: true },
-      },
-    },
-  });
+  const enrolledStudents = (await sql`
+    SELECT
+      ss."codigoEstudiante",
+      st."nombre", st."apellido", st."grupo"
+    FROM "StudentSchedule" ss
+    LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+    WHERE ss."codigoDisciplina" = ${sessionRow.codigoDisciplina}
+      AND ss."diaSemana" = ${sessionRow.diaSemana}
+  `) as unknown as Array<{
+    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null;
+  }>;
 
-  const existingAttendance = await prisma.attendanceRecord.findMany({
-    where: { sessionId },
-  });
+  const existingAttendance = (await sql`
+    SELECT "codigoEstudiante", "estado"
+    FROM "AttendanceRecord"
+    WHERE "sessionId" = ${sessionId}
+  `) as unknown as Array<{ codigoEstudiante: string; estado: string }>;
 
   const attendanceMap = new Map(existingAttendance.map((a) => [a.codigoEstudiante, a.estado]));
 
   const students = enrolledStudents.map((es) => ({
-    ...es.student,
+    codigoEstudiante: es.codigoEstudiante,
+    nombre: es.nombre,
+    apellido: es.apellido,
+    grupo: es.grupo,
     estado: attendanceMap.get(es.codigoEstudiante) || "pendiente",
   }));
 
   res.json({
     success: true,
     data: {
-      session: { id: session.id, estado: session.estado, fecha: session.fecha },
-      assignment: session.assignment,
-      schedule: session.schedule,
+      session: { id: sessionRow.id, estado: sessionRow.estado, fecha: sessionRow.fecha },
+      assignment: {
+        idAsignacion: sessionRow.idAsignacion,
+        discipline: { codigoDisciplina: sessionRow.codigoDisciplina, nombre: sessionRow.discNombre },
+        grade: { idGrado: sessionRow.gradoIdGrado, nombre: sessionRow.gradoNombre },
+      },
+      schedule: { idHorario: sessionRow.idHorario, diaSemana: sessionRow.diaSemana, horaInicio: sessionRow.horaInicio, horaFin: sessionRow.horaFin, aula: sessionRow.aula },
       students,
     },
   });
@@ -193,29 +305,34 @@ export async function saveAttendance(req: Request, res: Response) {
     throw new AppError(400, "VALIDATION_ERROR", "records debe ser un array");
   }
 
-  const session = await prisma.classSession.findUnique({ where: { id: sessionId } });
+  const session = await first<{ idProfesor: string }>(
+    (await sql`
+      SELECT "idProfesor"
+      FROM "ClassSession"
+      WHERE "id" = ${sessionId}
+      LIMIT 1
+    `) as unknown as Array<{ idProfesor: string }>
+  );
   if (!session || session.idProfesor !== teacherId) {
     throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
   }
 
-  await prisma.attendanceRecord.deleteMany({ where: { sessionId } });
+  await sql`DELETE FROM "AttendanceRecord" WHERE "sessionId" = ${sessionId}`;
 
-  const validRecords = records.filter((r: any) => r.estado === "presente" || r.estado === "ausente" || r.estado === "justificado");
+  const validRecords = records.filter((r: any) =>
+    r.estado === "presente" || r.estado === "ausente" || r.estado === "justificado"
+  );
 
   if (validRecords.length > 0) {
-    await prisma.attendanceRecord.createMany({
-      data: validRecords.map((r: any) => ({
-        sessionId,
-        codigoEstudiante: r.codigoEstudiante,
-        estado: r.estado,
-      })),
-    });
+    await sql.transaction((tx) =>
+      validRecords.map((r: any) =>
+        tx`INSERT INTO "AttendanceRecord" ("id", "sessionId", "codigoEstudiante", "estado", "createdAt")
+           VALUES (gen_random_uuid(), ${sessionId}, ${r.codigoEstudiante}, ${r.estado}, now())`
+      )
+    );
   }
 
-  await prisma.classSession.update({
-    where: { id: sessionId },
-    data: { estado: "finalizada" },
-  });
+  await sql`UPDATE "ClassSession" SET "estado" = 'finalizada', "updatedAt" = now() WHERE "id" = ${sessionId}`;
 
   res.json({ success: true, data: { message: "Asistencia guardada", total: validRecords.length } });
 }

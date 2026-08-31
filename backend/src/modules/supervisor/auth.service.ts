@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import prisma from "../../config/prisma";
+import { sql } from "../../config/db";
 import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { createRefreshService } from "../../modules/auth/refreshTokens";
@@ -8,7 +8,7 @@ import { setAuthCookies, clearAuthCookies, SUPERVISOR_REFRESH_COOKIE } from "../
 
 const supervisorRefresh = createRefreshService({
   userIdField: "supervisorId",
-  refreshModel: prisma.supervisorRefreshToken as any,
+  tableName: "SupervisorRefreshToken",
   buildAccessToken: ({ id, email }) =>
     jwt.sign({ supervisorId: id, email }, config.jwtSecret, {
       expiresIn: config.accessTokenExpiresIn,
@@ -22,7 +22,9 @@ export async function supervisorLogin(req: Request, res: Response) {
     throw new AppError(400, "VALIDATION_ERROR", "Email es requerido");
   }
 
-  const supervisor = await prisma.supervisor.findUnique({ where: { correo: email } });
+  const rows = await sql`SELECT * FROM "Supervisor" WHERE "correo" = ${email} LIMIT 1`;
+  const supervisor = rows[0] ?? null;
+
   if (!supervisor) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Correo no registrado como supervisor");
   }
@@ -60,10 +62,8 @@ export async function supervisorRefreshSession(req: Request, res: Response) {
 
   const { userId, refreshToken: newRefreshToken } = await supervisorRefresh.rotate(refreshToken, "");
 
-  const supervisor = await prisma.supervisor.findUnique({
-    where: { idSupervisor: userId },
-    select: { idSupervisor: true, nombre: true, apellido: true, correo: true, estado: true },
-  });
+  const rows = await sql`SELECT "idSupervisor", "nombre", "apellido", "correo", "estado" FROM "Supervisor" WHERE "idSupervisor" = ${userId} LIMIT 1`;
+  const supervisor = rows[0] ?? null;
 
   if (!supervisor || supervisor.estado !== "activo") {
     throw new AppError(403, "FORBIDDEN", "Acceso denegado");
@@ -102,10 +102,8 @@ export async function supervisorMe(req: Request, res: Response) {
     throw new AppError(401, "UNAUTHORIZED", "No autenticado");
   }
 
-  const supervisor = await prisma.supervisor.findUnique({
-    where: { idSupervisor: req.supervisor.supervisorId },
-    select: { idSupervisor: true, nombre: true, apellido: true, correo: true, estado: true },
-  });
+  const rows = await sql`SELECT "idSupervisor", "nombre", "apellido", "correo", "estado" FROM "Supervisor" WHERE "idSupervisor" = ${req.supervisor.supervisorId} LIMIT 1`;
+  const supervisor = rows[0] ?? null;
 
   if (!supervisor || supervisor.estado !== "activo") {
     throw new AppError(403, "FORBIDDEN", "Acceso denegado");

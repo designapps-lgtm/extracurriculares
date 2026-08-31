@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config";
-import prisma from "../config/prisma";
+import { sql } from "../config/db";
 import { ADMIN_ACCESS_COOKIE } from "../utils/authCookies";
 
 export interface AuthPayload {
@@ -45,8 +45,14 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     return;
   }
 
-  const admin = await prisma.adminUser.findUnique({ where: { id: req.admin.adminId } });
-  if (!admin || admin.estado !== "activo") {
+  const admin = (await sql`
+    SELECT "id", "estado"
+    FROM "AdminUser"
+    WHERE "id" = ${req.admin.adminId}
+    LIMIT 1
+  `) as unknown as Array<{ id: string; estado: string }>;
+
+  if (admin.length === 0 || admin[0].estado !== "activo") {
     res.status(403).json({ success: false, error: { code: "FORBIDDEN", message: "Acceso denegado" } });
     return;
   }

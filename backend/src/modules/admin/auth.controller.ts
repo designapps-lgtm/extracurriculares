@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import prisma from "../../config/prisma";
 import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { createRefreshService } from "../../modules/auth/refreshTokens";
@@ -9,7 +8,7 @@ import * as service from "./auth.service";
 
 const adminRefresh = createRefreshService({
   userIdField: "adminId",
-  refreshModel: prisma.adminRefreshToken as any,
+  tableName: "AdminRefreshToken",
   buildAccessToken: ({ id, email }) =>
     jwt.sign({ adminId: id, email }, config.jwtSecret, {
       expiresIn: config.accessTokenExpiresIn,
@@ -42,7 +41,6 @@ export async function refreshSession(req: Request, res: Response) {
 
   const admin = await service.getAdminById(userId);
 
-  // Re-firmar el access token con el email real del admin (rotate() recibe "")
   const accessToken = jwt.sign(
     { adminId: admin.id, email: admin.email },
     config.jwtSecret,

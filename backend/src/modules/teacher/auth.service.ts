@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { OAuth2Client } from "google-auth-library";
-import prisma from "../../config/prisma";
+import { googleOAuthClient } from "../../utils/googleOAuth";
+import { sql } from "../../config/db";
 import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { createRefreshService } from "../../modules/auth/refreshTokens";
@@ -9,7 +9,7 @@ import { setAuthCookies, clearAuthCookies, TEACHER_REFRESH_COOKIE } from "../../
 
 const teacherRefresh = createRefreshService({
   userIdField: "teacherId",
-  refreshModel: prisma.teacherRefreshToken as any,
+  tableName: "TeacherRefreshToken",
   buildAccessToken: ({ id, email }) =>
     jwt.sign({ teacherId: id, email }, config.jwtSecret, {
       expiresIn: config.accessTokenExpiresIn,
@@ -23,7 +23,9 @@ export async function teacherLogin(req: Request, res: Response) {
     throw new AppError(400, "VALIDATION_ERROR", "Email es requerido");
   }
 
-  const teacher = await prisma.teacher.findUnique({ where: { correo: email } });
+  const rows = await sql`SELECT * FROM "Teacher" WHERE "correo" = ${email} LIMIT 1`;
+  const teacher = rows[0] ?? null;
+
   if (!teacher) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Correo no registrado como profesor");
   }
@@ -63,7 +65,7 @@ export async function teacherGoogleLogin(req: Request, res: Response) {
     throw new AppError(503, "GOOGLE_AUTH_NOT_CONFIGURED", "El inicio con Google no está configurado");
   }
 
-  const client = new OAuth2Client(config.googleClientId);
+  const client = googleOAuthClient;
   let payload;
   try {
     const ticket = await client.verifyIdToken({
@@ -84,7 +86,9 @@ export async function teacherGoogleLogin(req: Request, res: Response) {
     throw new AppError(403, "GOOGLE_DOMAIN_NOT_ALLOWED", `La cuenta debe ser de la institución (${config.googleInstitutionDomain})`);
   }
 
-  const teacher = await prisma.teacher.findUnique({ where: { correo: email } });
+  const rows = await sql`SELECT * FROM "Teacher" WHERE "correo" = ${email} LIMIT 1`;
+  const teacher = rows[0] ?? null;
+
   if (!teacher) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Correo no registrado como profesor");
   }
@@ -93,7 +97,6 @@ export async function teacherGoogleLogin(req: Request, res: Response) {
     throw new AppError(403, "TEACHER_INACTIVE", "La cuenta está desactivada");
   }
 
-  // Reutiliza el mismo flujo de sesión (cookies).
   const { accessToken, refreshToken } = await teacherRefresh.issue(
     teacher.idProfesor,
     teacher.correo || ""
@@ -123,16 +126,13 @@ export async function teacherRefreshSession(req: Request, res: Response) {
 
   const { userId, refreshToken: newRefreshToken } = await teacherRefresh.rotate(refreshToken, "");
 
-  const teacher = await prisma.teacher.findUnique({
-    where: { idProfesor: userId },
-    select: { idProfesor: true, nombre: true, apellido: true, correo: true, estado: true },
-  });
+  const rows = await sql`SELECT "idProfesor", "nombre", "apellido", "correo", "estado" FROM "Teacher" WHERE "idProfesor" = ${userId} LIMIT 1`;
+  const teacher = rows[0] ?? null;
 
   if (!teacher || teacher.estado !== "activo") {
     throw new AppError(403, "FORBIDDEN", "Acceso denegado");
   }
 
-  // Re-firmar el access token con el correo real del teacher (rotate() recibe "")
   const accessToken = jwt.sign(
     { teacherId: teacher.idProfesor, email: teacher.correo },
     config.jwtSecret,
@@ -166,10 +166,8 @@ export async function teacherMe(req: Request, res: Response) {
     throw new AppError(401, "UNAUTHORIZED", "No autenticado");
   }
 
-  const teacher = await prisma.teacher.findUnique({
-    where: { idProfesor: req.teacher.teacherId },
-    select: { idProfesor: true, nombre: true, apellido: true, correo: true, estado: true },
-  });
+  const rows = await sql`SELECT "idProfesor", "nombre", "apellido", "correo", "estado" FROM "Teacher" WHERE "idProfesor" = ${req.teacher.teacherId} LIMIT 1`;
+  const teacher = rows[0] ?? null;
 
   if (!teacher || teacher.estado !== "activo") {
     throw new AppError(403, "FORBIDDEN", "Acceso denegado");
