@@ -6,6 +6,7 @@ import type {
   SupervisorSessionItem,
   SupervisorSessionDetail,
   SupervisorTeacherSchedule,
+  SupervisorScheduleHistory,
 } from "../types";
 
 export async function supervisorLogin(email: string): Promise<{ supervisor: Supervisor }> {
@@ -57,6 +58,16 @@ export async function getSupervisorFilters(): Promise<SupervisorFilterData> {
 
 export async function getSupervisorTeacherSchedules(): Promise<SupervisorTeacherSchedule[]> {
   const res = await api.get<ApiResponse<SupervisorTeacherSchedule[]>>("/api/supervisor/schedules");
+  return res.data;
+}
+
+export async function getSupervisorScheduleHistory(
+  asignacionId: string,
+  horarioId: string,
+): Promise<SupervisorScheduleHistory> {
+  const res = await api.get<ApiResponse<SupervisorScheduleHistory>>(
+    `/api/supervisor/schedules/${asignacionId}/${horarioId}`,
+  );
   return res.data;
 }
 

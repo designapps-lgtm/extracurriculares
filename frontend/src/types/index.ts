@@ -158,6 +158,21 @@ export interface SupervisorTeacherSchedule {
   schedules: Schedule[];
 }
 
+export interface SupervisorScheduleHistory {
+  assignment: {
+    teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
+    discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
+    grade: Pick<Grade, "idGrado" | "nombre">;
+  };
+  schedule: Schedule;
+  sessions: {
+    id: string;
+    fecha: string;
+    estado: string;
+    counts: { total: number; presente: number; ausente: number; justificado: number; };
+  }[];
+}
+
 export interface TeacherClass {
   idAsignacion: string;
   discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
