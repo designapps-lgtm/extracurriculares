@@ -17,7 +17,7 @@ crons = ["*/10 * * * *"]
 [vars]
 NODE_ENV = "production"
 PORT = "3000"
-FRONTEND_URL = "https://extracurriculares-gi.vercel.app"
+FRONTEND_URL = "https://extracurriculares-mu.vercel.app/"
 ACCESS_TOKEN_EXPIRES_IN = "15m"
 REFRESH_TOKEN_EXPIRES_IN_DAYS = "7"
 GOOGLE_INSTITUTION_DOMAIN = "gi.edu.co"

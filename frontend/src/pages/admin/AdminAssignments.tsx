@@ -74,17 +74,22 @@ export default function AdminAssignments() {
 
   useEffect(() => {
     load();
-    Promise.all([
-      getAdminDisciplines({ limit: "100" }),
-      getAdminTeachers({ limit: "100" }),
-      getAdminGrades(),
-      getAdminSchedules({ limit: "100" }),
-    ]).then(([d, t, g, s]) => {
-      setDisciplines(d.data);
-      setTeachers(t.data);
-      setGrades(g.data);
-      setSchedules(s.data);
-    });
+    (async () => {
+      try {
+        const [d, t, g, s] = await Promise.all([
+          getAdminDisciplines({ limit: "100" }),
+          getAdminTeachers({ limit: "100" }),
+          getAdminGrades(),
+          getAdminSchedules({ limit: "100" }),
+        ]);
+        setDisciplines(d.data);
+        setTeachers(t.data);
+        setGrades(g.data);
+        setSchedules(s.data);
+      } catch (err) {
+        console.error(err);
+      }
+    })();
   }, []);
 
   const openCreate = () => {
@@ -176,15 +181,21 @@ export default function AdminAssignments() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleToggleState = async (a: Assignment) => {
     const confirmed = await notify.confirm(
-      "Eliminar asignación",
-      "¿Está seguro de eliminar esta asignación?",
-      { confirmLabel: "Eliminar", variant: "danger" },
+      a.estado === "activo" ? "Desactivar asignación" : "Eliminar asignación",
+      a.estado === "activo"
+        ? "¿Está seguro de desactivar esta asignación?"
+        : "¿Está seguro de eliminar esta asignación?",
+      { confirmLabel: a.estado === "activo" ? "Desactivar" : "Eliminar", variant: "danger" },
     );
     if (!confirmed) return;
     try {
-      await deleteAdminAssignment(id);
+      if (a.estado === "activo") {
+        await updateAdminAssignment(a.idAsignacion, { estado: "inactivo" });
+      } else {
+        await deleteAdminAssignment(a.idAsignacion);
+      }
       load(meta.page);
     } catch (err: any) {
       notify.error(err.message);
@@ -295,7 +306,7 @@ export default function AdminAssignments() {
                         </button>
                       )}
                       <button
-                        onClick={() => handleDelete(a.idAsignacion)}
+                        onClick={() => handleToggleState(a)}
                         className="px-2.5 py-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg text-sm font-medium"
                       >
                         {a.estado === "activo" ? "Desactivar" : "Eliminar"}

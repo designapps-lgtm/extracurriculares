@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Students from "./pages/Students";
 import StudentProfile from "./pages/StudentProfile";
 import Disciplines from "./pages/Disciplines";
 import DisciplineDetail from "./pages/DisciplineDetail";
@@ -43,6 +44,14 @@ function App() {
       <Route path="/teacher/session/:sessionId" element={<TeacherAttendance />} />
       <Route path="/teacher/novedad/:codigoEstudiante" element={<TeacherNovedad />} />
 
+      {/* Public routes */}
+      <Route path="/students" element={<Students />} />
+      <Route path="/students/:codigo" element={<StudentProfile />} />
+      <Route path="/disciplines" element={<Disciplines />} />
+      <Route path="/disciplines/:codigo" element={<DisciplineDetail />} />
+      <Route path="/teachers" element={<Teachers />} />
+      <Route path="/teachers/:id" element={<TeacherDetail />} />
+
       {/* Supervisor routes */}
       <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
       <Route path="/supervisor/schedules" element={<SupervisorSchedules />} />
@@ -50,6 +59,7 @@ function App() {
 
       {/* Admin routes — AdminLayout handles auth + sidebar */}
       <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="students" element={<AdminStudents />} />
         <Route path="students/:codigo" element={<StudentProfile />} />
@@ -71,5 +81,4 @@ function App() {
 }
 
 export default App;
-
 

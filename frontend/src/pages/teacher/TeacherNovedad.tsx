@@ -27,15 +27,20 @@ export default function TeacherNovedad() {
 
   const [novedades, setNovedades] = useState<Novedad[]>(state?.novedades || []);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!codigoEstudiante) return;
     if (state?.novedades && state.novedades.length > 0) return;
     setLoading(true);
+    setError(null);
     getNovedadesBatch([codigoEstudiante])
       .then((res) => {
         const item = res.find((i) => i.codigoEstudiante === codigoEstudiante);
         setNovedades(item?.novedades || []);
+      })
+      .catch(() => {
+        setError("No se pudieron cargar las novedades.");
       })
       .finally(() => setLoading(false));
   }, [codigoEstudiante, state]);
@@ -93,7 +98,17 @@ export default function TeacherNovedad() {
           </div>
         </div>
 
-        {novedades.length === 0 && !loading ? (
+        {error ? (
+          <div className="card p-8 text-center space-y-3">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            <button
+              onClick={() => navigate(backTo)}
+              className="inline-flex items-center px-4 py-2 rounded-xl bg-surface-900 text-white text-sm font-medium"
+            >
+              Volver
+            </button>
+          </div>
+        ) : novedades.length === 0 && !loading ? (
           <div className="card p-8 text-center">
             <p className="text-surface-500 text-sm">No hay novedades activas para este estudiante.</p>
           </div>

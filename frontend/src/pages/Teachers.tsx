@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { getTeachers } from "../services/teachers";
 import { useDebounce } from "../hooks";
 import { Loading, ErrorMessage, EmptyState } from "../components/common/States";
@@ -7,6 +7,8 @@ import { Avatar } from "../components/common/Avatar";
 import type { TeacherWithCount } from "../types";
 
 export default function Teachers() {
+  const location = useLocation();
+  const isAdmin = location.pathname.startsWith("/admin");
   const [teachers, setTeachers] = useState<TeacherWithCount[]>([]);
   const [meta, setMeta] = useState({ total: 0 });
   const [loading, setLoading] = useState(true);
@@ -80,7 +82,7 @@ export default function Teachers() {
           {teachers.map((t) => (
             <Link
               key={t.idProfesor}
-              to={`/admin/teachers-view/${t.idProfesor}`}
+              to={`${isAdmin ? "/admin/teachers-view" : "/teachers"}/${t.idProfesor}`}
               className="card-interactive px-5 py-4 group"
             >
               <div className="flex items-center gap-3.5">
