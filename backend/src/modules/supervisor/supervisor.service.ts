@@ -301,6 +301,64 @@ export async function getSupervisorTeacherSchedules(req: Request, res: Response)
   res.json({ success: true, data: schedules });
 }
 
+export async function getSupervisorAssignmentHistory(req: Request, res: Response) {
+  const asignacionId = param(req, "asignacionId");
+
+  const assignment = await prisma.extracurricularAssignment.findUnique({
+    where: { idAsignacion: asignacionId },
+    include: {
+      teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
+      discipline: { select: { codigoDisciplina: true, nombre: true } },
+      grade: { select: { idGrado: true, nombre: true } },
+    },
+  });
+  if (!assignment) {
+    throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Asignación no encontrada");
+  }
+
+  const assignmentsSchedules = await prisma.assignmentSchedule.findMany({
+    where: { idAsignacion: asignacionId },
+    include: {
+      schedule: { select: { idHorario: true, diaSemana: true, horaInicio: true, horaFin: true, aula: true } },
+    },
+  });
+
+  const sessions = await prisma.classSession.findMany({
+    where: { idAsignacion: asignacionId },
+    include: { attendances: true },
+    orderBy: { fecha: "desc" },
+  });
+
+  const schedules = assignmentsSchedules.map((as) => ({
+    schedule: as.schedule,
+    sessions: sessions
+      .filter((s) => s.idHorario === as.schedule.idHorario)
+      .map((s) => ({
+        id: s.id,
+        fecha: s.fecha,
+        estado: s.estado,
+        counts: {
+          total: s.attendances.length,
+          presente: s.attendances.filter((a) => a.estado === "presente").length,
+          ausente: s.attendances.filter((a) => a.estado === "ausente").length,
+          justificado: s.attendances.filter((a) => a.estado === "justificado").length,
+        },
+      })),
+  }));
+
+  res.json({
+    success: true,
+    data: {
+      assignment: {
+        teacher: assignment.teacher,
+        discipline: assignment.discipline,
+        grade: assignment.grade,
+      },
+      schedules,
+    },
+  });
+}
+
 export async function getSupervisorScheduleHistory(req: Request, res: Response) {
   const asignacionId = param(req, "asignacionId");
   const horarioId = param(req, "horarioId");

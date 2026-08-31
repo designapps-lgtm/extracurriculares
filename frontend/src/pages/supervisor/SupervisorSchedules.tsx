@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getSupervisorTeacherSchedules,
-  getSupervisorScheduleHistory,
+  getSupervisorAssignmentHistory,
   supervisorMe,
   supervisorLogout,
 } from "../../services/supervisor";
@@ -12,7 +12,8 @@ import Logo from "../../components/common/Logo";
 import type {
   Supervisor,
   SupervisorTeacherSchedule,
-  SupervisorScheduleHistory,
+  SupervisorAssignmentHistory,
+  Schedule,
 } from "../../types";
 
 const DIAS_CORTO: Record<string, string> = {
@@ -32,24 +33,81 @@ function formatFecha(iso: string): string {
   return d.toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" });
 }
 
-function SessionState({ estado, counts }: { estado: string; counts: { total: number; presente: number; ausente: number; justificado: number } }) {
-  const llamoLista = estado === "finalizada";
+function SessionRow({ session, onView }: { session: { id: string; fecha: string; estado: string; counts: { total: number; presente: number; ausente: number; justificado: number } }; onView: () => void }) {
+  const llamoLista = session.estado === "finalizada";
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex items-center gap-2 min-w-0">
-        {llamoLista ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400">
-            Llamó a lista
-          </span>
-        ) : (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400">
-            Sin registro
-          </span>
-        )}
+    <li className="flex items-center justify-between gap-3 rounded-xl border border-surface-200 dark:border-surface-800 px-3 py-2.5 bg-white dark:bg-surface-950">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-surface-900 dark:text-surface-100">
+          {formatFecha(session.fecha)}
+        </p>
+        <div className="mt-1">
+          {llamoLista ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400">
+              Llamó a lista
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400">
+              Sin registro
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
         {llamoLista && (
-          <p className="text-xs text-surface-500 tabular-nums">
-            {counts.presente} presente · {counts.ausente} ausente · {counts.justificado} justificado
+          <p className="text-xs text-surface-500 tabular-nums hidden sm:block">
+            {session.counts.presente} pres · {session.counts.ausente} aus
           </p>
+        )}
+        {llamoLista ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onView();
+            }}
+            className="px-3 py-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 dark:hover:bg-brand-950 rounded-lg"
+          >
+            Ver lista →
+          </button>
+        ) : (
+          <span className="text-xs text-surface-300">—</span>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ScheduleBlock({
+  schedule,
+  sessions,
+  onViewSession,
+}: {
+  schedule: Schedule;
+  sessions: SupervisorAssignmentHistory["schedules"][number]["sessions"];
+  onViewSession: (sessionId: string) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-surface-200 dark:border-surface-800 overflow-hidden">
+      <div className="px-3 py-2 bg-surface-50 dark:bg-surface-800/60 flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">
+          {DIAS_CORTO[schedule.diaSemana] || schedule.diaSemana}
+        </span>
+        <span className="text-xs text-surface-500 tabular-nums">
+          {schedule.horaInicio ?? "?"}–{schedule.horaFin ?? "?"}
+        </span>
+        {schedule.aula && <span className="text-xs text-surface-400">· {schedule.aula}</span>}
+      </div>
+      <div className="px-3 py-2.5">
+        {sessions.length === 0 ? (
+          <p className="text-sm text-surface-500">
+            Todavía no se registró asistencia para este horario.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {sessions.map((s) => (
+              <SessionRow key={s.id} session={s} onView={() => onViewSession(s.id)} />
+            ))}
+          </ul>
         )}
       </div>
     </div>
@@ -61,8 +119,8 @@ export default function SupervisorSchedules() {
   const [assignments, setAssignments] = useState<SupervisorTeacherSchedule[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [selected, setSelected] = useState<{ asignacionId: string; horarioId: string } | null>(null);
-  const [history, setHistory] = useState<SupervisorScheduleHistory | null>(null);
+  const [selectedAsignacion, setSelectedAsignacion] = useState<string | null>(null);
+  const [history, setHistory] = useState<SupervisorAssignmentHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -93,17 +151,17 @@ export default function SupervisorSchedules() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openHistory = (a: SupervisorTeacherSchedule, horarioId: string) => {
-    setSelected({ asignacionId: a.idAsignacion, horarioId });
+  const openHistory = (a: SupervisorTeacherSchedule) => {
+    setSelectedAsignacion(a.idAsignacion);
     setHistory(null);
     setHistoryLoading(true);
-    getSupervisorScheduleHistory(a.idAsignacion, horarioId)
+    getSupervisorAssignmentHistory(a.idAsignacion)
       .then(setHistory)
       .catch((err: any) => notify.error(err.message || "Error al cargar el historial"))
       .finally(() => setHistoryLoading(false));
   };
 
-  const closeHistory = () => setSelected(null);
+  const closeHistory = () => setSelectedAsignacion(null);
 
   const handleLogout = async () => {
     await supervisorLogout();
@@ -118,16 +176,21 @@ export default function SupervisorSchedules() {
           (x.horaInicio ?? "").localeCompare(y.horaInicio ?? ""),
       )
       .map((sch) => (
-        <button
+        <span
           key={sch.idHorario}
-          onClick={() => openHistory(a, sch.idHorario)}
-          title={`Ver historial de ${DIAS_CORTO[sch.diaSemana] || sch.diaSemana} ${sch.horaInicio ?? "?"}–${sch.horaFin ?? "?"}`}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-surface-600 dark:text-surface-400 border border-surface-200 dark:border-surface-700 hover:border-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-800"
         >
           <span className="font-medium">{DIAS_CORTO[sch.diaSemana] || sch.diaSemana}</span>
           <span className="tabular-nums">{sch.horaInicio ?? "?"}–{sch.horaFin ?? "?"}</span>
-        </button>
+        </span>
       ));
+
+  const orderedHistorySchedules = (historyArg: SupervisorAssignmentHistory) =>
+    [...historyArg.schedules].sort(
+      (x, y) =>
+        DIAS_ORDEN.indexOf(x.schedule.diaSemana) - DIAS_ORDEN.indexOf(y.schedule.diaSemana) ||
+        (x.schedule.horaInicio ?? "").localeCompare(y.schedule.horaInicio ?? ""),
+    );
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
@@ -163,7 +226,7 @@ export default function SupervisorSchedules() {
           </h1>
           {!loading && (
             <span className="text-xs text-surface-400">
-              Toca un horario para ver si llamó a lista
+              Toca una clase para ver sus registros de asistencia
             </span>
           )}
         </div>
@@ -178,7 +241,11 @@ export default function SupervisorSchedules() {
           ) : (
             <div className="divide-y divide-surface-100 dark:divide-surface-800">
               {assignments.map((a) => (
-                <div key={a.idAsignacion} className="p-5">
+                <button
+                  key={a.idAsignacion}
+                  onClick={() => openHistory(a)}
+                  className="w-full text-left p-5 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors focus:outline-none focus:bg-surface-50 dark:focus:bg-surface-800/50"
+                >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -191,18 +258,23 @@ export default function SupervisorSchedules() {
                         {renderSchedules(a)}
                       </div>
                     </div>
-                    <div className="text-sm text-surface-500 shrink-0">
-                      {a.teacher.nombre} {a.teacher.apellido}
+                    <div className="sm:flex items-center gap-3 shrink-0">
+                      <span className="text-sm text-surface-500">
+                        {a.teacher.nombre} {a.teacher.apellido}
+                      </span>
+                      <span className="text-sm text-brand-600 dark:text-brand-400 font-medium">
+                        Ver registros →
+                      </span>
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
         </div>
       </main>
 
-      {selected && (
+      {selectedAsignacion && (
         <div
           className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           onClick={closeHistory}
@@ -216,13 +288,11 @@ export default function SupervisorSchedules() {
             <div className="px-5 py-4 border-b border-surface-200 dark:border-surface-800 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="font-display font-bold text-surface-900 dark:text-surface-100 truncate">
-                  {history?.assignment.discipline.nombre ?? "Horario"}
+                  {history?.assignment.discipline.nombre ?? "Clase"}
                   <span className="ml-2 text-sm text-surface-500">Grado {history?.assignment.grade.nombre ?? ""}</span>
                 </h2>
                 <p className="text-sm text-surface-500 mt-1">
-                  {history
-                    ? `${history.assignment.teacher.nombre} ${history.assignment.teacher.apellido} · ${DIAS_CORTO[history.schedule.diaSemana] ?? history.schedule.diaSemana} ${history.schedule.horaInicio ?? "?"}–${history.schedule.horaFin ?? "?"}${history.schedule.aula ? ` · ${history.schedule.aula}` : ""}`
-                    : "Cargando…"}
+                  {history ? `${history.assignment.teacher.nombre} ${history.assignment.teacher.apellido}` : "Cargando…"}
                 </p>
               </div>
               <button
@@ -234,44 +304,20 @@ export default function SupervisorSchedules() {
               </button>
             </div>
 
-            <div className="px-5 py-4 max-h-[60vh] overflow-y-auto">
-              <p className="text-xs font-medium uppercase tracking-wide text-surface-400 mb-2">
-                Registros de asistencia
-              </p>
+            <div className="px-5 py-4 max-h-[65vh] overflow-y-auto space-y-3">
               {historyLoading ? (
                 <Loading />
               ) : !history ? (
                 <p className="text-sm text-surface-500">No se pudo cargar el historial.</p>
-              ) : history.sessions.length === 0 ? (
-                <p className="text-sm text-surface-500">
-                  Todavía no se registró ninguna asistencia para esta clase.
-                </p>
               ) : (
-                <ul className="space-y-2">
-                  {history.sessions.map((s) => (
-                    <li
-                      key={s.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-surface-200 dark:border-surface-800 px-3 py-2.5 bg-white dark:bg-surface-950"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-surface-900 dark:text-surface-100">
-                          {formatFecha(s.fecha)}
-                        </p>
-                        <div className="mt-1">
-                          <SessionState estado={s.estado} counts={s.counts} />
-                        </div>
-                      </div>
-                      {s.estado === "finalizada" ? (
-                        <button
-                          onClick={() => navigate(`/supervisor/session/${s.id}`)}
-                          className="px-3 py-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 dark:hover:bg-brand-950 rounded-lg shrink-0"
-                        >
-                          Ver lista →
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+                orderedHistorySchedules(history).map((h) => (
+                  <ScheduleBlock
+                    key={h.schedule.idHorario}
+                    schedule={h.schedule}
+                    sessions={h.sessions}
+                    onViewSession={(sessionId) => navigate(`/supervisor/session/${sessionId}`)}
+                  />
+                ))
               )}
             </div>
           </div>
