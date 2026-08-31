@@ -123,7 +123,13 @@ export default function TeacherDashboard() {
                       const key = `${cls.idAsignacion}-${cls.schedule.idHorario}`;
                       const startingKey = starting === key;
                       return (
-                        <div key={key} className={`card p-4 ${isToday ? "ring-2 ring-brand-200 dark:ring-brand-800" : ""}`}>
+                        <div
+                          key={key}
+                          onClick={cls.sessionId ? () => navigate(`/teacher/session/${cls.sessionId}`) : undefined}
+                          className={`card p-4 ${isToday ? "ring-2 ring-brand-200 dark:ring-brand-800" : ""} ${
+                            cls.sessionId ? "cursor-pointer transition-colors hover:bg-surface-50 dark:hover:bg-surface-800/60" : ""
+                          }`}
+                        >
                           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-surface-900 dark:text-surface-100">
@@ -142,20 +148,22 @@ export default function TeacherDashboard() {
                             </div>
 
                             <div className="sm:ml-4 shrink-0 sm:self-start w-full sm:w-auto">
-                              {cls.sessionEstado === "finalizada" ? (
-                                <span className="inline-flex items-center text-xs text-green-600 font-medium py-2">
-                                  Finalizada
-                                </span>
-                              ) : cls.sessionId ? (
+                              {cls.sessionId ? (
                                 <button
-                                  onClick={() => navigate(`/teacher/session/${cls.sessionId}`)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/teacher/session/${cls.sessionId}`);
+                                  }}
                                   className="w-full sm:w-auto px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600"
                                 >
-                                  Continuar
+                                  {cls.sessionEstado === "finalizada" ? "Reabrir lista" : "Continuar"}
                                 </button>
                               ) : (
                                 <button
-                                  onClick={() => handleStartSession(cls)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStartSession(cls);
+                                  }}
                                   disabled={starting !== null}
                                   className={`w-full sm:w-auto px-4 py-2 text-white text-sm font-medium rounded-xl disabled:opacity-50 ${
                                     isToday

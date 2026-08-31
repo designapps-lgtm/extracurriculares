@@ -2,13 +2,13 @@ import * as XLSX from "xlsx";
 
 // Alias de headers tal como aparecen en el Excel → nombre de campo
 const HEADER_ALIASES: Record<string, string[]> = {
-  novedadId: ["NovedadID_M"],
-  listaEstudiantes: ["Lista_Estudiantes"],
-  descripcion: ["Novedad_de_Salida_Diaria_M", "Novedad de Salida Diaria M"],
+  novedadId: ["NovedadID_M", "NovedadID", "Novedad Id"],
+  listaEstudiantes: ["Lista_Estudiantes", "StudentID"],
+  descripcion: ["Novedad_de_Salida_Diaria_M", "Novedad de Salida Diaria M", "Novedad_de_Salida_Diaria", "Novedad de Salida Diaria"],
   seAusentaCon: ["Se ausenta con", "Se_Ausenta_Con"],
   grados: ["Grados"],
-  fotos: ["Fotos"],
-  nombresEstudiantes: ["Nombres_Estudiantes"],
+  fotos: ["Fotos", "Foto_Estudiante_Snap"],
+  nombresEstudiantes: ["Nombres_Estudiantes", "Nombre_Estudiante_Snap"],
   fechaHora: ["FechaHora", "Fecha Hora"],
   scanCodes: ["ScanCode", "Scan Code"],
   fechaCreacion: ["Fecha_Creacion", "Fecha Creacion", "Fecha_Creacion", "Fecha de Creacion"],
@@ -32,15 +32,10 @@ function normalizeHeader(value: string): string {
     .replace(/\s+/g, "_");
 }
 
-// Canonical form for each field: first alias normalized
-const CANONICAL_BY_FIELD: Record<string, string> = {};
-const FIELD_BY_CANONICAL: Record<string, string> = {};
+// Todas las formas canónicas de cada campo (permite varias variantes de header).
+const CANONICALS_BY_FIELD: Record<string, string[]> = {};
 for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
-  for (const alias of aliases) {
-    const canonical = normalizeHeader(alias);
-    CANONICAL_BY_FIELD[field] = CANONICAL_BY_FIELD[field] || canonical;
-    FIELD_BY_CANONICAL[canonical] = field;
-  }
+  CANONICALS_BY_FIELD[field] = aliases.map(normalizeHeader);
 }
 
 export interface ParsedNovedadRow {
@@ -123,8 +118,14 @@ function normalizeRow(row: Record<string, unknown>): Record<string, string> {
 
   const out: Record<string, string> = {};
   for (const field of Object.keys(HEADER_ALIASES)) {
-    const canonical = CANONICAL_BY_FIELD[field];
-    out[field] = rawByCanonical[canonical] ?? "";
+    let value = "";
+    for (const canonical of CANONICALS_BY_FIELD[field]) {
+      if (canonical in rawByCanonical) {
+        value = rawByCanonical[canonical];
+        break;
+      }
+    }
+    out[field] = value;
   }
   return out;
 }
