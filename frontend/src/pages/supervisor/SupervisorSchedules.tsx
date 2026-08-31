@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getSupervisorTeacherSchedules,
@@ -118,6 +118,7 @@ export default function SupervisorSchedules() {
   const [supervisor, setSupervisor] = useState<Supervisor | null>(null);
   const [assignments, setAssignments] = useState<SupervisorTeacherSchedule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profesor, setProfesor] = useState("");
 
   const [selectedAsignacion, setSelectedAsignacion] = useState<string | null>(null);
   const [history, setHistory] = useState<SupervisorAssignmentHistory | null>(null);
@@ -167,6 +168,19 @@ export default function SupervisorSchedules() {
     await supervisorLogout();
     navigate("/");
   };
+
+  const profesores = useMemo(() => {
+    const map = new Map<string, { idProfesor: string; nombre: string; apellido: string }>();
+    for (const a of assignments) map.set(a.teacher.idProfesor, a.teacher);
+    return [...map.values()].sort(
+      (x, y) => x.apellido.localeCompare(y.apellido) || x.nombre.localeCompare(y.nombre),
+    );
+  }, [assignments]);
+
+  const filtered = useMemo(
+    () => (profesor ? assignments.filter((a) => a.teacher.idProfesor === profesor) : assignments),
+    [assignments, profesor],
+  );
 
   const renderSchedules = (a: SupervisorTeacherSchedule) =>
     [...a.schedules]
@@ -220,27 +234,43 @@ export default function SupervisorSchedules() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-display font-bold text-surface-900 dark:text-surface-100">
             Horarios de los profesores
           </h1>
           {!loading && (
-            <span className="text-xs text-surface-400">
-              Toca una clase para ver sus registros de asistencia
+            <span className="text-xs text-surface-400 shrink-0">
+              {filtered.length} de {assignments.length} clase{assignments.length === 1 ? "" : "s"}
             </span>
           )}
+        </div>
+
+        <div className="card p-4">
+          <label className="block text-xs font-medium text-surface-500 mb-1">Profesor</label>
+          <select
+            value={profesor}
+            onChange={(e) => setProfesor(e.target.value)}
+            className="w-full sm:max-w-xs px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="">Todos los profesores</option>
+            {profesores.map((t) => (
+              <option key={t.idProfesor} value={t.idProfesor}>
+                {t.nombre} {t.apellido}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="card overflow-hidden">
           {loading ? (
             <Loading />
-          ) : assignments.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="text-center py-12 text-sm text-surface-500">
-              No hay horarios registrados.
+              {profesor ? "Este profesor no tiene horarios registrados." : "No hay horarios registrados."}
             </div>
           ) : (
             <div className="divide-y divide-surface-100 dark:divide-surface-800">
-              {assignments.map((a) => (
+              {filtered.map((a) => (
                 <button
                   key={a.idAsignacion}
                   onClick={() => openHistory(a)}
