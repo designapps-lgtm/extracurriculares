@@ -36,5 +36,7 @@ photoRouter.get("/drive/:fileId", asyncHandler(async (req, res) => {
 
   res.setHeader("Content-Type", imageRes.headers.get("content-type") || meta.mimeType || "image/jpeg");
   res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.send(Buffer.from(await imageRes.arrayBuffer()));
 }));
