@@ -75,7 +75,7 @@ DATABASE_URL="postgresql://USER:PASS@HOST/neondb?sslmode=require" npx prisma db 
 |----------|-------|
 | `VITE_API_URL` | **Ya no se usa en producción.** El frontend llama a `/api/*` por el mismo dominio y `vercel.json` proxya hacia Render (para que las cookies sean first-party y funcionen en móvil). Solo hace falta para desarrollo local (docker usa `http://localhost:3000`). |
 
-> `vercel.json` contiene el rewrite `/api/* → https://extracurriculares-gi.onrender.com/api/*`.
+> `vercel.json` contiene el rewrite `/api/* → https://extracurriculares.onrender.com/api/*`.
 > Si cambia el backend de Render, actualizar esa URL. Sin el proxy, los navegadores
 > móviles bloquean las cookies `SameSite=None` (third-party) y la sesión se pierde.
 
