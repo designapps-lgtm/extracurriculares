@@ -31,8 +31,8 @@ interface StudentScheduleDisciplineRow {
 const ACCENT_FROM = "áéíóúüñÁÉÍÓÚÜÑ";
 const ACCENT_TO = "aeiouunAEIOUUN";
 
-function accentInsensitiveMatch(column: string, placeholder: string) {
-  return `LOWER(TRANSLATE(${column}, '${ACCENT_FROM}', '${ACCENT_TO}')) LIKE LOWER(TRANSLATE(${placeholder}, '${ACCENT_FROM}', '${ACCENT_TO}'))`;
+function normalizedExpr(expr: string): string {
+  return `LOWER(TRANSLATE(${expr}, '${ACCENT_FROM}', '${ACCENT_TO}'))`;
 }
 
 export async function getStudents(query: StudentQuery, pagination: PaginationParams): Promise<PaginatedResult<any>> {
@@ -52,10 +52,14 @@ export async function getStudents(query: StudentQuery, pagination: PaginationPar
   const studentConds: string[] = [];
 
   if (search) {
-    const p = nextParam(`%${search}%`);
-    studentConds.push(
-      `(${accentInsensitiveMatch('s."codigoEstudiante"', p)} OR ${accentInsensitiveMatch('s."nombre"', p)} OR ${accentInsensitiveMatch('s."apellido"', p)})`
-    );
+    const fullName = normalizedExpr(`COALESCE(s."nombre", '') || ' ' || COALESCE(s."apellido", '')`);
+    const code = normalizedExpr(`s."codigoEstudiante"`);
+    const tokens = search.trim().split(/\s+/).filter(Boolean);
+    const parts = tokens.map((token) => {
+      const p = nextParam(`%${token}%`);
+      return `(${fullName} LIKE ${p} OR ${code} LIKE ${p})`;
+    });
+    studentConds.push(`(${parts.join(" AND ")})`);
   }
 
   if (grado) {
