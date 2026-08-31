@@ -71,6 +71,7 @@ export interface DriveFile {
   id: string;
   name: string;
   mimeType: string;
+  modifiedTime?: string;
 }
 
 async function request<T>(url: string, token: string): Promise<T> {
@@ -85,9 +86,18 @@ async function request<T>(url: string, token: string): Promise<T> {
 export async function listFolderFiles(folderId: string, creds: ServiceAccountCredentials): Promise<DriveFile[]> {
   const token = await getAccessToken(creds);
   const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
-  const url = `${DRIVE_FILES_URL}?q=${q}&fields=files(id,name,mimeType)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
-  const data = await request<{ files: DriveFile[] }>(url, token);
-  return data.files || [];
+  const files: DriveFile[] = [];
+  let pageToken = "";
+
+  do {
+    const page = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
+    const url = `${DRIVE_FILES_URL}?q=${q}&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${page}`;
+    const data = await request<{ files: DriveFile[]; nextPageToken?: string }>(url, token);
+    files.push(...(data.files || []));
+    pageToken = data.nextPageToken || "";
+  } while (pageToken);
+
+  return files;
 }
 
 export async function downloadFile(fileId: string, creds: ServiceAccountCredentials): Promise<Buffer> {

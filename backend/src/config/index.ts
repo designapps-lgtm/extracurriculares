@@ -5,7 +5,12 @@ dotenv.config();
 // En Cloudflare Workers, workerd fija process.env.NODE_ENV en "development" de
 // forma inmutable (no se puede cambiar). Como este Worker ES el de producción,
 // detectamos el runtime edge y usamos "production" directamente.
-const isWorkersRuntime = typeof WebSocket !== "undefined";
+//
+// OJO: no usar `typeof WebSocket !== "undefined"` para detectar Workers: desde
+// Node 22 WebSocket es un global nativo y el backend normal queda marcado como
+// edge, forzando NODE_ENV=production y rompiendo el arranque en desarrollo.
+// `caches` (CacheStorage) sí es exclusivo de Workers en este stack.
+const isWorkersRuntime = "caches" in globalThis;
 
 const nodeEnv = isWorkersRuntime ? "production" : process.env.NODE_ENV || "development";
 

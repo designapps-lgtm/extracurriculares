@@ -11,7 +11,8 @@
     "prisma:studio": "prisma studio",
     "seed": "ts-node prisma/seed.ts",
     "import:students": "ts-node src/import/cli/importStudents.ts",
-    "import:offer": "ts-node src/import/cli/importOffer.ts"
+    "import:offer": "ts-node src/import/cli/importOffer.ts",
+    "import:photo-links": "ts-node src/import/cli/importPhotoLinks.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.0",
