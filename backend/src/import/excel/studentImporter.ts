@@ -147,14 +147,15 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
 
       // Upsert student (ON CONFLICT para HTTP driver sin transacción)
       await sql(
-        `INSERT INTO "Student" ("codigoEstudiante", "nombre", "apellido", "idGrado", "grupo", "correo")
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO "Student" ("codigoEstudiante", "nombre", "apellido", "idGrado", "grupo", "correo", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, now())
          ON CONFLICT ("codigoEstudiante") DO UPDATE SET
            "nombre" = EXCLUDED."nombre",
            "apellido" = EXCLUDED."apellido",
            "idGrado" = EXCLUDED."idGrado",
            "grupo" = EXCLUDED."grupo",
-           "correo" = EXCLUDED."correo"`,
+           "correo" = EXCLUDED."correo",
+           "updatedAt" = now()`,
         [student.codigoEstudiante, student.nombre, student.apellido, grade.idGrado, student.grupo, student.correo]
       );
 

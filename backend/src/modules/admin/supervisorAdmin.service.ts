@@ -51,7 +51,7 @@ export async function createSupervisor(data: { codigoSupervisor?: string; nombre
     throw new AppError(400, "VALIDATION_ERROR", "Nombre y apellido son requeridos");
   }
 
-  const rows = await sql(`INSERT INTO "Supervisor" ("idSupervisor", "codigoSupervisor", "nombre", "apellido", "correo", "fotoUrl") VALUES (gen_random_uuid(), $1, $2, $3, $4, $5) RETURNING ${SELECT_COLS}`, [codigoSupervisor || null, nombre, apellido, correo || null, fotoUrl || null]) as any[];
+  const rows = await sql(`INSERT INTO "Supervisor" ("idSupervisor", "codigoSupervisor", "nombre", "apellido", "correo", "fotoUrl", "updatedAt") VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, now()) RETURNING ${SELECT_COLS}`, [codigoSupervisor || null, nombre, apellido, correo || null, fotoUrl || null]) as any[];
   return rows[0];
 }
 

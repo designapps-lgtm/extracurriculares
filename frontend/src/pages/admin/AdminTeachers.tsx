@@ -8,6 +8,7 @@ import {
   createAdminAssignment,
   updateAdminAssignment,
   deleteAdminAssignment,
+  deleteAdminTeacher,
   getAdminDisciplines,
   getAdminGrades,
   getAdminSchedules,
@@ -229,6 +230,22 @@ export default function AdminTeachers() {
     }
   };
 
+  const handleDeleteTeacher = async (teacher: Teacher) => {
+    const confirmed = await notify.confirm(
+      "Eliminar profesor",
+      `¿Está seguro de eliminar a ${teacher.nombre} ${teacher.apellido}? Se borrarán también sus asignaciones, horarios y sesiones. Esta acción no se puede deshacer.`,
+      { confirmLabel: "Eliminar", variant: "danger" },
+    );
+    if (!confirmed) return;
+    try {
+      await deleteAdminTeacher(teacher.idProfesor);
+      notify.success("Profesor eliminado");
+      load(meta.page);
+    } catch (err: any) {
+      notify.error(err.message || "Error al eliminar profesor");
+    }
+  };
+
   const openEdit = (teacher: Teacher) => {
     setEditing(teacher);
     setForm({
@@ -372,6 +389,12 @@ export default function AdminTeachers() {
                       className={`px-2 py-1.5 text-xs font-medium rounded-lg hover:bg-surface-100 ${t.estado === "activo" ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"}`}
                     >
                       {t.estado === "activo" ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTeacher(t)}
+                      className="px-2 py-1.5 text-xs font-medium text-red-600 hover:text-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950"
+                    >
+                      Eliminar
                     </button>
                   </div>
                 </div>

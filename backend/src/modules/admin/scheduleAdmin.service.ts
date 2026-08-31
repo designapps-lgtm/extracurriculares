@@ -63,7 +63,7 @@ export async function createSchedule(data: {
     return { schedule: existing, created: false };
   }
 
-  const rows = await sql`INSERT INTO "Schedule" ("idHorario", "diaSemana", "horaInicio", "horaFin", "aula") VALUES (gen_random_uuid(), ${diaSemana}, ${hi}, ${hf}, ${aula}) RETURNING *` as any[];
+  const rows = await sql`INSERT INTO "Schedule" ("idHorario", "diaSemana", "horaInicio", "horaFin", "aula", "updatedAt") VALUES (gen_random_uuid(), ${diaSemana}, ${hi}, ${hf}, ${aula}, now()) RETURNING *` as any[];
 
   return { schedule: rows[0], created: true };
 }

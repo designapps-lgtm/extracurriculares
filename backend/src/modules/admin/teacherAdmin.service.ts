@@ -70,7 +70,7 @@ export async function createTeacher(data: { nombre: string; apellido: string; co
     throw new AppError(400, "VALIDATION_ERROR", "Nombre y apellido son requeridos");
   }
 
-  const rows = await sql(`INSERT INTO "Teacher" ("idProfesor", "nombre", "apellido", "correo", "fotoUrl") VALUES (gen_random_uuid(), $1, $2, $3, $4) RETURNING ${TEACHER_SELECT}`, [nombre, apellido, correo || null, fotoUrl || null]) as any[];
+  const rows = await sql(`INSERT INTO "Teacher" ("idProfesor", "nombre", "apellido", "correo", "fotoUrl", "updatedAt") VALUES (gen_random_uuid(), $1, $2, $3, $4, now()) RETURNING ${TEACHER_SELECT}`, [nombre, apellido, correo || null, fotoUrl || null]) as any[];
   return rows[0];
 }
 
@@ -87,13 +87,6 @@ export async function updateTeacher(id: string, data: {
     await sql`SELECT "idProfesor", "estado" FROM "Teacher" WHERE "idProfesor" = ${id} LIMIT 1` as any[]
   );
   if (!teacher) throw new AppError(404, "TEACHER_NOT_FOUND", "No se encontró el profesor");
-
-  if (estado === "inactivo" && teacher.estado !== "inactivo") {
-    const cntRows = await sql`SELECT COUNT(*)::int AS count FROM "ExtracurricularAssignment" WHERE "idProfesor" = ${id} AND "estado" = 'activo'` as any[];
-    if ((cntRows[0]?.count ?? 0) > 0) {
-      throw new AppError(400, "HAS_ACTIVE_ASSIGNMENTS", "No se puede desactivar un profesor con asignaciones activas");
-    }
-  }
 
   const sets: string[] = [];
   const vals: any[] = [];
@@ -122,14 +115,20 @@ export async function updateTeacher(id: string, data: {
 
 export async function deleteTeacher(id: string) {
   const teacher = await first<any>(
-    await sql`SELECT "idProfesor" FROM "Teacher" WHERE "idProfesor" = ${id} LIMIT 1` as any[]
+    await sql`SELECT "idProfesor", "nombre", "apellido" FROM "Teacher" WHERE "idProfesor" = ${id} LIMIT 1` as any[]
   );
   if (!teacher) throw new AppError(404, "TEACHER_NOT_FOUND", "No se encontró el profesor");
 
-  const cntRows = await sql`SELECT COUNT(*)::int AS count FROM "ExtracurricularAssignment" WHERE "idProfesor" = ${id} AND "estado" = 'activo'` as any[];
-  if ((cntRows[0]?.count ?? 0) > 0) {
-    throw new AppError(400, "HAS_ACTIVE_ASSIGNMENTS", "No se puede eliminar un profesor con asignaciones activas");
-  }
-
-  await sql`DELETE FROM "Teacher" WHERE "idProfesor" = ${id}`;
+  // Borrado en cascada (manual, porque no hay ON DELETE CASCADE en todos lados):
+  // - ClassSession sin cascade: se borra vía sus asignaciones.
+  // - AssignmentSchedule tiene ON DELETE CASCADE desde la asignación.
+  // - TeacherRefreshToken tiene ON DELETE CASCADE desde el teacher.
+  // No se tocan StudentSchedule / AttendanceRecord / Novedad (históricos de estudiantes).
+  await sql.transaction((tx) => [
+    tx`DELETE FROM "ClassSession" WHERE "idAsignacion" IN (
+          SELECT "idAsignacion" FROM "ExtracurricularAssignment" WHERE "idProfesor" = ${id}
+        )`,
+    tx`DELETE FROM "ExtracurricularAssignment" WHERE "idProfesor" = ${id}`,
+    tx`DELETE FROM "Teacher" WHERE "idProfesor" = ${id}`,
+  ]);
 }

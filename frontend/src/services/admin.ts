@@ -78,6 +78,10 @@ export async function updateAdminTeacher(id: string, data: Record<string, unknow
   return api.patch<ApiResponse<Teacher>>(`/api/admin/teachers/${id}`, data);
 }
 
+export async function deleteAdminTeacher(id: string) {
+  return api.delete<ApiResponse<{ id: string }>>(`/api/admin/teachers/${id}`);
+}
+
 export async function getAdminAssignments(params?: Record<string, string>) {
   return api.get<PaginatedResponse<Assignment>>("/api/admin/assignments", params);
 }

@@ -33,7 +33,7 @@ export async function createAdmin(data: { email: string; nombre?: string; apelli
   if (existing) throw new AppError(409, "DUPLICATE_EMAIL", "Ya existe un admin con ese email");
 
   const hash = await bcrypt.hash(password, 12);
-  const rows = await sql(`INSERT INTO "AdminUser" ("id", "email", "passwordHash", "nombre", "apellido") VALUES (gen_random_uuid(), $1, $2, $3, $4) RETURNING ${ADMIN_COLUMNS}`, [email, hash, nombre || email.split("@")[0], apellido || ""]) as any[];
+  const rows = await sql(`INSERT INTO "AdminUser" ("id", "email", "passwordHash", "nombre", "apellido", "updatedAt") VALUES (gen_random_uuid(), $1, $2, $3, $4, now()) RETURNING ${ADMIN_COLUMNS}`, [email, hash, nombre || email.split("@")[0], apellido || ""]) as any[];
   return rows[0];
 }
 

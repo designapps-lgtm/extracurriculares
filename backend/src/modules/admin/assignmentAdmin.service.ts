@@ -109,7 +109,7 @@ async function resolveScheduleLinks(schedules: any): Promise<{ idHorario: string
     if (existing) {
       links.push({ idHorario: existing.idHorario });
     } else {
-      const rows = await sql`INSERT INTO "Schedule" ("idHorario", "diaSemana", "horaInicio", "horaFin", "aula") VALUES (gen_random_uuid(), ${diaSemana}, ${hi}, ${hf}, ${aula || null}) RETURNING "idHorario"` as any[];
+      const rows = await sql`INSERT INTO "Schedule" ("idHorario", "diaSemana", "horaInicio", "horaFin", "aula", "updatedAt") VALUES (gen_random_uuid(), ${diaSemana}, ${hi}, ${hf}, ${aula || null}, now()) RETURNING "idHorario"` as any[];
       links.push({ idHorario: rows[0].idHorario });
     }
   }
@@ -152,7 +152,7 @@ export async function createAssignment(data: {
   const newId = idRows[0].id;
 
   await sql.transaction((tx) => [
-    tx`INSERT INTO "ExtracurricularAssignment" ("idAsignacion", "idProfesor", "codigoDisciplina", "idGrado", "esPrincipal") VALUES (${newId}, ${idProfesor}, ${codigoDisciplina}, ${idGrado}, ${esPrincipal || false})`,
+    tx`INSERT INTO "ExtracurricularAssignment" ("idAsignacion", "idProfesor", "codigoDisciplina", "idGrado", "esPrincipal", "updatedAt") VALUES (${newId}, ${idProfesor}, ${codigoDisciplina}, ${idGrado}, ${esPrincipal || false}, now())`,
     ...scheduleLinks.map((link) =>
       tx`INSERT INTO "AssignmentSchedule" ("id", "idAsignacion", "idHorario") VALUES (gen_random_uuid(), ${newId}, ${link.idHorario})`
     ),
@@ -195,17 +195,17 @@ export async function updateAssignment(id: string, data: { esPrincipal?: boolean
 
 export async function deleteAssignment(id: string) {
   const assignment = await first<any>(
-    await sql`SELECT "idAsignacion", "codigoDisciplina" FROM "ExtracurricularAssignment" WHERE "idAsignacion" = ${id} LIMIT 1` as any[]
+    await sql`SELECT "idAsignacion" FROM "ExtracurricularAssignment" WHERE "idAsignacion" = ${id} LIMIT 1` as any[]
   );
   if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "No se encontró la asignación");
 
-  const enrolledRows = await sql`SELECT COUNT(*)::int AS count FROM "StudentSchedule" WHERE "codigoDisciplina" = ${assignment.codigoDisciplina}` as any[];
+  // Se borra SIEMPRE en cascada, aunque haya estudiantes inscritos.
+  // ClassSession no tiene ON DELETE CASCADE, así que se limpia antes.
+  // AssignmentSchedule tiene ON DELETE CASCADE desde la asignación.
+  await sql.transaction((tx) => [
+    tx`DELETE FROM "ClassSession" WHERE "idAsignacion" = ${id}`,
+    tx`DELETE FROM "ExtracurricularAssignment" WHERE "idAsignacion" = ${id}`,
+  ]);
 
-  if ((enrolledRows[0]?.count ?? 0) > 0) {
-    await sql`UPDATE "ExtracurricularAssignment" SET "estado" = 'inactivo', "updatedAt" = now() WHERE "idAsignacion" = ${id}`;
-    return { message: "Asignación desactivada (tiene estudiantes inscritos)" };
-  } else {
-    await sql`DELETE FROM "ExtracurricularAssignment" WHERE "idAsignacion" = ${id}`;
-    return { message: "Asignación eliminada" };
-  }
+  return { message: "Asignación eliminada" };
 }
