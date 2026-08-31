@@ -51,9 +51,11 @@ export async function getTeacherClasses(req: Request, res: Response) {
       .map(async (a) => {
         const enrolledCountRow = (await sql`
           SELECT COUNT(*)::int AS cnt
-          FROM "StudentSchedule"
-          WHERE "codigoDisciplina" = ${a.codigoDisciplina}
-            AND "diaSemana" = ${a.diaSemana!}
+          FROM "StudentSchedule" ss
+          LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+          WHERE ss."codigoDisciplina" = ${a.codigoDisciplina}
+            AND ss."diaSemana" = ${a.diaSemana!}
+            AND st."idGrado" = ${a.idGrado}
         `) as unknown as Array<{ cnt: number }>;
 
         const sessionRow = await first<{
@@ -65,7 +67,7 @@ export async function getTeacherClasses(req: Request, res: Response) {
           LEFT JOIN "AttendanceRecord" ar ON ar."sessionId" = cs."id"
           WHERE cs."idAsignacion" = ${a.idAsignacion}
             AND cs."idHorario" = ${a.idHorario!}
-            AND cs."fecha" = ${todayStr}
+            AND cs."fecha"::date = ${todayStr}::date
           GROUP BY cs."id", cs."estado"
         `) as unknown as Array<{ id: string; estado: string; attendanceCount: number }>);
 
@@ -202,7 +204,7 @@ export async function startSession(req: Request, res: Response) {
       FROM "ClassSession"
       WHERE "idAsignacion" = ${idAsignacion}
         AND "idHorario" = ${idHorario}
-        AND "fecha" = ${today}
+        AND "fecha"::date = ${todayStr}::date
       LIMIT 1
     `) as unknown as Array<{ id: string; estado: string }>
   );
@@ -261,6 +263,7 @@ export async function getAttendanceList(req: Request, res: Response) {
     LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
     WHERE ss."codigoDisciplina" = ${sessionRow.codigoDisciplina}
       AND ss."diaSemana" = ${sessionRow.diaSemana}
+      AND st."idGrado" = ${sessionRow.gradoIdGrado}
   `) as unknown as Array<{
     codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null;
   }>;

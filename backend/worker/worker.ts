@@ -4,12 +4,6 @@ import app from "../src/app";
 import { config } from "../src/config";
 import { syncNovedadesFromDrive } from "../src/modules/novedades/novedades.service";
 
-// httpServerHandler envuelve la app Express y la conecta al runtime de Workers,
-// devolviendo un ExportedHandler completo (con su propio fetch()).
-// NUNCA ejecutar server.ts aquí: ese entrypoint llama app.listen() + setInterval,
-// que no aplican al runtime edge (el cron lo maneja Cloudflare con `scheduled`).
-app.listen(config.port);
-
 const expressHandler = httpServerHandler({ port: config.port });
 
 export default {

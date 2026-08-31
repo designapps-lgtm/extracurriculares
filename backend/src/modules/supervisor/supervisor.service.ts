@@ -495,9 +495,10 @@ export async function getSupervisorAssignmentHistory(req: Request, res: Response
            st."nombre", st."apellido", st."idGrado", st."grupo", st."correo", st."fotoUrl"
     FROM "StudentSchedule" ss
     LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
-    WHERE ss."codigoDisciplina" = $1
+    WHERE ss."codigoDisciplina" = ${assignment.codigoDisciplina}
+      AND st."idGrado" = ${assignment.idGrado}
     ORDER BY st."apellido" ASC, st."nombre" ASC
-  `, [assignment.codigoDisciplina]) as unknown as Array<{
+  `) as unknown as Array<{
     diaSemana: string; codigoEstudiante: string; nombre: string; apellido: string;
     idGrado: number; grupo: string | null; correo: string | null; fotoUrl: string | null;
   }>;
