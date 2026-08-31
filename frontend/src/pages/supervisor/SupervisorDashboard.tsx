@@ -5,9 +5,9 @@ import {
   getSupervisorFilters,
   exportSupervisorAttendance,
   supervisorMe,
-  supervisorLogout,
   type SupervisorFilterData,
 } from "../../services/supervisor";
+import { logout } from "../../services/auth";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import { Pagination } from "../../components/common/Pagination";
@@ -109,7 +109,7 @@ export default function SupervisorDashboard() {
   };
 
   const handleLogout = async () => {
-    await supervisorLogout();
+    await logout();
     navigate("/");
   };
 

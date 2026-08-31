@@ -38,7 +38,7 @@ export async function login(email: string, password: string): Promise<{ admin: A
 
 export async function logout(): Promise<void> {
   try {
-    await api.post<ApiResponse<null>>("/api/admin/auth/logout", {});
+    await api.post<ApiResponse<null>>("/api/auth/logout", {});
   } catch {
     // Las cookies se limpian en el backend; si falla la llamada, igual navegamos.
   }

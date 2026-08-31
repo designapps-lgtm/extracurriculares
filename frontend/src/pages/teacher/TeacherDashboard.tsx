@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getTeacherClasses, teacherLogout, startSession } from "../../services/teacher";
+import { getTeacherClasses, startSession } from "../../services/teacher";
+import { logout } from "../../services/auth";
 import { useNotify } from "../../components/common/Notify";
 import type { TeacherClass } from "../../types";
 import Logo from "../../components/common/Logo";
@@ -53,7 +54,7 @@ export default function TeacherDashboard() {
   };
 
   const handleLogout = async () => {
-    await teacherLogout();
+    await logout();
     navigate("/");
   };
 

@@ -4,8 +4,8 @@ import {
   getSupervisorTeacherSchedules,
   getSupervisorAssignmentHistory,
   supervisorMe,
-  supervisorLogout,
 } from "../../services/supervisor";
+import { logout } from "../../services/auth";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
@@ -230,7 +230,7 @@ export default function SupervisorSchedules() {
   const closeHistory = () => setSelectedAsignacion(null);
 
   const handleLogout = async () => {
-    await supervisorLogout();
+    await logout();
     navigate("/");
   };
 
