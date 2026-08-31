@@ -16,7 +16,11 @@ interface TeacherRow {
   count: number;
 }
 
-export async function getTeachers(query: TeacherQuery, pagination: PaginationParams): Promise<PaginatedResult<TeacherRow>> {
+interface TeacherWithCount extends Omit<TeacherRow, "count"> {
+  _count: { assignments: number };
+}
+
+export async function getTeachers(query: TeacherQuery, pagination: PaginationParams): Promise<PaginatedResult<TeacherWithCount>> {
   const conditions: string[] = [];
   const params: any[] = [];
   let paramIndex = 0;
@@ -45,7 +49,7 @@ export async function getTeachers(query: TeacherQuery, pagination: PaginationPar
   const offsetIdx = params.length + 2;
   const dataParams = [...params, pagination.limit, offset];
 
-  const data = await sql(
+  const dataRaw = await sql(
     `SELECT
        t."idProfesor", t."codigoProfesor", t."nombre", t."apellido",
        t."correo", t."fotoUrl", t."estado", t."createdAt", t."updatedAt",
@@ -59,6 +63,19 @@ export async function getTeachers(query: TeacherQuery, pagination: PaginationPar
      LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
     dataParams
   ) as unknown as TeacherRow[];
+
+  const data = dataRaw.map((t) => ({
+    idProfesor: t.idProfesor,
+    codigoProfesor: t.codigoProfesor,
+    nombre: t.nombre,
+    apellido: t.apellido,
+    correo: t.correo,
+    fotoUrl: t.fotoUrl,
+    estado: t.estado,
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
+    _count: { assignments: t.count },
+  }));
 
   return paginatedResult(data, total, pagination);
 }
