@@ -1,6 +1,14 @@
 import { Request, Response } from "express";
 import { sql } from "../../config/db";
-import { getNovedadesForStudent } from "./novedades.service";
+import { getNovedadesForStudent, syncNovedadesFromDrive } from "./novedades.service";
+
+async function refreshNovedades(): Promise<void> {
+  try {
+    await syncNovedadesFromDrive();
+  } catch (e: any) {
+    console.error("[Novedades] Error en refresh on-demand:", e?.message || e);
+  }
+}
 
 function todayColombiaStart(): Date {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -124,6 +132,7 @@ function serialize(n: any) {
 
 export async function getNovedadesByCodigo(req: Request, res: Response): Promise<void> {
   const codigoEstudiante = String(req.params.codigoEstudiante || "");
+  await refreshNovedades();
   const todos = await getNovedadesForStudent(codigoEstudiante);
   const daysByStudent = await getStudentDays([codigoEstudiante]);
   const filtered = todos.filter((n) => matchesExtracurricularDay(n, daysByStudent));
@@ -138,6 +147,8 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
     res.json({ success: true, data: [] });
     return;
   }
+
+  await refreshNovedades();
 
   const rows = (await sql`
     SELECT * FROM "Novedad"

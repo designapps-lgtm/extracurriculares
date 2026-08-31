@@ -17,7 +17,27 @@ export interface SyncResult {
   errors: string[];
 }
 
-export async function syncNovedadesFromDrive(): Promise<SyncResult> {
+let syncLock: Promise<SyncResult> | null = null;
+let lastSyncAt = 0;
+const SYNC_MIN_INTERVAL_MS = 30_000;
+
+export function syncNovedadesFromDrive(): Promise<SyncResult> {
+  if (syncLock) return syncLock;
+  if (Date.now() - lastSyncAt < SYNC_MIN_INTERVAL_MS) {
+    return Promise.resolve({ ok: true, driveConfigured: true, files: 0, novedades: 0, errors: [] });
+  }
+  syncLock = doSyncNovedades()
+    .then((r) => {
+      lastSyncAt = Date.now();
+      return r;
+    })
+    .finally(() => {
+      syncLock = null;
+    });
+  return syncLock;
+}
+
+async function doSyncNovedades(): Promise<SyncResult> {
   if (!isDriveConfigured(config.googleServiceAccountJson || "", config.googleDriveFolderId || "")) {
     return { ok: false, driveConfigured: false, files: 0, novedades: 0, errors: ["Drive no configurado: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID"] };
   }
@@ -37,7 +57,11 @@ export async function syncNovedadesFromDrive(): Promise<SyncResult> {
   }
 
   const spreadsheets = files.filter(
-    (f) => f.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || f.mimeType === "application/vnd.google-apps.spreadsheet" || f.name.toLowerCase().endsWith(".xlsx")
+    (f) =>
+      (f.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        f.mimeType === "application/vnd.google-apps.spreadsheet" ||
+        f.name.toLowerCase().endsWith(".xlsx")) &&
+      f.name.toLowerCase().includes("novedad")
   );
 
   for (const file of spreadsheets) {
