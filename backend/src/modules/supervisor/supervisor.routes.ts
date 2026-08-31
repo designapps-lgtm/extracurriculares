@@ -7,12 +7,14 @@ import {
   getSupervisorFilters,
   exportSupervisorAttendance,
   exportSupervisorSessionAttendance,
+  getSupervisorTeacherSchedules,
 } from "./supervisor.service";
 
 const router = Router();
 
 router.use(authenticateSupervisor, requireActiveSupervisor);
 
+router.get("/schedules", asyncHandler(getSupervisorTeacherSchedules));
 router.get("/filters", asyncHandler(getSupervisorFilters));
 router.get("/sessions/export", asyncHandler(exportSupervisorAttendance));
 router.get("/sessions/:sessionId/export", asyncHandler(exportSupervisorSessionAttendance));

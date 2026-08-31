@@ -268,3 +268,35 @@ export async function exportSupervisorSessionAttendance(req: Request, res: Respo
   const rows = session.attendances.map((a) => attendanceRow(session, a));
   sendWorkbook(res, rows);
 }
+
+export async function getSupervisorTeacherSchedules(req: Request, res: Response) {
+  const assignments = await prisma.extracurricularAssignment.findMany({
+    where: { estado: "activo" },
+    include: {
+      teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
+      discipline: { select: { codigoDisciplina: true, nombre: true } },
+      grade: { select: { idGrado: true, nombre: true } },
+      schedules: {
+        include: {
+          schedule: {
+            select: { idHorario: true, diaSemana: true, horaInicio: true, horaFin: true, aula: true },
+          },
+        },
+      },
+    },
+    orderBy: [{ teacher: { apellido: "asc" } }, { teacher: { nombre: "asc" } }, { codigoDisciplina: "asc" }],
+  });
+
+  const schedules = assignments
+    .map((a) => ({
+      idAsignacion: a.idAsignacion,
+      esPrincipal: a.esPrincipal,
+      teacher: a.teacher,
+      discipline: a.discipline,
+      grade: a.grade,
+      schedules: a.schedules.map((as) => as.schedule),
+    }))
+    .filter((a) => a.schedules.length > 0);
+
+  res.json({ success: true, data: schedules });
+}

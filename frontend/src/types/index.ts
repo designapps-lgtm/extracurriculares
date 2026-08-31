@@ -149,6 +149,15 @@ export interface Assignment {
   estado: string;
 }
 
+export interface SupervisorTeacherSchedule {
+  idAsignacion: string;
+  esPrincipal: boolean;
+  teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
+  discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
+  grade: Pick<Grade, "idGrado" | "nombre">;
+  schedules: Schedule[];
+}
+
 export interface TeacherClass {
   idAsignacion: string;
   discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;

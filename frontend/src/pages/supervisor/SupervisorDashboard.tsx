@@ -126,9 +126,17 @@ export default function SupervisorDashboard() {
               <p className="text-xs text-surface-500">Asistencias registradas por los profesores</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 shrink-0">
-            Salir
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => navigate("/supervisor/schedules")}
+              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+            >
+              Ver horarios
+            </button>
+            <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 
