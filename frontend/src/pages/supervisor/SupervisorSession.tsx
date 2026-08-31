@@ -31,7 +31,7 @@ export default function SupervisorSession() {
       .then(setData)
       .catch((err: any) => {
         if (err.message?.includes("401") || err.message?.includes("No autenticado")) {
-          navigate("/supervisor/login");
+          navigate("/");
         }
       })
       .finally(() => setLoading(false));

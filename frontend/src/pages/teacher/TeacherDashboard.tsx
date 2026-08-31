@@ -31,7 +31,7 @@ export default function TeacherDashboard() {
       })
       .catch((err: any) => {
         if (err.message?.includes("401") || err.message?.includes("No autenticado")) {
-          navigate("/teacher/login");
+          navigate("/");
         }
       })
       .finally(() => setLoading(false));

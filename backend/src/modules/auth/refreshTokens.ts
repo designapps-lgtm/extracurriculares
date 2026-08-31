@@ -120,7 +120,29 @@ export function createRefreshService({
     }
   };
 
-  return { issue, rotate, revoke };
+  // Verifica un refresh token SIN rotarlo (para consultar la sesión activa sin
+  // invalidar tokens de otras pestañas). Devuelve el userId si es válido.
+  const validate = async (presented: string): Promise<{ userId: string }> => {
+    if (!presented) {
+      throw new AppError(401, "REFRESH_REQUIRED", "No hay sesión activa para renovar");
+    }
+
+    const record = await refreshModel.findUnique({
+      where: { tokenHash: hashRefreshToken(presented) },
+    });
+
+    if (!record || record.revokedAt) {
+      throw new AppError(401, "INVALID_REFRESH_TOKEN", "Token de renovación inválido");
+    }
+
+    if (record.expiresAt < new Date()) {
+      throw new AppError(401, "REFRESH_TOKEN_EXPIRED", "La sesión expiró. Vuelva a iniciar sesión.");
+    }
+
+    return { userId: record[userIdField] };
+  };
+
+  return { issue, rotate, revoke, validate };
 }
 
 export { jwt };

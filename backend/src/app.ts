@@ -3,6 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { config } from "./config";
+import { unifiedAuthRouter } from "./modules/auth/unifiedAuth.routes";
 import { errorHandler, notFound } from "./middlewares/errorHandler";
 import { requestLogger } from "./middlewares/requestLogger";
 import { authenticate, requireAdmin } from "./middlewares/auth";
@@ -75,6 +76,9 @@ app.use("/api/schedules", apiLimiter, scheduleRouter);
 
 // Auth routes (login/logout cuentan contra authLimiter por ruta; refresh no)
 app.use("/api/admin/auth", adminAuthRouter);
+
+// Auth unificado (Google): detecta el rol del correo y emite la sesión del rol correcto
+app.use("/api/auth", unifiedAuthRouter);
 
 // Protected admin routes   
 app.use("/api/admin/dashboard", authenticate, requireAdmin, adminDashboardRouter);

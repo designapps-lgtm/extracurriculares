@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import RoleSelect from "./pages/RoleSelect";
+import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import StudentProfile from "./pages/StudentProfile";
 import Disciplines from "./pages/Disciplines";
@@ -9,20 +9,17 @@ import TeacherDetail from "./pages/TeacherDetail";
 
 // Admin
 import AdminLayout from "./pages/admin/AdminLayout";
-import AdminLogin from "./pages/admin/AdminLogin";
 import AdminStudents from "./pages/admin/AdminStudents";
 import AdminTeachers from "./pages/admin/AdminTeachers";
 import AdminAssignments from "./pages/admin/AdminAssignments";
 import AdminUsers from "./pages/admin/AdminUsers";
 
 // Teacher
-import TeacherLogin from "./pages/teacher/TeacherLogin";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import TeacherAttendance from "./pages/teacher/TeacherAttendance";
 import TeacherNovedad from "./pages/teacher/TeacherNovedad";
 
 // Supervisor
-import SupervisorLogin from "./pages/supervisor/SupervisorLogin";
 import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import SupervisorSession from "./pages/supervisor/SupervisorSession";
 
@@ -32,22 +29,22 @@ import AdminSupervisors from "./pages/admin/AdminSupervisors";
 function App() {
   return (
     <Routes>
-      {/* Root = Role selector */}
-      <Route path="/" element={<RoleSelect />} />
+      {/* Root = login unificado con Google */}
+      <Route path="/" element={<Login />} />
+
+      {/* Rutas de login viejas → redirigen al login unificado */}
+      <Route path="/teacher/login" element={<Navigate to="/" replace />} />
+      <Route path="/supervisor/login" element={<Navigate to="/" replace />} />
+      <Route path="/admin/login" element={<Navigate to="/" replace />} />
 
       {/* Teacher routes */}
-      <Route path="/teacher/login" element={<TeacherLogin />} />
       <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
       <Route path="/teacher/session/:sessionId" element={<TeacherAttendance />} />
       <Route path="/teacher/novedad/:codigoEstudiante" element={<TeacherNovedad />} />
 
       {/* Supervisor routes */}
-      <Route path="/supervisor/login" element={<SupervisorLogin />} />
       <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
       <Route path="/supervisor/session/:sessionId" element={<SupervisorSession />} />
-
-      {/* Admin login (no layout) */}
-      <Route path="/admin/login" element={<AdminLogin />} />
 
       {/* Admin routes — AdminLayout handles auth + sidebar */}
       <Route path="/admin" element={<AdminLayout />}>

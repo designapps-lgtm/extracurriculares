@@ -56,7 +56,7 @@ export default function SupervisorDashboard() {
         })
         .catch((err: any) => {
           if (err.message?.includes("401") || err.message?.includes("No autenticado")) {
-            navigate("/supervisor/login");
+            navigate("/");
           } else {
             notify.error(err.message || "Error al cargar asistencias");
           }
@@ -69,7 +69,7 @@ export default function SupervisorDashboard() {
   useEffect(() => {
     supervisorMe()
       .then(setSupervisor)
-      .catch(() => navigate("/supervisor/login"));
+      .catch(() => navigate("/"));
   }, [navigate]);
 
   useEffect(() => {
