@@ -1,6 +1,5 @@
 import "./env";
 import { httpServerHandler } from "cloudflare:node";
-import app from "../src/app";
 import { config } from "../src/config";
 import { syncNovedadesFromDrive } from "../src/modules/novedades/novedades.service";
 

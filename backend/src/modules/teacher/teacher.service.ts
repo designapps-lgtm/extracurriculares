@@ -204,7 +204,7 @@ export async function startSession(req: Request, res: Response) {
       FROM "ClassSession"
       WHERE "idAsignacion" = ${idAsignacion}
         AND "idHorario" = ${idHorario}
-        AND "fecha"::date = ${todayStr}::date
+        AND "fecha"::date = ${today.toISOString().split("T")[0]}::date
       LIMIT 1
     `) as unknown as Array<{ id: string; estado: string }>
   );
