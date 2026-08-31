@@ -77,58 +77,44 @@ interface UserIdentity {
 }
 
 async function resolveRoleByEmail(email: string): Promise<UserIdentity> {
-  const teacher = await prisma.teacher.findUnique({
-    where: { correo: email },
-    select: { idProfesor: true, correo: true, nombre: true, apellido: true, estado: true },
-  });
-  if (teacher) {
-    if (teacher.estado !== "activo") {
-      throw new AppError(403, "TEACHER_INACTIVE", "Tu cuenta de profesor está desactivada");
-    }
-    return {
-      role: "teacher",
-      id: teacher.idProfesor,
-      email: teacher.correo || email,
-      nombre: teacher.nombre,
-      apellido: teacher.apellido,
-    };
-  }
-
-  const supervisor = await prisma.supervisor.findUnique({
-    where: { correo: email },
-    select: { idSupervisor: true, correo: true, nombre: true, apellido: true, estado: true },
-  });
-  if (supervisor) {
-    if (supervisor.estado !== "activo") {
-      throw new AppError(403, "SUPERVISOR_INACTIVE", "Tu cuenta de supervisor está desactivada");
-    }
-    return {
-      role: "supervisor",
-      id: supervisor.idSupervisor,
-      email: supervisor.correo || email,
-      nombre: supervisor.nombre,
-      apellido: supervisor.apellido,
-    };
-  }
+  // Prioridad de rol: si el mismo correo existe en varias tablas, gana el de
+  // mayor jerarquía (admin > supervisor > teacher), para que por ejemplo un
+  // admin que también figura como profesor entre siempre al panel administrativo.
+  const matches: Array<{ role: Role; id: string; email: string; nombre: string; apellido: string; estado: string }> = [];
 
   const admin = await prisma.adminUser.findUnique({
     where: { email },
     select: { id: true, email: true, nombre: true, apellido: true, estado: true },
   });
-  if (admin) {
-    if (admin.estado !== "activo") {
-      throw new AppError(403, "ACCOUNT_DISABLED", "Tu cuenta de administrador está deshabilitada");
-    }
-    return {
-      role: "admin",
-      id: admin.id,
-      email: admin.email,
-      nombre: admin.nombre,
-      apellido: admin.apellido,
-    };
+  if (admin) matches.push({ role: "admin", id: admin.id, email: admin.email, nombre: admin.nombre, apellido: admin.apellido, estado: admin.estado });
+
+  const supervisor = await prisma.supervisor.findUnique({
+    where: { correo: email },
+    select: { idSupervisor: true, correo: true, nombre: true, apellido: true, estado: true },
+  });
+  if (supervisor) matches.push({ role: "supervisor", id: supervisor.idSupervisor, email: supervisor.correo || email, nombre: supervisor.nombre, apellido: supervisor.apellido, estado: supervisor.estado });
+
+  const teacher = await prisma.teacher.findUnique({
+    where: { correo: email },
+    select: { idProfesor: true, correo: true, nombre: true, apellido: true, estado: true },
+  });
+  if (teacher) matches.push({ role: "teacher", id: teacher.idProfesor, email: teacher.correo || email, nombre: teacher.nombre, apellido: teacher.apellido, estado: teacher.estado });
+
+  const priority: Record<Role, number> = { admin: 0, supervisor: 1, teacher: 2 };
+  matches.sort((a, b) => priority[a.role] - priority[b.role]);
+
+  const match = matches[0];
+  if (!match) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Este correo no está registrado en el sistema");
   }
 
-  throw new AppError(401, "INVALID_CREDENTIALS", "Este correo no está registrado en el sistema");
+  if (match.estado !== "activo") {
+    const code = match.role === "teacher" ? "TEACHER_INACTIVE" : match.role === "supervisor" ? "SUPERVISOR_INACTIVE" : "ACCOUNT_DISABLED";
+    const label = match.role === "teacher" ? "profesor" : match.role === "supervisor" ? "supervisor" : "administrador";
+    throw new AppError(403, code, `Tu cuenta de ${label} está desactivada`);
+  }
+
+  return { role: match.role, id: match.id, email: match.email, nombre: match.nombre, apellido: match.apellido };
 }
 
 async function issueSession(res: Response, identity: UserIdentity) {
