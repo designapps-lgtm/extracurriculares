@@ -14,7 +14,7 @@ export interface ApiRequestOptions {
 type AuthRole = "admin" | "teacher" | "supervisor";
 
 function isAuthPath(path: string): boolean {
-  return path.startsWith("/api/admin/auth") || path.startsWith("/api/teacher/auth") || path.startsWith("/api/supervisor/auth");
+  return path.includes("/auth/refresh") || path.includes("/auth/logout") || path.includes("/auth/login") || path.includes("/auth/google");
 }
 
 function roleForPath(path: string): AuthRole | null {
