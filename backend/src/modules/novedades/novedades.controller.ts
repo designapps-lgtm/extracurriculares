@@ -51,6 +51,51 @@ function isOnDay(n: { fechaNovedad: Date | null; fechaCreacion: Date | null }, b
   return d >= bounds.start && d < bounds.end;
 }
 
+const DAY_NAME_MAP: Record<string, string> = {
+  MONDAY: "LUNES",
+  TUESDAY: "MARTES",
+  WEDNESDAY: "MIERCOLES",
+  THURSDAY: "JUEVES",
+  FRIDAY: "VIERNES",
+  SATURDAY: "SABADO",
+  SUNDAY: "DOMINGO",
+};
+
+// Día de la semana (en zona Colombia) de una novedad.
+function novedadDayName(n: any): string {
+  const d = n.fechaNovedad || n.fechaHora || n.fechaCreacion;
+  if (!d) return "";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Bogota",
+    weekday: "long",
+  }).formatToParts(d);
+  const day = parts.find((p) => p.type === "weekday")?.value.toUpperCase() || "";
+  return DAY_NAME_MAP[day] || "";
+}
+
+// Días de extracurricular por estudiante (StudentSchedule.diaSemana).
+async function getStudentDays(codigos: string[]): Promise<Map<string, Set<string>>> {
+  const rows = (await sql`
+    SELECT "codigoEstudiante", "diaSemana"
+    FROM "StudentSchedule"
+    WHERE "codigoEstudiante" = ANY(${codigos})
+  `) as unknown as Array<{ codigoEstudiante: string; diaSemana: string }>;
+
+  const map = new Map<string, Set<string>>();
+  for (const r of rows) {
+    if (!map.has(r.codigoEstudiante)) map.set(r.codigoEstudiante, new Set());
+    map.get(r.codigoEstudiante)!.add(r.diaSemana);
+  }
+  return map;
+}
+
+// Una novedad solo se muestra si se hizo el mismo día que el estudiante tiene extracurricular.
+function matchesExtracurricularDay(n: any, daysByStudent: Map<string, Set<string>>): boolean {
+  const days = daysByStudent.get(n.codigoEstudiante);
+  if (!days || days.size === 0) return false;
+  return days.has(novedadDayName(n));
+}
+
 function serialize(n: any) {
   return {
     id: n.id,
@@ -80,7 +125,9 @@ function serialize(n: any) {
 export async function getNovedadesByCodigo(req: Request, res: Response): Promise<void> {
   const codigoEstudiante = String(req.params.codigoEstudiante || "");
   const todos = await getNovedadesForStudent(codigoEstudiante);
-  res.json({ success: true, data: todos.map(serialize) });
+  const daysByStudent = await getStudentDays([codigoEstudiante]);
+  const filtered = todos.filter((n) => matchesExtracurricularDay(n, daysByStudent));
+  res.json({ success: true, data: filtered.map(serialize) });
 }
 
 export async function getNovedadesBatch(req: Request, res: Response): Promise<void> {
@@ -99,8 +146,10 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
   `) as unknown as any[];
 
   const bounds = fechaParam ? dayBounds(fechaParam) : null;
+  const daysByStudent = await getStudentDays(codigos);
   const activas: Record<string, any[]> = {};
   for (const r of rows) {
+    if (!matchesExtracurricularDay(r, daysByStudent)) continue;
     const match = bounds ? isOnDay(r, bounds) : isActive(r);
     if (!match) continue;
     (activas[r.codigoEstudiante] = activas[r.codigoEstudiante] || []).push(serialize(r));
