@@ -13,6 +13,7 @@ import type {
   Supervisor,
   SupervisorTeacherSchedule,
   SupervisorAssignmentHistory,
+  SupervisorEnrolledStudent,
   Schedule,
 } from "../../types";
 
@@ -27,6 +28,19 @@ const DIAS_CORTO: Record<string, string> = {
 };
 
 const DIAS_ORDEN = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
+
+function diaDeFecha(fecha: string): string {
+  const d = new Date(`${fecha}T00:00:00`);
+  const idx = d.getDay();
+  return ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"][idx];
+}
+
+function hoyInput(): string {
+  const t = new Date();
+  const mm = String(t.getMonth() + 1).padStart(2, "0");
+  const dd = String(t.getDate()).padStart(2, "0");
+  return `${t.getFullYear()}-${mm}-${dd}`;
+}
 
 function formatFecha(iso: string): string {
   const d = new Date(iso);
@@ -77,12 +91,39 @@ function SessionRow({ session, onView }: { session: { id: string; fecha: string;
   );
 }
 
+function StudentRow({ student }: { student: SupervisorEnrolledStudent }) {
+  const inicial = (student.nombre[0] ?? "?").toUpperCase();
+  return (
+    <li className="flex items-center gap-3 py-2">
+      {student.fotoUrl ? (
+        <img src={student.fotoUrl} alt="" className="h-9 w-9 rounded-full object-cover shrink-0" />
+      ) : (
+        <div className="h-9 w-9 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 flex items-center justify-center text-xs font-semibold shrink-0">
+          {inicial}
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">
+          {student.nombre} {student.apellido}
+        </p>
+        <p className="text-xs text-surface-500 truncate">
+          {student.codigoEstudiante}
+          {student.grupo ? ` · ${student.grupo}` : ""}
+        </p>
+      </div>
+      <span className="text-xs text-surface-400 shrink-0">Grado {student.idGrado}</span>
+    </li>
+  );
+}
+
 function ScheduleBlock({
   schedule,
+  students,
   sessions,
   onViewSession,
 }: {
   schedule: Schedule;
+  students: SupervisorEnrolledStudent[];
   sessions: SupervisorAssignmentHistory["schedules"][number]["sessions"];
   onViewSession: (sessionId: string) => void;
 }) {
@@ -96,8 +137,28 @@ function ScheduleBlock({
           {schedule.horaInicio ?? "?"}–{schedule.horaFin ?? "?"}
         </span>
         {schedule.aula && <span className="text-xs text-surface-400">· {schedule.aula}</span>}
+        <span className="ml-auto text-xs text-surface-400">
+          {students.length} estudiante{students.length === 1 ? "" : "s"}
+        </span>
       </div>
+
       <div className="px-3 py-2.5">
+        <p className="text-xs font-medium uppercase tracking-wide text-surface-400 mb-1">
+          Estudiantes
+        </p>
+        {students.length === 0 ? (
+          <p className="text-sm text-surface-500">Sin estudiantes matriculados en este horario.</p>
+        ) : (
+          <ul className="divide-y divide-surface-50 dark:divide-surface-800/60 max-h-48 overflow-y-auto">
+            {students.map((st) => (
+              <StudentRow key={st.codigoEstudiante} student={st} />
+            ))}
+          </ul>
+        )}
+
+        <p className="text-xs font-medium uppercase tracking-wide text-surface-400 mb-1 mt-4">
+          Registros de asistencia
+        </p>
         {sessions.length === 0 ? (
           <p className="text-sm text-surface-500">
             Todavía no se registró asistencia para este horario.
@@ -118,7 +179,11 @@ export default function SupervisorSchedules() {
   const [supervisor, setSupervisor] = useState<Supervisor | null>(null);
   const [assignments, setAssignments] = useState<SupervisorTeacherSchedule[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [profesor, setProfesor] = useState("");
+  const [profesorQuery, setProfesorQuery] = useState("");
+  const [grado, setGrado] = useState("");
+  const [fecha, setFecha] = useState("");
 
   const [selectedAsignacion, setSelectedAsignacion] = useState<string | null>(null);
   const [history, setHistory] = useState<SupervisorAssignmentHistory | null>(null);
@@ -177,10 +242,33 @@ export default function SupervisorSchedules() {
     );
   }, [assignments]);
 
-  const filtered = useMemo(
-    () => (profesor ? assignments.filter((a) => a.teacher.idProfesor === profesor) : assignments),
-    [assignments, profesor],
-  );
+  const gradosDisponibles = useMemo(() => {
+    const set = new Map<number, string>();
+    for (const a of assignments) set.set(a.grade.idGrado, a.grade.nombre);
+    return [...set.entries()]
+      .sort((x, y) => x[0] - y[0])
+      .map(([idGrado, nombre]) => ({ idGrado, nombre }));
+  }, [assignments]);
+
+  const filtered = useMemo(() => {
+    let list = assignments;
+    if (profesor) list = list.filter((a) => a.teacher.idProfesor === profesor);
+    if (profesorQuery.trim()) {
+      const q = profesorQuery.trim().toLowerCase();
+      list = list.filter(
+        (a) =>
+          a.teacher.nombre.toLowerCase().includes(q) ||
+          a.teacher.apellido.toLowerCase().includes(q) ||
+          `${a.teacher.nombre} ${a.teacher.apellido}`.toLowerCase().includes(q),
+      );
+    }
+    if (grado) list = list.filter((a) => String(a.grade.idGrado) === grado);
+    if (fecha) {
+      const d = diaDeFecha(fecha);
+      list = list.filter((a) => a.schedules.some((sc) => sc.diaSemana === d));
+    }
+    return list;
+  }, [assignments, profesor, profesorQuery, grado, fecha]);
 
   const renderSchedules = (a: SupervisorTeacherSchedule) =>
     [...a.schedules]
@@ -205,6 +293,8 @@ export default function SupervisorSchedules() {
         DIAS_ORDEN.indexOf(x.schedule.diaSemana) - DIAS_ORDEN.indexOf(y.schedule.diaSemana) ||
         (x.schedule.horaInicio ?? "").localeCompare(y.schedule.horaInicio ?? ""),
     );
+
+  const hasActiveFilters = profesor !== "" || profesorQuery !== "" || grado !== "" || fecha !== "";
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
@@ -245,20 +335,87 @@ export default function SupervisorSchedules() {
           )}
         </div>
 
-        <div className="card p-4">
-          <label className="block text-xs font-medium text-surface-500 mb-1">Profesor</label>
-          <select
-            value={profesor}
-            onChange={(e) => setProfesor(e.target.value)}
-            className="w-full sm:max-w-xs px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="">Todos los profesores</option>
-            {profesores.map((t) => (
-              <option key={t.idProfesor} value={t.idProfesor}>
-                {t.nombre} {t.apellido}
-              </option>
-            ))}
-          </select>
+        <div className="card p-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-surface-500 mb-1">Buscar profesor</label>
+              <input
+                type="text"
+                value={profesorQuery}
+                onChange={(e) => setProfesorQuery(e.target.value)}
+                placeholder="Nombre o apellido…"
+                className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-surface-500 mb-1">Profesor</label>
+              <select
+                value={profesor}
+                onChange={(e) => setProfesor(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">Todos</option>
+                {profesores.map((t) => (
+                  <option key={t.idProfesor} value={t.idProfesor}>
+                    {t.nombre} {t.apellido}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-surface-500 mb-1">Grado</label>
+              <select
+                value={grado}
+                onChange={(e) => setGrado(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">Todos</option>
+                {gradosDisponibles.map((g) => (
+                  <option key={g.idGrado} value={g.idGrado}>
+                    {g.nombre}°
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-surface-500 mb-1">Día</label>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <button
+                  onClick={() => setFecha(hoyInput())}
+                  className="px-3 py-2 shrink-0 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+                >
+                  Hoy
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {hasActiveFilters && (
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-surface-400">
+                {fecha
+                  ? `Mostrando las clases del ${DIAS_CORTO[diaDeFecha(fecha)] || diaDeFecha(fecha)} (${fecha}).`
+                  : "Aplicando filtros de las clases."}
+              </p>
+              <button
+                onClick={() => {
+                  setProfesor("");
+                  setProfesorQuery("");
+                  setGrado("");
+                  setFecha("");
+                }}
+                className="text-xs font-medium text-brand-600 hover:text-brand-700"
+              >
+                Limpiar filtros
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="card overflow-hidden">
@@ -266,7 +423,7 @@ export default function SupervisorSchedules() {
             <Loading />
           ) : filtered.length === 0 ? (
             <div className="text-center py-12 text-sm text-surface-500">
-              {profesor ? "Este profesor no tiene horarios registrados." : "No hay horarios registrados."}
+              No hay clases que coincidan con los filtros actuales.
             </div>
           ) : (
             <div className="divide-y divide-surface-100 dark:divide-surface-800">
@@ -293,7 +450,7 @@ export default function SupervisorSchedules() {
                         {a.teacher.nombre} {a.teacher.apellido}
                       </span>
                       <span className="text-sm text-brand-600 dark:text-brand-400 font-medium">
-                        Ver registros →
+                        Ver estudiantes →
                       </span>
                     </div>
                   </div>
@@ -334,7 +491,7 @@ export default function SupervisorSchedules() {
               </button>
             </div>
 
-            <div className="px-5 py-4 max-h-[65vh] overflow-y-auto space-y-3">
+            <div className="px-5 py-4 max-h-[70vh] overflow-y-auto space-y-3">
               {historyLoading ? (
                 <Loading />
               ) : !history ? (
@@ -344,6 +501,7 @@ export default function SupervisorSchedules() {
                   <ScheduleBlock
                     key={h.schedule.idHorario}
                     schedule={h.schedule}
+                    students={h.students}
                     sessions={h.sessions}
                     onViewSession={(sessionId) => navigate(`/supervisor/session/${sessionId}`)}
                   />

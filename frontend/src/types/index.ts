@@ -173,6 +173,16 @@ export interface SupervisorScheduleHistory {
   }[];
 }
 
+export interface SupervisorEnrolledStudent {
+  codigoEstudiante: string;
+  nombre: string;
+  apellido: string;
+  idGrado: number;
+  grupo: string | null;
+  correo: string | null;
+  fotoUrl: string | null;
+}
+
 export interface SupervisorAssignmentHistory {
   assignment: {
     teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
@@ -181,6 +191,7 @@ export interface SupervisorAssignmentHistory {
   };
   schedules: {
     schedule: Schedule;
+    students: SupervisorEnrolledStudent[];
     sessions: {
       id: string;
       fecha: string;

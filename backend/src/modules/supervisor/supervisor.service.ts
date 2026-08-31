@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import * as XLSX from "xlsx";
-import prisma from "../../config/prisma";
-import type { Prisma } from "@prisma/client";
+import { sql, first } from "../../config/db";
 import { parsePagination } from "../../utils/pagination";
 import { param } from "../../utils/reqParams";
 import { AppError } from "../../middlewares/errorHandler";
@@ -18,55 +17,152 @@ function dayEnd(date: Date): Date {
   return new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1);
 }
 
-function buildSessionWhere(query: Record<string, string>): Record<string, unknown> {
-  const { fecha, disciplina, profesor } = query;
-  const where: Record<string, unknown> = { estado: "finalizada" };
-  if (disciplina) where.assignment = { codigoDisciplina: disciplina };
-  if (profesor) where.idProfesor = profesor;
-  const fechaStart = parseDateFilter(fecha);
-  if (fechaStart) where.fecha = { gte: fechaStart, lte: dayEnd(fechaStart) };
-  return where;
+interface SessionWhere {
+  conditions: string[];
+  params: any[];
 }
+
+// Convierte los filtros de query en condiciones SQL + params.
+function buildSessionWhereSQL(query: Record<string, string>): SessionWhere {
+  const { fecha, disciplina, profesor } = query;
+  const conditions: string[] = [];
+  const params: any[] = [];
+
+  conditions.push(`cs."estado" = 'finalizada'`);
+
+  if (disciplina) {
+    params.push(disciplina);
+    conditions.push(`ea."codigoDisciplina" = $${params.length}`);
+  }
+  if (profesor) {
+    params.push(profesor);
+    conditions.push(`cs."idProfesor" = $${params.length}`);
+  }
+  const fechaStart = parseDateFilter(fecha);
+  if (fechaStart) {
+    params.push(fechaStart);
+    const p1 = params.length;
+    params.push(dayEnd(fechaStart));
+    const p2 = params.length;
+    conditions.push(`cs."fecha" >= $${p1} AND cs."fecha" <= $${p2}`);
+  }
+
+  return { conditions, params };
+}
+
+// Devuelve el shape completo de una sesión (con assignment/discipline/grade,
+// schedule y teacher), igual que con el include de Prisma.
+interface SessionRow {
+  id: string;
+  idAsignacion: string;
+  idHorario: string;
+  fecha: Date;
+  estado: string;
+  idProfesor: string;
+  esPrincipal: boolean;
+  codigoDisciplina: string;
+  idGrado: number;
+  eaEstado: string;
+  eaCreatedAt: Date;
+  eaUpdatedAt: Date;
+  disciplinaNombre: string;
+  gradoNombre: string;
+  schIdHorario: string;
+  diaSemana: string;
+  horaInicio: string | null;
+  horaFin: string | null;
+  aula: string | null;
+  profesorNombre: string;
+  profesorApellido: string;
+  total: number;
+  presente: number;
+  ausente: number;
+  justificado: number;
+}
+
+const SESSION_SELECT = `
+  cs."id", cs."idAsignacion", cs."idHorario", cs."fecha", cs."estado", cs."idProfesor",
+  ea."esPrincipal", ea."codigoDisciplina", ea."idGrado", ea."estado" AS "eaEstado",
+  ea."createdAt" AS "eaCreatedAt", ea."updatedAt" AS "eaUpdatedAt",
+  d."nombre" AS "disciplinaNombre",
+  g."nombre" AS "gradoNombre",
+  sc."idHorario" AS "schIdHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula",
+  t."nombre" AS "profesorNombre", t."apellido" AS "profesorApellido",
+  COUNT(a."id")::int AS "total",
+  COUNT(a."id") FILTER (WHERE a."estado" = 'presente')::int AS "presente",
+  COUNT(a."id") FILTER (WHERE a."estado" = 'ausente')::int AS "ausente",
+  COUNT(a."id") FILTER (WHERE a."estado" = 'justificado')::int AS "justificado"
+`;
+
+function sessionShape(s: SessionRow) {
+  return {
+    id: s.id,
+    idAsignacion: s.idAsignacion,
+    idHorario: s.idHorario,
+    fecha: s.fecha,
+    estado: s.estado,
+    assignment: {
+      idAsignacion: s.idAsignacion,
+      idProfesor: s.idProfesor,
+      codigoDisciplina: s.codigoDisciplina,
+      idGrado: s.idGrado,
+      esPrincipal: s.esPrincipal,
+      estado: s.eaEstado,
+      createdAt: s.eaCreatedAt,
+      updatedAt: s.eaUpdatedAt,
+      discipline: { codigoDisciplina: s.codigoDisciplina, nombre: s.disciplinaNombre },
+      grade: { idGrado: s.idGrado, nombre: s.gradoNombre },
+    },
+    schedule: { idHorario: s.schIdHorario, diaSemana: s.diaSemana, horaInicio: s.horaInicio, horaFin: s.horaFin, aula: s.aula },
+    teacher: { idProfesor: s.idProfesor, nombre: s.profesorNombre, apellido: s.profesorApellido },
+    counts: {
+      total: s.total,
+      presente: s.presente,
+      ausente: s.ausente,
+      justificado: s.justificado,
+    },
+  };
+}
+
+const SESSION_JOIN = `
+  FROM "ClassSession" cs
+  LEFT JOIN "ExtracurricularAssignment" ea ON ea."idAsignacion" = cs."idAsignacion"
+  LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+  LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+  LEFT JOIN "Schedule" sc ON sc."idHorario" = cs."idHorario"
+  LEFT JOIN "Teacher" t ON t."idProfesor" = cs."idProfesor"
+  LEFT JOIN "AttendanceRecord" a ON a."sessionId" = cs."id"
+`;
 
 export async function getSupervisorSessions(req: Request, res: Response) {
   const pagination = parsePagination(req.query as Record<string, string>);
-  const where = buildSessionWhere(req.query as Record<string, string>);
+  const { conditions, params } = buildSessionWhereSQL(req.query as Record<string, string>);
 
-  const [data, total] = await Promise.all([
-    prisma.classSession.findMany({
-      where,
-      include: {
-        assignment: {
-          include: {
-            discipline: { select: { codigoDisciplina: true, nombre: true } },
-            grade: { select: { idGrado: true, nombre: true } },
-          },
-        },
-        schedule: { select: { idHorario: true, diaSemana: true, horaInicio: true, horaFin: true, aula: true } },
-        teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-        attendances: true,
-      },
-      skip: (pagination.page - 1) * pagination.limit,
-      take: pagination.limit,
-      orderBy: [{ fecha: "desc" }, { updatedAt: "desc" }],
-    }),
-    prisma.classSession.count({ where }),
-  ]);
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  const sessions = data.map((s) => ({
-    id: s.id,
-    fecha: s.fecha,
-    estado: s.estado,
-    assignment: s.assignment,
-    schedule: s.schedule,
-    teacher: s.teacher,
-    counts: {
-      total: s.attendances.length,
-      presente: s.attendances.filter((a) => a.estado === "presente").length,
-      ausente: s.attendances.filter((a) => a.estado === "ausente").length,
-      justificado: s.attendances.filter((a) => a.estado === "justificado").length,
-    },
-  }));
+  const countRows = await sql(
+    `SELECT COUNT(DISTINCT cs."id")::int AS total FROM "ClassSession" cs
+     LEFT JOIN "ExtracurricularAssignment" ea ON ea."idAsignacion" = cs."idAsignacion"
+     ${where}`,
+    params
+  ) as unknown as Array<{ total: number }>;
+  const total = countRows[0]?.total ?? 0;
+
+  const dataParams = [...params, pagination.limit, (pagination.page - 1) * pagination.limit];
+  const lim = params.length + 1;
+  const off = params.length + 2;
+
+  const rows = await sql(
+    `SELECT ${SESSION_SELECT}
+     ${SESSION_JOIN}
+     ${where}
+     GROUP BY cs."id", ea."idAsignacion", d."codigoDisciplina", g."idGrado", sc."idHorario", t."idProfesor"
+     ORDER BY cs."fecha" DESC, cs."updatedAt" DESC
+     LIMIT $${lim} OFFSET $${off}`,
+    dataParams
+  ) as unknown as SessionRow[];
+
+  const sessions = rows.map(sessionShape);
 
   const paginated = {
     success: true,
@@ -81,34 +177,41 @@ export async function getSupervisorSessions(req: Request, res: Response) {
   res.json(paginated);
 }
 
+interface AttendanceRow {
+  codigoEstudiante: string;
+  nombre: string;
+  apellido: string;
+  grupo: string | null;
+  estado: string;
+}
+
 export async function getSupervisorSessionAttendance(req: Request, res: Response) {
   const sessionId = param(req, "sessionId");
 
-  const session = await prisma.classSession.findUnique({
-    where: { id: sessionId },
-    include: {
-      assignment: {
-        include: {
-          discipline: { select: { codigoDisciplina: true, nombre: true } },
-          grade: { select: { idGrado: true, nombre: true } },
-        },
-      },
-      schedule: { select: { idHorario: true, diaSemana: true, horaInicio: true, horaFin: true, aula: true } },
-      teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-      attendances: {
-        include: {
-          student: {
-            select: { codigoEstudiante: true, nombre: true, apellido: true, grupo: true, idGrado: true },
-          },
-        },
-        orderBy: [{ student: { apellido: "asc" } }, { student: { nombre: "asc" } }],
-      },
-    },
-  });
+  const session = await first<SessionRow>(
+    await sql(
+      `SELECT ${SESSION_SELECT}
+       ${SESSION_JOIN}
+       WHERE cs."id" = $1
+       GROUP BY cs."id", ea."idAsignacion", d."codigoDisciplina", g."idGrado", sc."idHorario", t."idProfesor"`,
+      [sessionId]
+    ) as unknown as SessionRow[]
+  );
 
   if (!session) {
     throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
   }
+
+  const records = await sql(
+    `SELECT a."codigoEstudiante", st."nombre", st."apellido", st."grupo", a."estado"
+     FROM "AttendanceRecord" a
+     LEFT JOIN "Student" st ON st."codigoEstudiante" = a."codigoEstudiante"
+     WHERE a."sessionId" = $1
+     ORDER BY st."apellido" ASC, st."nombre" ASC`,
+    [sessionId]
+  ) as unknown as AttendanceRow[];
+
+  const shaped = sessionShape(session);
 
   res.json({
     success: true,
@@ -116,14 +219,14 @@ export async function getSupervisorSessionAttendance(req: Request, res: Response
       id: session.id,
       fecha: session.fecha,
       estado: session.estado,
-      assignment: session.assignment,
-      schedule: session.schedule,
-      teacher: session.teacher,
-      records: session.attendances.map((a) => ({
+      assignment: shaped.assignment,
+      schedule: shaped.schedule,
+      teacher: shaped.teacher,
+      records: records.map((a) => ({
         codigoEstudiante: a.codigoEstudiante,
-        nombre: a.student.nombre,
-        apellido: a.student.apellido,
-        grupo: a.student.grupo,
+        nombre: a.nombre,
+        apellido: a.apellido,
+        grupo: a.grupo,
         estado: a.estado,
       })),
     },
@@ -131,28 +234,14 @@ export async function getSupervisorSessionAttendance(req: Request, res: Response
 }
 
 export async function getSupervisorFilters(req: Request, res: Response) {
-  const [disciplines, assignments, teachers] = await Promise.all([
-    prisma.discipline.findMany({
-      select: { codigoDisciplina: true, nombre: true },
-      orderBy: { nombre: "asc" },
-    }),
-    prisma.extracurricularAssignment.findMany({
-      select: {
-        codigoDisciplina: true,
-        grade: { select: { nombre: true } },
-      },
-    }),
-    prisma.teacher.findMany({
-      where: { estado: "activo" },
-      select: { idProfesor: true, nombre: true, apellido: true },
-      orderBy: [{ apellido: "asc" }, { nombre: "asc" }],
-    }),
-  ]);
+  const disciplines = await sql`SELECT "codigoDisciplina", "nombre" FROM "Discipline" ORDER BY "nombre" ASC` as unknown as Array<{ codigoDisciplina: string; nombre: string }>;
+  const assignments = await sql`SELECT ea."codigoDisciplina", g."nombre" FROM "ExtracurricularAssignment" ea LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"` as unknown as Array<{ codigoDisciplina: string; nombre: string | null }>;
+  const teachers = await sql`SELECT "idProfesor", "nombre", "apellido" FROM "Teacher" WHERE "estado" = 'activo' ORDER BY "apellido" ASC, "nombre" ASC` as unknown as Array<{ idProfesor: string; nombre: string; apellido: string }>;
 
   const gradeNamesByCode = new Map<string, Set<string>>();
   for (const a of assignments) {
     const set = gradeNamesByCode.get(a.codigoDisciplina) ?? new Set<string>();
-    set.add(a.grade.nombre);
+    if (a.nombre) set.add(a.nombre);
     gradeNamesByCode.set(a.codigoDisciplina, set);
   }
 
@@ -176,56 +265,39 @@ const ESTADO_ASISTENCIA_LABEL: Record<string, string> = {
   justificado: "Justificado",
 };
 
-const SESSION_INCLUDE = {
-  assignment: {
-    include: {
-      discipline: { select: { codigoDisciplina: true, nombre: true } },
-      grade: { select: { idGrado: true, nombre: true } },
-    },
-  },
-  schedule: true,
-  teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-  attendances: {
-    include: {
-      student: {
-        select: { codigoEstudiante: true, nombre: true, apellido: true, grupo: true },
-      },
-    },
-    orderBy: [{ student: { apellido: "asc" } }, { student: { nombre: "asc" } }],
-  },
-} satisfies Prisma.ClassSessionInclude;
+type ExportRow = {
+  Fecha: string;
+  "Día": string;
+  "Hora inicio": string;
+  "Hora fin": string;
+  Disciplina: string;
+  Grado: string;
+  Profesor: string;
+  Código: string;
+  "Nombre del estudiante": string;
+  Apellido: string;
+  Grupo: string;
+  Estado: string;
+};
 
-const SESSION_ORDER: Prisma.ClassSessionOrderByWithRelationInput[] = [
-  { fecha: "desc" },
-  { updatedAt: "desc" },
-];
-
-type AttendSession = Prisma.ClassSessionGetPayload<{ include: typeof SESSION_INCLUDE }>;
-type AttendRecord = AttendSession["attendances"][number];
-
-function dateOnly(d: Date): string {
-  const tz = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return tz.toISOString().slice(0, 10);
-}
-
-function attendanceRow(s: AttendSession, a: AttendRecord): Record<string, string> {
+function attendanceRow(s: SessionRow, a: AttendanceRow): ExportRow {
   return {
     Fecha: s.fecha.toISOString().slice(0, 10),
-    "Día": s.schedule?.diaSemana ?? "",
-    "Hora inicio": s.schedule?.horaInicio ?? "",
-    "Hora fin": s.schedule?.horaFin ?? "",
-    Disciplina: s.assignment.discipline.nombre,
-    Grado: s.assignment.grade.nombre,
-    Profesor: `${s.teacher.nombre} ${s.teacher.apellido}`,
-    "Código": a.student.codigoEstudiante,
-    "Nombre del estudiante": a.student.nombre,
-    Apellido: a.student.apellido,
-    Grupo: a.student.grupo ?? "",
+    "Día": s.diaSemana ?? "",
+    "Hora inicio": s.horaInicio ?? "",
+    "Hora fin": s.horaFin ?? "",
+    Disciplina: s.disciplinaNombre,
+    Grado: String(s.gradoNombre),
+    Profesor: `${s.profesorNombre} ${s.profesorApellido}`,
+    "Código": a.codigoEstudiante,
+    "Nombre del estudiante": a.nombre,
+    Apellido: a.apellido,
+    Grupo: a.grupo ?? "",
     Estado: ESTADO_ASISTENCIA_LABEL[a.estado] ?? a.estado,
   };
 }
 
-function sendWorkbook(res: Response, rows: Record<string, string>[]): void {
+function sendWorkbook(res: Response, rows: ExportRow[]): void {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, ws, "Asistencias");
@@ -236,18 +308,55 @@ function sendWorkbook(res: Response, rows: Record<string, string>[]): void {
   res.send(buffer);
 }
 
+// Devuelve sesiones (sin paginar) con TODAS sus asistencias unidas por fila.
+async function sessionsWithAttendances(conditions: string[], params: any[]): Promise<{ session: SessionRow; records: AttendanceRow[] }[]> {
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const baseParams = [...params];
+  // Primero obtiene las sesiones
+  const sessions = await sql(
+    `SELECT ${SESSION_SELECT}
+     ${SESSION_JOIN}
+     ${where}
+     GROUP BY cs."id", ea."idAsignacion", d."codigoDisciplina", g."idGrado", sc."idHorario", t."idProfesor"
+     ORDER BY cs."fecha" DESC, cs."updatedAt" DESC`,
+    baseParams
+  ) as unknown as SessionRow[];
+
+  if (sessions.length === 0) return [];
+
+  const sessionIds = sessions.map((s) => s.id);
+  const records = await sql(
+    `SELECT a."sessionId", a."codigoEstudiante", st."nombre", st."apellido", st."grupo", a."estado"
+     FROM "AttendanceRecord" a
+     LEFT JOIN "Student" st ON st."codigoEstudiante" = a."codigoEstudiante"
+     WHERE a."sessionId" = ANY($1)
+     ORDER BY st."apellido" ASC, st."nombre" ASC`,
+    [sessionIds]
+  ) as unknown as Array<AttendanceRow & { sessionId: string }>;
+
+  const bySession = new Map<string, AttendanceRow[]>();
+  for (const r of records) {
+    if (!bySession.has(r.sessionId)) bySession.set(r.sessionId, []);
+    bySession.get(r.sessionId)!.push({
+      codigoEstudiante: r.codigoEstudiante,
+      nombre: r.nombre,
+      apellido: r.apellido,
+      grupo: r.grupo,
+      estado: r.estado,
+    });
+  }
+
+  return sessions.map((s) => ({ session: s, records: bySession.get(s.id) ?? [] }));
+}
+
 export async function exportSupervisorAttendance(req: Request, res: Response) {
-  const where = buildSessionWhere(req.query as Record<string, string>);
+  const { conditions, params } = buildSessionWhereSQL(req.query as Record<string, string>);
+  const pairs = await sessionsWithAttendances(conditions, params);
 
-  const sessions = await prisma.classSession.findMany({
-    where,
-    include: SESSION_INCLUDE,
-    orderBy: SESSION_ORDER,
-  });
-
-  const rows: Record<string, string>[] = [];
-  for (const s of sessions) {
-    for (const a of s.attendances) rows.push(attendanceRow(s, a));
+  const rows: ExportRow[] = [];
+  for (const p of pairs) {
+    for (const a of p.records) rows.push(attendanceRow(p.session, a));
   }
 
   sendWorkbook(res, rows);
@@ -256,105 +365,174 @@ export async function exportSupervisorAttendance(req: Request, res: Response) {
 export async function exportSupervisorSessionAttendance(req: Request, res: Response) {
   const sessionId = param(req, "sessionId");
 
-  const session = await prisma.classSession.findUnique({
-    where: { id: sessionId },
-    include: SESSION_INCLUDE,
-  });
+  const session = await first<SessionRow>(
+    await sql(
+      `SELECT ${SESSION_SELECT}
+       ${SESSION_JOIN}
+       WHERE cs."id" = $1
+       GROUP BY cs."id", ea."idAsignacion", d."codigoDisciplina", g."idGrado", sc."idHorario", t."idProfesor"`,
+      [sessionId]
+    ) as unknown as SessionRow[]
+  );
 
   if (!session) {
     throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
   }
 
-  const rows = session.attendances.map((a) => attendanceRow(session, a));
+  const records = await sql(
+    `SELECT a."sessionId", a."codigoEstudiante", st."nombre", st."apellido", st."grupo", a."estado"
+     FROM "AttendanceRecord" a
+     LEFT JOIN "Student" st ON st."codigoEstudiante" = a."codigoEstudiante"
+     WHERE a."sessionId" = $1
+     ORDER BY st."apellido" ASC, st."nombre" ASC`,
+    [sessionId]
+  ) as unknown as Array<AttendanceRow & { sessionId: string }>;
+
+  const rows = records.map((a) =>
+    attendanceRow(session, {
+      codigoEstudiante: a.codigoEstudiante,
+      nombre: a.nombre,
+      apellido: a.apellido,
+      grupo: a.grupo,
+      estado: a.estado,
+    })
+  );
   sendWorkbook(res, rows);
 }
 
 export async function getSupervisorTeacherSchedules(req: Request, res: Response) {
-  const assignments = await prisma.extracurricularAssignment.findMany({
-    where: { estado: "activo" },
-    include: {
-      teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-      discipline: { select: { codigoDisciplina: true, nombre: true } },
-      grade: { select: { idGrado: true, nombre: true } },
-      schedules: {
-        include: {
-          schedule: {
-            select: { idHorario: true, diaSemana: true, horaInicio: true, horaFin: true, aula: true },
-          },
-        },
-      },
-    },
-    orderBy: [{ teacher: { apellido: "asc" } }, { teacher: { nombre: "asc" } }, { codigoDisciplina: "asc" }],
-  });
+  const rows = await sql(
+    `SELECT ea."idAsignacion", ea."esPrincipal",
+            t."idProfesor", t."nombre", t."apellido",
+            ea."codigoDisciplina", d."nombre" AS "disciplinaNombre",
+            ea."idGrado", g."nombre" AS "gradoNombre",
+            sc."idHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula"
+     FROM "ExtracurricularAssignment" ea
+     LEFT JOIN "Teacher" t ON t."idProfesor" = ea."idProfesor"
+     LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+     LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+     LEFT JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
+     LEFT JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
+     WHERE ea."estado" = 'activo'
+     ORDER BY t."apellido" ASC, t."nombre" ASC, ea."codigoDisciplina" ASC`
+  ) as unknown as any[];
 
-  const schedules = assignments
-    .map((a) => ({
-      idAsignacion: a.idAsignacion,
-      esPrincipal: a.esPrincipal,
-      teacher: a.teacher,
-      discipline: a.discipline,
-      grade: a.grade,
-      schedules: a.schedules.map((as) => as.schedule),
-    }))
-    .filter((a) => a.schedules.length > 0);
+  const byAssign = new Map<string, any>();
+  for (const r of rows) {
+    if (!byAssign.has(r.idAsignacion)) {
+      byAssign.set(r.idAsignacion, {
+        idAsignacion: r.idAsignacion,
+        esPrincipal: r.esPrincipal,
+        teacher: { idProfesor: r.idProfesor, nombre: r.nombre, apellido: r.apellido },
+        discipline: { codigoDisciplina: r.codigoDisciplina, nombre: r.disciplinaNombre },
+        grade: { idGrado: r.idGrado, nombre: r.gradoNombre },
+        schedules: [],
+      });
+    }
+    const a = byAssign.get(r.idAsignacion)!;
+    if (r.schIdHorario) {
+      a.schedules.push({
+        schedule: { idHorario: r.schIdHorario, diaSemana: r.diaSemana, horaInicio: r.horaInicio, horaFin: r.horaFin, aula: r.aula },
+      });
+    }
+  }
 
+  const schedules = Array.from(byAssign.values()).filter((a) => a.schedules.length > 0);
   res.json({ success: true, data: schedules });
 }
 
 export async function getSupervisorAssignmentHistory(req: Request, res: Response) {
   const asignacionId = param(req, "asignacionId");
 
-  const assignment = await prisma.extracurricularAssignment.findUnique({
-    where: { idAsignacion: asignacionId },
-    include: {
-      teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-      discipline: { select: { codigoDisciplina: true, nombre: true } },
-      grade: { select: { idGrado: true, nombre: true } },
-    },
-  });
+  const assignment = await first<any>(
+    await sql(
+      `SELECT t."idProfesor", t."nombre", t."apellido",
+              ea."codigoDisciplina", d."nombre" AS "disciplinaNombre",
+              ea."idGrado", g."nombre" AS "gradoNombre"
+       FROM "ExtracurricularAssignment" ea
+       LEFT JOIN "Teacher" t ON t."idProfesor" = ea."idProfesor"
+       LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+       LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+       WHERE ea."idAsignacion" = $1 LIMIT 1`,
+      [asignacionId]
+    ) as unknown as any[]
+  );
   if (!assignment) {
     throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Asignación no encontrada");
   }
 
-  const assignmentsSchedules = await prisma.assignmentSchedule.findMany({
-    where: { idAsignacion: asignacionId },
-    include: {
-      schedule: { select: { idHorario: true, diaSemana: true, horaInicio: true, horaFin: true, aula: true } },
-    },
-  });
+  const assignmentsSchedules = await sql(
+    `SELECT sc."idHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula"
+     FROM "AssignmentSchedule" asch
+     LEFT JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
+     WHERE asch."idAsignacion" = $1`,
+    [asignacionId]
+  ) as unknown as Array<{ idHorario: string; diaSemana: string; horaInicio: string | null; horaFin: string | null; aula: string | null }>;
 
-  const sessions = await prisma.classSession.findMany({
-    where: { idAsignacion: asignacionId },
-    include: { attendances: true },
-    orderBy: { fecha: "desc" },
-  });
+  const sessions = await sql(
+    `SELECT cs."id", cs."idHorario", cs."fecha", cs."estado",
+            COUNT(a."id")::int AS "total",
+            COUNT(a."id") FILTER (WHERE a."estado" = 'presente')::int AS "presente",
+            COUNT(a."id") FILTER (WHERE a."estado" = 'ausente')::int AS "ausente",
+            COUNT(a."id") FILTER (WHERE a."estado" = 'justificado')::int AS "justificado"
+     FROM "ClassSession" cs
+     LEFT JOIN "AttendanceRecord" a ON a."sessionId" = cs."id"
+     WHERE cs."idAsignacion" = $1
+     GROUP BY cs."id"
+     ORDER BY cs."fecha" DESC`,
+    [asignacionId]
+  ) as unknown as any[];
 
-  const schedules = assignmentsSchedules.map((as) => ({
-    schedule: as.schedule,
+  const schedules = assignmentsSchedules.map((sch) => ({
+    schedule: sch,
     sessions: sessions
-      .filter((s) => s.idHorario === as.schedule.idHorario)
-      .map((s) => ({
-        id: s.id,
-        fecha: s.fecha,
-        estado: s.estado,
-        counts: {
-          total: s.attendances.length,
-          presente: s.attendances.filter((a) => a.estado === "presente").length,
-          ausente: s.attendances.filter((a) => a.estado === "ausente").length,
-          justificado: s.attendances.filter((a) => a.estado === "justificado").length,
-        },
-      })),
+      .filter((s) => s.idHorario === sch.idHorario)
+      .map((s) => ({ id: s.id, fecha: s.fecha, estado: s.estado, counts: { total: s.total, presente: s.presente, ausente: s.ausente, justificado: s.justificado } })),
+  }));
+
+  const enrolled = (await sql`
+    SELECT ss."diaSemana", ss."codigoEstudiante",
+           st."nombre", st."apellido", st."idGrado", st."grupo", st."correo", st."fotoUrl"
+    FROM "StudentSchedule" ss
+    LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+    WHERE ss."codigoDisciplina" = $1
+    ORDER BY st."apellido" ASC, st."nombre" ASC
+  `, [assignment.codigoDisciplina]) as unknown as Array<{
+    diaSemana: string; codigoEstudiante: string; nombre: string; apellido: string;
+    idGrado: number; grupo: string | null; correo: string | null; fotoUrl: string | null;
+  }>;
+
+  const byDay = new Map<string, Array<{
+    codigoEstudiante: string; nombre: string; apellido: string; idGrado: number;
+    grupo: string | null; correo: string | null; fotoUrl: string | null;
+  }>>();
+  for (const e of enrolled) {
+    if (!byDay.has(e.diaSemana)) byDay.set(e.diaSemana, []);
+    byDay.get(e.diaSemana)!.push({
+      codigoEstudiante: e.codigoEstudiante,
+      nombre: e.nombre,
+      apellido: e.apellido,
+      idGrado: e.idGrado,
+      grupo: e.grupo,
+      correo: e.correo,
+      fotoUrl: e.fotoUrl,
+    });
+  }
+
+  const schedulesWithStudents = schedules.map((sch) => ({
+    ...sch,
+    students: byDay.get(sch.schedule.diaSemana) ?? [],
   }));
 
   res.json({
     success: true,
     data: {
       assignment: {
-        teacher: assignment.teacher,
-        discipline: assignment.discipline,
-        grade: assignment.grade,
+        teacher: { idProfesor: assignment.idProfesor, nombre: assignment.nombre, apellido: assignment.apellido },
+        discipline: { codigoDisciplina: assignment.codigoDisciplina, nombre: assignment.disciplinaNombre },
+        grade: { idGrado: assignment.idGrado, nombre: assignment.gradoNombre },
       },
-      schedules,
+      schedules: schedulesWithStudents,
     },
   });
 }
@@ -363,51 +541,58 @@ export async function getSupervisorScheduleHistory(req: Request, res: Response) 
   const asignacionId = param(req, "asignacionId");
   const horarioId = param(req, "horarioId");
 
-  const assignment = await prisma.extracurricularAssignment.findUnique({
-    where: { idAsignacion: asignacionId },
-    include: {
-      teacher: { select: { idProfesor: true, nombre: true, apellido: true } },
-      discipline: { select: { codigoDisciplina: true, nombre: true } },
-      grade: { select: { idGrado: true, nombre: true } },
-    },
-  });
+  const assignment = await first<any>(
+    await sql(
+      `SELECT t."idProfesor", t."nombre", t."apellido",
+              ea."codigoDisciplina", d."nombre" AS "disciplinaNombre",
+              ea."idGrado", g."nombre" AS "gradoNombre"
+       FROM "ExtracurricularAssignment" ea
+       LEFT JOIN "Teacher" t ON t."idProfesor" = ea."idProfesor"
+       LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+       LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+       WHERE ea."idAsignacion" = $1 LIMIT 1`,
+      [asignacionId]
+    ) as unknown as any[]
+  );
   if (!assignment) {
     throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Asignación no encontrada");
   }
 
-  const schedule = await prisma.schedule.findUnique({
-    where: { idHorario: horarioId },
-    select: { idHorario: true, diaSemana: true, horaInicio: true, horaFin: true, aula: true },
-  });
+  const schedule = await first<any>(
+    await sql`SELECT "idHorario", "diaSemana", "horaInicio", "horaFin", "aula" FROM "Schedule" WHERE "idHorario" = ${horarioId} LIMIT 1` as unknown as any[]
+  );
   if (!schedule) {
     throw new AppError(404, "SCHEDULE_NOT_FOUND", "Horario no encontrado");
   }
 
-  const sessions = await prisma.classSession.findMany({
-    where: { idAsignacion: asignacionId, idHorario: horarioId },
-    include: { attendances: true },
-    orderBy: { fecha: "desc" },
-  });
+  const sessions = await sql(
+    `SELECT cs."id", cs."fecha", cs."estado",
+            COUNT(a."id")::int AS "total",
+            COUNT(a."id") FILTER (WHERE a."estado" = 'presente')::int AS "presente",
+            COUNT(a."id") FILTER (WHERE a."estado" = 'ausente')::int AS "ausente",
+            COUNT(a."id") FILTER (WHERE a."estado" = 'justificado')::int AS "justificado"
+     FROM "ClassSession" cs
+     LEFT JOIN "AttendanceRecord" a ON a."sessionId" = cs."id"
+     WHERE cs."idAsignacion" = $1 AND cs."idHorario" = $2
+     GROUP BY cs."id"
+     ORDER BY cs."fecha" DESC`,
+    [asignacionId, horarioId]
+  ) as unknown as any[];
 
   res.json({
     success: true,
     data: {
       assignment: {
-        teacher: assignment.teacher,
-        discipline: assignment.discipline,
-        grade: assignment.grade,
+        teacher: { idProfesor: assignment.idProfesor, nombre: assignment.nombre, apellido: assignment.apellido },
+        discipline: { codigoDisciplina: assignment.codigoDisciplina, nombre: assignment.disciplinaNombre },
+        grade: { idGrado: assignment.idGrado, nombre: assignment.gradoNombre },
       },
       schedule,
       sessions: sessions.map((s) => ({
         id: s.id,
         fecha: s.fecha,
         estado: s.estado,
-        counts: {
-          total: s.attendances.length,
-          presente: s.attendances.filter((a) => a.estado === "presente").length,
-          ausente: s.attendances.filter((a) => a.estado === "ausente").length,
-          justificado: s.attendances.filter((a) => a.estado === "justificado").length,
-        },
+        counts: { total: s.total, presente: s.presente, ausente: s.ausente, justificado: s.justificado },
       })),
     },
   });
