@@ -258,14 +258,14 @@ export async function getAttendanceList(req: Request, res: Response) {
   const enrolledStudents = (await sql`
     SELECT
       ss."codigoEstudiante",
-      st."nombre", st."apellido", st."grupo"
+      st."nombre", st."apellido", st."grupo", st."fotoUrl"
     FROM "StudentSchedule" ss
     LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
     WHERE ss."codigoDisciplina" = ${sessionRow.codigoDisciplina}
       AND ss."diaSemana" = ${sessionRow.diaSemana}
       AND st."idGrado" = ${sessionRow.gradoIdGrado}
   `) as unknown as Array<{
-    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null;
+    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
   }>;
 
   const existingAttendance = (await sql`
@@ -281,6 +281,7 @@ export async function getAttendanceList(req: Request, res: Response) {
     nombre: es.nombre,
     apellido: es.apellido,
     grupo: es.grupo,
+    fotoUrl: es.fotoUrl,
     estado: attendanceMap.get(es.codigoEstudiante) || "pendiente",
   }));
 
@@ -334,8 +335,6 @@ export async function saveAttendance(req: Request, res: Response) {
       )
     );
   }
-
-  await sql`UPDATE "ClassSession" SET "estado" = 'finalizada', "updatedAt" = now() WHERE "id" = ${sessionId}`;
 
   res.json({ success: true, data: { message: "Asistencia guardada", total: validRecords.length } });
 }

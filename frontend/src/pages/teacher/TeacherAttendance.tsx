@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getAttendanceList, saveAttendance, getNovedadesBatch } from "../../services/teacher";
 import { useNotify } from "../../components/common/Notify";
 import Logo from "../../components/common/Logo";
+import { Avatar } from "../../components/common/Avatar";
 import type { AttendanceStudent as Student, Schedule, Assignment, Novedad } from "../../types";
 
 export default function TeacherAttendance() {
@@ -139,11 +140,23 @@ export default function TeacherAttendance() {
               }`}
             >
               <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="text-xs text-surface-400 w-6 text-right shrink-0">{i + 1}</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-surface-900 dark:text-surface-100 break-words">
-                    {student.nombre} {student.apellido}
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-xs text-surface-400 w-6 text-right shrink-0">{i + 1}</span>
+                  {student.fotoUrl ? (
+                    <img
+                      src={student.fotoUrl}
+                      alt={`${student.nombre} ${student.apellido}`}
+                      className="h-11 w-11 rounded-xl object-cover shrink-0"
+                    />
+                  ) : (
+                    <Avatar seed={student.codigoEstudiante} className="h-11 w-11 rounded-xl text-sm shrink-0">
+                      {student.nombre.charAt(0)}
+                      {student.apellido.charAt(0)}
+                    </Avatar>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-surface-900 dark:text-surface-100 break-words">
+                      {student.nombre} {student.apellido}
                   </p>
                   <p className="text-xs text-surface-500">{student.codigoEstudiante} · {student.grupo || "—"}</p>
                   {novedades.length > 0 && (

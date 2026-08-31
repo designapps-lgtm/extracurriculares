@@ -135,7 +135,7 @@ export default function TeacherDashboard() {
                               </p>
                               <p className="text-xs text-surface-400 mt-1">
                                 {cls.enrolledCount} inscritos
-                                {cls.sessionEstado === "finalizada" && cls.attendanceCount > 0 && (
+                                {cls.attendanceCount > 0 && (
                                   <span className="ml-2 text-green-600">· {cls.attendanceCount} asistencias</span>
                                 )}
                               </p>

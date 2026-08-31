@@ -224,6 +224,7 @@ export interface AttendanceStudent {
   nombre: string;
   apellido: string;
   grupo: string | null;
+  fotoUrl: string | null;
   estado: string;
 }
 
