@@ -18,7 +18,8 @@ function requireEnv(name: string): string {
 }
 
 function codeFromName(name: string): string {
-  return name.split(".")[0].trim();
+  const match = name.match(/\d{10}/);
+  return match ? match[0] : name.split(".")[0].trim();
 }
 
 function isStudentPhoto(file: DriveFile): boolean {

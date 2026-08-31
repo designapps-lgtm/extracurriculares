@@ -4,6 +4,13 @@ import { PaginationParams, paginatedResult } from "../../utils/pagination";
 
 const VALID_DAYS = new Set(["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"]);
 
+const ACCENT_FROM = "áéíóúüñÁÉÍÓÚÜÑ";
+const ACCENT_TO = "aeiouunAEIOUUN";
+
+function accentInsensitiveMatch(column: string, placeholder: string) {
+  return `LOWER(TRANSLATE(${column}, '${ACCENT_FROM}', '${ACCENT_TO}')) LIKE LOWER(TRANSLATE(${placeholder}, '${ACCENT_FROM}', '${ACCENT_TO}'))`;
+}
+
 export async function getStudents(query: { search?: string; grado?: string; inscrito?: string }, pagination: PaginationParams) {
   const { search, grado, inscrito } = query;
 
@@ -14,7 +21,7 @@ export async function getStudents(query: { search?: string; grado?: string; insc
 
   if (search) {
     const p = next(`%${search}%`);
-    conditions.push(`(s."codigoEstudiante" ILIKE ${p} OR s."nombre" ILIKE ${p} OR s."apellido" ILIKE ${p})`);
+    conditions.push(`(${accentInsensitiveMatch('s."codigoEstudiante"', p)} OR ${accentInsensitiveMatch('s."nombre"', p)} OR ${accentInsensitiveMatch('s."apellido"', p)})`);
   }
 
   if (grado) {

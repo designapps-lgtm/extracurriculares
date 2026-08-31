@@ -28,6 +28,13 @@ interface StudentScheduleDisciplineRow {
   disciplinaDescripcion: string | null;
 }
 
+const ACCENT_FROM = "áéíóúüñÁÉÍÓÚÜÑ";
+const ACCENT_TO = "aeiouunAEIOUUN";
+
+function accentInsensitiveMatch(column: string, placeholder: string) {
+  return `LOWER(TRANSLATE(${column}, '${ACCENT_FROM}', '${ACCENT_TO}')) LIKE LOWER(TRANSLATE(${placeholder}, '${ACCENT_FROM}', '${ACCENT_TO}'))`;
+}
+
 export async function getStudents(query: StudentQuery, pagination: PaginationParams): Promise<PaginatedResult<any>> {
   const { search, grado, disciplina, inscrito } = query;
 
@@ -47,7 +54,7 @@ export async function getStudents(query: StudentQuery, pagination: PaginationPar
   if (search) {
     const p = nextParam(`%${search}%`);
     studentConds.push(
-      `(s."codigoEstudiante" ILIKE ${p} OR s."nombre" ILIKE ${p} OR s."apellido" ILIKE ${p})`
+      `(${accentInsensitiveMatch('s."codigoEstudiante"', p)} OR ${accentInsensitiveMatch('s."nombre"', p)} OR ${accentInsensitiveMatch('s."apellido"', p)})`
     );
   }
 
