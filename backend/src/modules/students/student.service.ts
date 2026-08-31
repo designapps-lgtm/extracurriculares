@@ -231,7 +231,7 @@ export async function getStudentProfile(codigo: string) {
         SELECT
           ea."idAsignacion",
           t."nombre" AS "profesorNombre", t."apellido" AS "profesorApellido",
-          asch."id", asch."diaSemana" AS "schDia",
+          asch."id", sc."diaSemana" AS "schDia",
           sc."horaInicio", sc."horaFin"
         FROM "ExtracurricularAssignment" ea
         LEFT JOIN "Teacher" t ON t."idProfesor" = ea."idProfesor"
