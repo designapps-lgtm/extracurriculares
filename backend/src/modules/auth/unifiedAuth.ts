@@ -182,7 +182,10 @@ const refreshMap: Record<Role, string> = {
 };
 
 export async function me(req: Request, res: Response) {
-  for (const role of ["teacher", "supervisor", "admin"] as Role[]) {
+  // Misma prioridad que googleLogin (admin > supervisor > teacher): si quedaron
+  // cookies de varios roles en el dispositivo, continuar siempre en el de mayor
+  // jerarquía para no entrar a un panel distinto del que entrega el login.
+  for (const role of ["admin", "supervisor", "teacher"] as Role[]) {
     const cookie = req.cookies?.[refreshMap[role]];
     if (!cookie) continue;
 
