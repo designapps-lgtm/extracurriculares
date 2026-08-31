@@ -160,25 +160,21 @@ export default function TeacherAttendance() {
                   </p>
                   <p className="text-xs text-surface-500">{student.codigoEstudiante} · {student.grupo || "—"}</p>
                   {novedades.length > 0 && (
-                    <div className="mt-1.5">
-                      <button
-                        onClick={() =>
-                          navigate(`/teacher/novedad/${student.codigoEstudiante}`, {
-                            state: {
-                              sessionId,
-                              codigoEstudiante: student.codigoEstudiante,
-                              nombre: student.nombre,
-                              apellido: student.apellido,
-                              grupo: student.grupo,
-                              novedades,
-                            },
-                          })
-                        }
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-xs font-medium hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors"
-                      >
-                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
-                        Ver novedad
-                      </button>
+                    <div className="mt-2 space-y-1.5">
+                      {novedades.map((n) => (
+                        <div key={n.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
+                          {n.descripcion && (
+                            <p className="text-amber-800 dark:text-amber-300 font-medium">{n.descripcion}</p>
+                          )}
+                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
+                            {n.seAusentaCon && <span>Se ausenta con: {n.seAusentaCon}</span>}
+                            <span>
+                              {n.regresaAlColegio ? "Sí regresa" : "No regresa"}
+                              {n.horaEstimadaRegreso ? ` · ${n.horaEstimadaRegreso}` : ""}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -206,17 +202,6 @@ export default function TeacherAttendance() {
                   }`}
                 >
                   A
-                </button>
-                <button
-                  onClick={() => toggleAttendance(student.codigoEstudiante, "justificado")}
-                  aria-label="Marcar justificado"
-                  className={`min-w-[44px] min-h-[44px] px-3 rounded-lg text-sm font-semibold transition-colors ${
-                    student.estado === "justificado"
-                      ? "bg-amber-500 text-white"
-                      : "bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-amber-100"
-                  }`}
-                >
-                  J
                 </button>
               </div>
               </div>
