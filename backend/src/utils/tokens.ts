@@ -27,3 +27,7 @@ export function parseDurationToMs(duration: string): number {
 export function daysToMs(days: number): number {
   return Math.max(days, 1) * 24 * 60 * 60 * 1000;
 }
+
+export function hoursToMs(hours: number): number {
+  return Math.max(hours, 1) * 60 * 60 * 1000;
+}

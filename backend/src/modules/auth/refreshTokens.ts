@@ -2,7 +2,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { sql } from "../../config/db";
 import { config } from "../../config";
-import { generateRefreshToken, hashRefreshToken, daysToMs } from "../../utils/tokens";
+import { generateRefreshToken, hashRefreshToken, hoursToMs } from "../../utils/tokens";
 import { AppError } from "../../middlewares/errorHandler";
 
 interface RefreshServiceOptions {
@@ -30,7 +30,9 @@ export function createRefreshService({
   const issue = async (userId: string, email: string): Promise<IssueResult> => {
     const token = generateRefreshToken();
     const familyId = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + daysToMs(config.refreshTokenExpiresInDays));
+    // Vencimiento ABSOLUTO de la sesión (no se desliza al rotar): se fija al
+    // iniciar sesión y se mantiene en toda la familia de refresh tokens.
+    const expiresAt = new Date(Date.now() + hoursToMs(config.sessionDurationHours));
 
     await sql(
       `INSERT INTO "${tableName}" ("id", "${userIdField}", "tokenHash", "familyId", "expiresAt", "createdAt", "lastUsedAt")
@@ -78,7 +80,9 @@ export function createRefreshService({
     const userId = record[userIdField];
 
     const newToken = generateRefreshToken();
-    const newExpiresAt = new Date(Date.now() + daysToMs(config.refreshTokenExpiresInDays));
+    // Mismo vencimiento ABSOLUTO de la familia: al rotar NO se estira la sesión,
+    // se hereda la fecha límite original del login.
+    const newExpiresAt = record.expiresAt;
 
     await sql(
       `UPDATE "${tableName}" SET "revokedAt" = now(), "lastUsedAt" = now() WHERE "id" = $1`,

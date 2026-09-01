@@ -29,6 +29,7 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || "dev-secret-change-in-production",
   accessTokenExpiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || "15m",
   refreshTokenExpiresInDays: parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS || "7", 10),
+  sessionDurationHours: parseInt(process.env.SESSION_DURATION_HOURS || "12", 10),
   googleServiceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON || null,
   googleDriveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID || null,
   novedadesSyncMinutes: parseInt(process.env.NOVEDADES_SYNC_MINUTES || "10", 10),

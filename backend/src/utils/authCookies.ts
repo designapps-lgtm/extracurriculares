@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { config } from "../config";
-import { parseDurationToMs, daysToMs } from "./tokens";
+import { parseDurationToMs, hoursToMs } from "./tokens";
 
 export const ADMIN_ACCESS_COOKIE = "admin_access";
 export const ADMIN_REFRESH_COOKIE = "admin_refresh";
@@ -34,7 +34,7 @@ export function setAuthCookies(
   });
   res.cookie(`${prefix}_refresh`, refreshToken, {
     ...cookieBase,
-    maxAge: daysToMs(config.refreshTokenExpiresInDays),
+    maxAge: hoursToMs(config.sessionDurationHours),
   });
 }
 
