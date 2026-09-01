@@ -10,6 +10,15 @@ import Logo from "../../components/common/Logo";
 import { Avatar } from "../../components/common/Avatar";
 import type { AttendanceStudent as Student, Schedule, Assignment, Novedad, AttendanceResponse } from "../../types";
 
+function todayBogotaStr(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 export default function SupervisorAttendance() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
@@ -36,7 +45,7 @@ export default function SupervisorAttendance() {
         setTransfers(data.transfers ?? []);
         const codigos = data.students.map((s) => s.codigoEstudiante);
         if (codigos.length === 0) return;
-        const novedades = await getSupervisorNovedadesBatch(codigos, data.session?.fecha);
+        const novedades = await getSupervisorNovedadesBatch(codigos, todayBogotaStr());
         setNovedadesMap(
           novedades.reduce((acc, item) => {
             if (item.novedades.length > 0) acc[item.codigoEstudiante] = item.novedades;
