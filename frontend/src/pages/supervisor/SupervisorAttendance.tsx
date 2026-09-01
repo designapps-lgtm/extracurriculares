@@ -267,12 +267,14 @@ export default function SupervisorAttendance() {
                           ))}
                         </div>
                       )}
-                      <button
-                        onClick={() => openNovedad(student)}
-                        className="mt-2 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/60"
-                      >
-                        Novedades
-                      </button>
+                      {novedades.length > 0 && (
+                        <button
+                          onClick={() => openNovedad(student)}
+                          className="mt-2 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/60"
+                        >
+                          Novedades
+                        </button>
+                      )}
                     </div>
                   </div>
 

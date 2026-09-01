@@ -104,6 +104,23 @@ function matchesExtracurricularDay(n: any, daysByStudent: Map<string, Set<string
   return days.has(novedadDayName(n));
 }
 
+function isRelevantNovedad(n: any): boolean {
+  const text = [
+    n.descripcion,
+    n.seAusentaCon,
+    n.seAusentaConOtro,
+    n.seAusentaConTipo,
+    n.tipoNovedad,
+    n.flujoNovedad,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toUpperCase();
+
+  return Boolean(n.seAusentaCon || n.seAusentaConOtro || n.seAusentaConTipo) ||
+    /SALIDA|AUSEN|CAMBIO|DEPORTE/.test(text);
+}
+
 function serialize(n: any) {
   return {
     id: n.id,
@@ -136,7 +153,7 @@ export async function getNovedadesByCodigo(req: Request, res: Response): Promise
   const todos = await getNovedadesForStudent(codigoEstudiante);
   const daysByStudent = await getStudentDays([codigoEstudiante]);
   const filtered = todos.filter((n) => matchesExtracurricularDay(n, daysByStudent));
-  res.json({ success: true, data: filtered.map(serialize) });
+  res.json({ success: true, data: filtered.filter(isRelevantNovedad).map(serialize) });
 }
 
 export async function getNovedadesBatch(req: Request, res: Response): Promise<void> {
@@ -161,6 +178,7 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
   const activas: Record<string, any[]> = {};
   for (const r of rows) {
     if (!matchesExtracurricularDay(r, daysByStudent)) continue;
+    if (!isRelevantNovedad(r)) continue;
     const match = bounds ? isOnDay(r, bounds) : isActive(r);
     if (!match) continue;
     (activas[r.codigoEstudiante] = activas[r.codigoEstudiante] || []).push(serialize(r));
