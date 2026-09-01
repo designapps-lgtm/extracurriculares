@@ -7,7 +7,6 @@ import {
   supervisorMe,
   type SupervisorFilterData,
 } from "../../services/supervisor";
-import { logout } from "../../services/auth";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import { Pagination } from "../../components/common/Pagination";
@@ -108,11 +107,6 @@ export default function SupervisorDashboard() {
     }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/");
-  };
-
   return (
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
@@ -125,35 +119,6 @@ export default function SupervisorDashboard() {
               </h1>
               <p className="text-xs text-surface-500">Asistencias registradas por los profesores</p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => navigate("/supervisor/classes")}
-              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
-            >
-              Llamar lista
-            </button>
-            <button
-              onClick={() => navigate("/supervisor/transfers")}
-              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
-            >
-              Traslados
-            </button>
-            <button
-              onClick={() => navigate("/supervisor/schedules")}
-              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
-            >
-              Ver horarios
-            </button>
-            <button
-              onClick={() => navigate("/supervisor/stays")}
-              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
-            >
-              Niños que se quedan
-            </button>
-            <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
-              Salir
-            </button>
           </div>
         </div>
       </header>

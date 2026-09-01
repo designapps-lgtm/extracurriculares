@@ -8,7 +8,6 @@ import {
   searchSupervisorStudents,
   supervisorMe,
 } from "../../services/supervisor";
-import { logout } from "../../services/auth";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
@@ -197,11 +196,6 @@ export default function SupervisorTransfers() {
     }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/");
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
@@ -224,29 +218,6 @@ export default function SupervisorTransfers() {
                 {supervisor?.nombre ? `${supervisor.nombre} ${supervisor.apellido}` : ""} · mover un estudiante de una clase a otra por un tiempo
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => navigate("/supervisor/dashboard")}
-              className="px-3 py-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800"
-            >
-              Asistencias
-            </button>
-            <button
-              onClick={() => navigate("/supervisor/classes")}
-              className="px-3 py-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800"
-            >
-              Llamar lista
-            </button>
-            <button
-              onClick={() => navigate("/supervisor/stays")}
-              className="px-3 py-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800"
-            >
-              Niños que se quedan
-            </button>
-            <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
-              Salir
-            </button>
           </div>
         </div>
       </header>

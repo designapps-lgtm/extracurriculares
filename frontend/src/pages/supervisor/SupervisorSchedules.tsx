@@ -6,7 +6,6 @@ import {
   supervisorStartSession,
   supervisorMe,
 } from "../../services/supervisor";
-import { logout } from "../../services/auth";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
@@ -245,11 +244,6 @@ export default function SupervisorSchedules() {
 
   const closeHistory = () => setSelectedAsignacion(null);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/");
-  };
-
   const profesores = useMemo(() => {
     const map = new Map<string, { idProfesor: string; nombre: string; apellido: string }>();
     for (const a of assignments) map.set(a.teacher.idProfesor, a.teacher);
@@ -324,17 +318,6 @@ export default function SupervisorSchedules() {
               </h1>
               <p className="text-xs text-surface-500">Horarios de todos los profesores</p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => navigate("/supervisor/dashboard")}
-              className="px-3 py-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800"
-            >
-              Asistencias
-            </button>
-            <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
-              Salir
-            </button>
           </div>
         </div>
       </header>

@@ -7,10 +7,10 @@ import type { Supervisor } from "../../types";
 
 const NAV_ITEMS = [
   { path: "/supervisor/dashboard", label: "Asistencias", icon: "M3 13l4-4m0 0l4 4m-4-4v10m8-6l4 4m0 0l4-4m-4 4V3" },
-  { path: "/supervisor/classes", label: "Clases", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
+  { path: "/supervisor/classes", label: "Llamar lista", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
   { path: "/supervisor/schedules", label: "Horarios", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
   { path: "/supervisor/transfers", label: "Traslados", icon: "M9 13h6m2 0-2-2m2 2-2 2M7 13h.01M4 6h16M4 18h16" },
-  { path: "/supervisor/stays", label: "Se quedan", icon: "M4 7h16M4 12h10M4 17h16" },
+  { path: "/supervisor/stays", label: "Niños que se quedan", icon: "M4 7h16M4 12h10M4 17h16" },
 ];
 
 export default function SupervisorLayout() {
