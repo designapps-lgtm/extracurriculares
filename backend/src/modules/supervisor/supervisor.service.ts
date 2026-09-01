@@ -468,46 +468,59 @@ export async function getSupervisorClasses(req: Request, res: Response) {
     horaFin: string | null; aula: string | null;
   }>;
 
-  const classesWithStats = await Promise.all(
-    assignmentRows
-      .filter((a) => a.idHorario !== null)
-      .map(async (a) => {
-        const enrolledCountRow = (await sql`
-          SELECT COUNT(*)::int AS cnt
-          FROM "StudentSchedule" ss
-          LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
-          WHERE ss."codigoDisciplina" = ${a.codigoDisciplina}
-            AND ss."diaSemana" = ${a.diaSemana!}
-            AND st."idGrado" = ${a.idGrado}
-        `) as unknown as Array<{ cnt: number }>;
+  // N+1 eliminado: en vez de 1 query por clase (~600 subrequests en Workers),
+  // traemos conteos y sesiones del día con dos queries agrupadas y combinamos
+  // en memoria. Cloudflare Workers limita los subrequests por invocación.
+  const enrolledRows = (await sql`
+    SELECT ss."codigoDisciplina", ss."diaSemana", st."idGrado", COUNT(*)::int AS cnt
+    FROM "StudentSchedule" ss
+    LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+    GROUP BY ss."codigoDisciplina", ss."diaSemana", st."idGrado"
+  `) as unknown as Array<{ codigoDisciplina: string; diaSemana: string; idGrado: number; cnt: number }>;
 
-        const sessionRow = await first<{
-          id: string; estado: string; attendanceCount: number;
-        }>((await sql`
-          SELECT cs."id", cs."estado",
-                 COUNT(ar."id")::int AS "attendanceCount"
-          FROM "ClassSession" cs
-          LEFT JOIN "AttendanceRecord" ar ON ar."sessionId" = cs."id"
-          WHERE cs."idAsignacion" = ${a.idAsignacion}
-            AND cs."idHorario" = ${a.idHorario!}
-            AND cs."fecha"::date = ${todayStr}::date
-          GROUP BY cs."id", cs."estado"
-        `) as unknown as Array<{ id: string; estado: string; attendanceCount: number }>);
+  const sessionRows = (await sql`
+    SELECT cs."idAsignacion", cs."idHorario", cs."id", cs."estado",
+           COUNT(ar."id")::int AS "attendanceCount"
+    FROM "ClassSession" cs
+    LEFT JOIN "AttendanceRecord" ar ON ar."sessionId" = cs."id"
+    WHERE cs."fecha"::date = ${todayStr}::date
+    GROUP BY cs."idAsignacion", cs."idHorario", cs."id", cs."estado"
+  `) as unknown as Array<{
+    idAsignacion: string; idHorario: string; id: string; estado: string; attendanceCount: number;
+  }>;
 
-        return {
-          idAsignacion: a.idAsignacion,
-          discipline: { codigoDisciplina: a.codigoDisciplina, nombre: a.disciplinaNombre },
-          grade: { idGrado: a.gradoIdGrado, nombre: a.gradoNombre },
-          teacher: { idProfesor: a.idProfesor, nombre: a.profesorNombre, apellido: a.profesorApellido },
-          schedule: { idHorario: a.idHorario, diaSemana: a.diaSemana, horaInicio: a.horaInicio, horaFin: a.horaFin, aula: a.aula },
-          isToday: a.diaSemana === todayDay,
-          enrolledCount: enrolledCountRow[0]?.cnt ?? 0,
-          sessionId: sessionRow?.id ?? null,
-          sessionEstado: sessionRow?.estado ?? null,
-          attendanceCount: sessionRow?.attendanceCount ?? 0,
-        };
-      })
-  );
+  const enrolledKey = (d: string, dia: string, g: number) => `${d}|${dia}|${g}`;
+  const enrolledMap = new Map<string, number>();
+  for (const r of enrolledRows) {
+    enrolledMap.set(enrolledKey(r.codigoDisciplina, r.diaSemana, r.idGrado), r.cnt);
+  }
+
+  const sessionKey = (a: string, h: string) => `${a}|${h}`;
+  const sessionMap = new Map<string, { id: string; estado: string; attendanceCount: number }>();
+  for (const r of sessionRows) {
+    const key = sessionKey(r.idAsignacion, r.idHorario);
+    if (!sessionMap.has(key)) {
+      sessionMap.set(key, { id: r.id, estado: r.estado, attendanceCount: r.attendanceCount });
+    }
+  }
+
+  const classesWithStats = assignmentRows
+    .filter((a) => a.idHorario !== null)
+    .map((a) => {
+      const sessionRow = sessionMap.get(sessionKey(a.idAsignacion, a.idHorario!));
+      return {
+        idAsignacion: a.idAsignacion,
+        discipline: { codigoDisciplina: a.codigoDisciplina, nombre: a.disciplinaNombre },
+        grade: { idGrado: a.gradoIdGrado, nombre: a.gradoNombre },
+        teacher: { idProfesor: a.idProfesor, nombre: a.profesorNombre, apellido: a.profesorApellido },
+        schedule: { idHorario: a.idHorario, diaSemana: a.diaSemana, horaInicio: a.horaInicio, horaFin: a.horaFin, aula: a.aula },
+        isToday: a.diaSemana === todayDay,
+        enrolledCount: enrolledMap.get(enrolledKey(a.codigoDisciplina, a.diaSemana!, a.idGrado)) ?? 0,
+        sessionId: sessionRow?.id ?? null,
+        sessionEstado: sessionRow?.estado ?? null,
+        attendanceCount: sessionRow?.attendanceCount ?? 0,
+      };
+    });
 
   const classes = todayOnly
     ? classesWithStats.filter((c) => c.isToday)
