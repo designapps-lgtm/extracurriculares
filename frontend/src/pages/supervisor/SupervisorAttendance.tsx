@@ -150,44 +150,50 @@ export default function SupervisorAttendance() {
           const allNovedades = Object.entries(novedadesMap).flatMap(([codigo, list]) =>
             list.map((n) => ({ codigo, novedad: n })),
           );
-          return allNovedades.length > 0 ? (
+          return (
             <section className="card p-5 mb-6">
               <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base mb-3">
                 Novedades del día
               </h2>
-              <div className="space-y-2">
-                {allNovedades.map(({ codigo, novedad }) => {
-                  const st = students.find((s) => s.codigoEstudiante === codigo);
-                  return (
-                    <div key={novedad.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
-                      {st && (
-                        <p className="text-amber-900 dark:text-amber-200 font-semibold">
-                          {st.nombre} {st.apellido} {st.grupo ? `· ${st.grupo}` : ""}
-                        </p>
-                      )}
-                      {novedad.descripcion && (
-                        <p className="text-amber-800 dark:text-amber-300 font-medium">{novedad.descripcion}</p>
-                      )}
-                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
-                        {novedad.seAusentaCon && <span>Se ausenta con: {novedad.seAusentaCon}</span>}
-                        <span>
-                          {novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}
-                          {novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}
-                        </span>
+              {allNovedades.length === 0 ? (
+                <p className="text-sm text-surface-500">No hay novedades registradas para hoy.</p>
+              ) : (
+                <div className="space-y-2">
+                  {allNovedades.map(({ codigo, novedad }) => {
+                    const st = students.find((s) => s.codigoEstudiante === codigo);
+                    return (
+                      <div key={novedad.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
+                        {st && (
+                          <p className="text-amber-900 dark:text-amber-200 font-semibold">
+                            {st.nombre} {st.apellido} {st.grupo ? `· ${st.grupo}` : ""}
+                          </p>
+                        )}
+                        {novedad.descripcion && (
+                          <p className="text-amber-800 dark:text-amber-300 font-medium">{novedad.descripcion}</p>
+                        )}
+                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
+                          {novedad.seAusentaCon && <span>Se ausenta con: {novedad.seAusentaCon}</span>}
+                          <span>
+                            {novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}
+                            {novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
-          ) : null;
+          );
         })()}
 
-        {transferCount > 0 && (
-          <section className="card p-5 mb-6">
-            <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base mb-3">
-              Cambios de disciplina del día
-            </h2>
+        <section className="card p-5 mb-6">
+          <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base mb-3">
+            Cambios de disciplina del día
+          </h2>
+          {transferCount === 0 ? (
+            <p className="text-sm text-surface-500">No hay cambios de disciplina registrados para este día.</p>
+          ) : (
             <div className="space-y-2">
               {transfers.map((t) => (
                 <div key={t.id} className="rounded-lg bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-800 px-3 py-2 text-xs">
@@ -201,8 +207,8 @@ export default function SupervisorAttendance() {
                 </div>
               ))}
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         <div className="space-y-1">
           {students.map((student, i) => {
