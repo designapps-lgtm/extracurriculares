@@ -17,5 +17,5 @@ services:
         sync: false
       - key: ACCESS_TOKEN_EXPIRES_IN
         value: "15m"
-      - key: REFRESH_TOKEN_EXPIRES_IN_DAYS
-        value: "7"
+      - key: SESSION_DURATION_HOURS
+        value: "168"

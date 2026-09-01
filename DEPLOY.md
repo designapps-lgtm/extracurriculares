@@ -52,7 +52,7 @@ DATABASE_URL="postgresql://USER:PASS@HOST/neondb?sslmode=require" npx prisma db 
 | `DATABASE_URL` | cadena de conexión de Neon |
 | `FRONTEND_URL` | `https://TU-PROYECTO.vercel.app` (origen permitido en CORS) |
 | `ACCESS_TOKEN_EXPIRES_IN` | `15m` |
-| `REFRESH_TOKEN_EXPIRES_IN_DAYS` | `7` |
+| `SESSION_DURATION_HOURS` | `168` (7 días — expiración absoluta de la sesión) |
 
 > `render.yaml` marca `JWT_SECRET`, `DATABASE_URL`, `FRONTEND_URL` como `sync: false`
 > para que los ingreses manualmente en el dashboard (secretos).
