@@ -109,7 +109,7 @@ export default function SupervisorAttendance() {
   return (
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Logo chip alt="Extracurriculares" className="h-9 w-auto shrink-0" />
             <div className="min-w-0">
@@ -124,7 +124,7 @@ export default function SupervisorAttendance() {
               </p>
             </div>
           </div>
-          <div className="text-right text-xs text-surface-500">
+          <div className="text-right text-xs text-surface-500 shrink-0">
             <p>{presentCount} presentes</p>
             <p>{absentCount} ausentes</p>
             {justifiedCount > 0 && <p>{justifiedCount} justificados</p>}
@@ -150,39 +150,36 @@ export default function SupervisorAttendance() {
           const allNovedades = Object.entries(novedadesMap).flatMap(([codigo, list]) =>
             list.map((n) => ({ codigo, novedad: n })),
           );
+          if (allNovedades.length === 0) return null;
           return (
             <section className="card p-5 mb-6">
               <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base mb-3">
                 Novedades del día
               </h2>
-              {allNovedades.length === 0 ? (
-                <p className="text-sm text-surface-500">No hay novedades registradas para hoy.</p>
-              ) : (
-                <div className="space-y-2">
-                  {allNovedades.map(({ codigo, novedad }) => {
-                    const st = students.find((s) => s.codigoEstudiante === codigo);
-                    return (
-                      <div key={novedad.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
-                        {st && (
-                          <p className="text-amber-900 dark:text-amber-200 font-semibold">
-                            {st.nombre} {st.apellido} {st.grupo ? `· ${st.grupo}` : ""}
-                          </p>
-                        )}
-                        {novedad.descripcion && (
-                          <p className="text-amber-800 dark:text-amber-300 font-medium">{novedad.descripcion}</p>
-                        )}
-                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
-                          {novedad.seAusentaCon && <span>Se ausenta con: {novedad.seAusentaCon}</span>}
-                          <span>
-                            {novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}
-                            {novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}
-                          </span>
-                        </div>
+              <div className="space-y-2">
+                {allNovedades.map(({ codigo, novedad }) => {
+                  const st = students.find((s) => s.codigoEstudiante === codigo);
+                  return (
+                    <div key={novedad.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
+                      {st && (
+                        <p className="text-amber-900 dark:text-amber-200 font-semibold">
+                          {st.nombre} {st.apellido} {st.grupo ? `· ${st.grupo}` : ""}
+                        </p>
+                      )}
+                      {novedad.descripcion && (
+                        <p className="text-amber-800 dark:text-amber-300 font-medium">{novedad.descripcion}</p>
+                      )}
+                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
+                        {novedad.seAusentaCon && <span>Se ausenta con: {novedad.seAusentaCon}</span>}
+                        <span>
+                          {novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}
+                          {novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    </div>
+                  );
+                })}
+              </div>
             </section>
           );
         })()}
