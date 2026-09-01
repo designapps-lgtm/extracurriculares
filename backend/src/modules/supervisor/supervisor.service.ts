@@ -447,7 +447,7 @@ export async function getSupervisorClasses(req: Request, res: Response) {
 
   const assignmentRows = (await sql`
     SELECT
-      ea."idAsignacion", ea."codigoDisciplina", ea."idGrado",
+      ea."idAsignacion", ea."codigoDisciplina", ea."idGrado", ea."esPrincipal",
       d."nombre" AS "disciplinaNombre",
       g."idGrado" AS "gradoIdGrado", g."nombre" AS "gradoNombre",
       t."idProfesor", t."nombre" AS "profesorNombre", t."apellido" AS "profesorApellido",
@@ -461,7 +461,7 @@ export async function getSupervisorClasses(req: Request, res: Response) {
     WHERE ea."estado" = 'activo'
     ORDER BY sc."diaSemana" ASC, t."apellido" ASC, t."nombre" ASC
   `) as unknown as Array<{
-    idAsignacion: string; codigoDisciplina: string; idGrado: number;
+    idAsignacion: string; codigoDisciplina: string; idGrado: number; esPrincipal: boolean;
     disciplinaNombre: string; gradoIdGrado: number; gradoNombre: string;
     idProfesor: string; profesorNombre: string; profesorApellido: string;
     idHorario: string | null; diaSemana: string | null; horaInicio: string | null;
@@ -504,34 +504,59 @@ export async function getSupervisorClasses(req: Request, res: Response) {
     }
   }
 
-  const classesWithStats = assignmentRows
-    .filter((a) => a.idHorario !== null)
-    .map((a) => {
-      const sessionRow = sessionMap.get(sessionKey(a.idAsignacion, a.idHorario!));
-      return {
+  // Llamar lista es por CÓDIGO de disciplina: una tarjeta agrupa todos los grados
+  // que un mismo profesor dicta bajo ese código en ese horario (ej: XC_23_Voleibol
+  // con grados 2 y 3). La asignación "representante" es la de esPrincipal (o la de
+  // menor grado) y ancla la sesión; el roster ya trae todos los grados del código.
+  const groupKey = (a: { codigoDisciplina: string; idProfesor: string; idHorario: string | null }) =>
+    `${a.codigoDisciplina}|${a.idProfesor}|${a.idHorario}`;
+
+  const groups = new Map<string, any>();
+  for (const a of assignmentRows) {
+    if (a.idHorario === null) continue;
+    const key = groupKey(a);
+    let g = groups.get(key);
+    if (!g) {
+      g = {
         idAsignacion: a.idAsignacion,
         discipline: { codigoDisciplina: a.codigoDisciplina, nombre: a.disciplinaNombre },
-        grade: { idGrado: a.gradoIdGrado, nombre: a.gradoNombre },
+        grades: [],
         teacher: { idProfesor: a.idProfesor, nombre: a.profesorNombre, apellido: a.profesorApellido },
         schedule: { idHorario: a.idHorario, diaSemana: a.diaSemana, horaInicio: a.horaInicio, horaFin: a.horaFin, aula: a.aula },
         isToday: a.diaSemana === todayDay,
-        enrolledCount: enrolledMap.get(enrolledKey(a.codigoDisciplina, a.diaSemana!, a.idGrado)) ?? 0,
-        sessionId: sessionRow?.id ?? null,
-        sessionEstado: sessionRow?.estado ?? null,
-        attendanceCount: sessionRow?.attendanceCount ?? 0,
+        enrolledCount: 0,
+        sessionId: null,
+        sessionEstado: null,
+        attendanceCount: 0,
       };
-    });
+      groups.set(key, g);
+    }
+    if (!g.grades.some((x: { idGrado: number }) => x.idGrado === a.idGrado)) {
+      g.grades.push({ idGrado: a.gradoIdGrado, nombre: a.gradoNombre });
+    }
+    g.enrolledCount += enrolledMap.get(enrolledKey(a.codigoDisciplina, a.diaSemana!, a.idGrado)) ?? 0;
+    const sessionRow = sessionMap.get(sessionKey(a.idAsignacion, a.idHorario!));
+    if (sessionRow) {
+      g.sessionId = sessionRow.id;
+      g.sessionEstado = sessionRow.estado;
+      g.attendanceCount = sessionRow.attendanceCount;
+    }
+  }
 
-  const classes = todayOnly
-    ? classesWithStats.filter((c) => c.isToday)
-    : classesWithStats;
+  for (const g of groups.values()) {
+    g.grades.sort((x: { idGrado: number }, y: { idGrado: number }) => x.idGrado - y.idGrado);
+  }
+
+  const classes = Array.from(groups.values());
+
+  const visibleClasses = todayOnly ? classes.filter((c) => c.isToday) : classes;
 
   res.json({
     success: true,
     data: {
       date: todayStr,
       dayName: todayDay,
-      classes,
+      classes: visibleClasses,
     },
   });
 }
@@ -994,17 +1019,39 @@ export async function getSupervisorAttendanceList(req: Request, res: Response) {
 
   const sessionFechaStr = new Date(sessionRow.fecha).toISOString().split("T")[0];
 
+  // Llamar lista es por CÓDIGO de disciplina: la lista incluye todos los grados
+  // que el mismo profesor dicta bajo ese código (ej: XC_23_Voleibol con grados
+  // 2 y 3). El grado de la asignación que ancla la sesión ya no restringe el
+  // roster: se toma el conjunto de grados del (código, profesor).
+  const codeGrades = (await sql`
+    SELECT DISTINCT ea."idGrado"
+    FROM "ExtracurricularAssignment" ea
+    WHERE ea."codigoDisciplina" = ${sessionRow.codigoDisciplina}
+      AND ea."idProfesor" = ${sessionRow.idProfesor}
+      AND ea."estado" = 'activo'
+  `) as unknown as Array<{ idGrado: number }>;
+  const gradeIds = codeGrades.map((g) => g.idGrado);
+
+  const gradeNameRows = (await sql`
+    SELECT "idGrado", "nombre" FROM "Grade" WHERE "idGrado" = ANY(${gradeIds})
+  `) as unknown as Array<{ idGrado: number; nombre: string }>;
+  const gradeNameMap = new Map(gradeNameRows.map((g) => [g.idGrado, g.nombre]));
+  const sessionGrades = gradeIds
+    .slice()
+    .sort((a, b) => a - b)
+    .map((idGrado) => ({ idGrado, nombre: gradeNameMap.get(idGrado) ?? String(idGrado) }));
+
   const enrolledStudents = (await sql`
     SELECT
       ss."codigoEstudiante",
-      st."nombre", st."apellido", st."grupo", st."fotoUrl"
+      st."nombre", st."apellido", st."grupo", st."fotoUrl", st."idGrado"
     FROM "StudentSchedule" ss
     LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
     WHERE ss."codigoDisciplina" = ${sessionRow.codigoDisciplina}
       AND ss."diaSemana" = ${sessionRow.diaSemana}
-      AND st."idGrado" = ${sessionRow.gradoIdGrado}
+      AND st."idGrado" = ANY(${gradeIds})
   `) as unknown as Array<{
-    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
+    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null; idGrado: number;
   }>;
 
   const transferredAway = (await sql`
@@ -1075,7 +1122,11 @@ export async function getSupervisorAttendanceList(req: Request, res: Response) {
   const allStudents = [
     ...enrolledStudents
       .filter((es) => !awaySet.has(es.codigoEstudiante))
-      .map((es) => ({ ...es, origen: "inscrito" as const })),
+      .map((es) => ({
+        ...es,
+        origen: "inscrito" as const,
+        gradoNombre: gradeNameMap.get(es.idGrado) ?? String(es.idGrado),
+      })),
     ...stays
       .filter((st) => !awaySet.has(st.codigoEstudiante) && !enrolledStudents.some((e) => e.codigoEstudiante === st.codigoEstudiante))
       .map((st) => ({ ...st, origen: "quedado" as const })),
@@ -1118,6 +1169,7 @@ export async function getSupervisorAttendanceList(req: Request, res: Response) {
         idAsignacion: sessionRow.idAsignacion,
         discipline: { codigoDisciplina: sessionRow.codigoDisciplina, nombre: sessionRow.discNombre },
         grade: { idGrado: sessionRow.gradoIdGrado, nombre: sessionRow.gradoNombre },
+        grades: sessionGrades,
       },
       teacher: { idProfesor: sessionRow.idProfesor, nombre: sessionRow.profesorNombre, apellido: sessionRow.profesorApellido },
       schedule: { idHorario: sessionRow.idHorario, diaSemana: sessionRow.diaSemana, horaInicio: sessionRow.horaInicio, horaFin: sessionRow.horaFin, aula: sessionRow.aula },

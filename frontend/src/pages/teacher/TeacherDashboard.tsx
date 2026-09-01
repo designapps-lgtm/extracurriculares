@@ -168,7 +168,9 @@ export default function TeacherDashboard() {
                                 {cls.discipline.nombre}
                               </p>
                               <p className="text-sm text-surface-500 mt-0.5">
-                                Grado {cls.grade.nombre} · {cls.schedule.horaInicio} - {cls.schedule.horaFin}
+                                {cls.grades && cls.grades.length > 0
+                                  ? `Grados ${cls.grades.map((g) => g.nombre).join(", ")}`
+                                  : `Grado ${cls.grade.nombre}`} · {cls.schedule.horaInicio} - {cls.schedule.horaFin}
                                 {cls.schedule.aula && ` · ${cls.schedule.aula}`}
                               </p>
                               <p className="text-xs text-surface-400 mt-1">

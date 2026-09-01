@@ -181,7 +181,13 @@ export default function SupervisorClasses() {
                             <p className="font-medium text-surface-900 dark:text-surface-100">
                               {cls.discipline.nombre}
                             </p>
-                            <span className="badge-neutral text-xs">{cls.grade.nombre}°</span>
+                            {cls.grades && cls.grades.length > 0 ? (
+                              <span className="badge-neutral text-xs">
+                                {cls.grades.map((g) => g.nombre).join(", ")}
+                              </span>
+                            ) : (
+                              <span className="badge-neutral text-xs">{cls.grade.nombre}°</span>
+                            )}
                           </div>
                           <p className="text-sm text-surface-500 mt-0.5">
                             {cls.teacher.nombre} {cls.teacher.apellido} · {DIAS_CORTO[cls.schedule.diaSemana] || cls.schedule.diaSemana} {cls.schedule.horaInicio} - {cls.schedule.horaFin}

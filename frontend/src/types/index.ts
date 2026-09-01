@@ -142,6 +142,7 @@ export interface Assignment {
   teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
   discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
   grade: Pick<Grade, "idGrado" | "nombre">;
+  grades?: { idGrado: number; nombre: string }[];
   schedules: {
     schedule: Schedule;
   }[];
@@ -235,6 +236,7 @@ export interface TeacherClass {
   idAsignacion: string;
   discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
   grade: Pick<Grade, "idGrado" | "nombre">;
+  grades?: { idGrado: number; nombre: string }[];
   schedule: Schedule;
   enrolledCount: number;
   sessionId: string | null;
@@ -258,6 +260,7 @@ export interface AttendanceStudent {
   estado: string;
   origen?: string;
   origenDisciplina?: string;
+  gradoNombre?: string;
 }
 
 export interface AttendanceResponse {
@@ -286,6 +289,7 @@ export interface SupervisorCallableClass {
   idAsignacion: string;
   discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
   grade: Pick<Grade, "idGrado" | "nombre">;
+  grades?: { idGrado: number; nombre: string }[];
   teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
   schedule: Schedule;
   isToday: boolean;

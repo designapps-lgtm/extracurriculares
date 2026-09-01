@@ -116,7 +116,7 @@ export default function SupervisorTransfers({ role = "supervisor" }: PageProps) 
   );
 
   const classLabel = (c: SupervisorCallableClass) =>
-    `${c.discipline.nombre} — ${c.grade.nombre}° · ${DIAS_CORTO[c.schedule.diaSemana]} ${c.schedule.horaInicio ?? ""} · ${c.teacher.nombre} ${c.teacher.apellido}`;
+    `${c.discipline.nombre}${c.grades && c.grades.length > 0 ? ` (Grados ${c.grades.map((g) => g.nombre).join(", ")})` : ` — ${c.grade.nombre}°`} · ${DIAS_CORTO[c.schedule.diaSemana]} ${c.schedule.horaInicio ?? ""} · ${c.teacher.nombre} ${c.teacher.apellido}`;
 
   useEffect(() => {
     setDestinoKey("");

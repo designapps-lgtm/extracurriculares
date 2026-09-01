@@ -94,7 +94,10 @@ export default function TeacherAttendance() {
                 ← Volver
               </button>
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 break-words">
-                {assignment?.discipline?.nombre} — {assignment?.grade?.nombre}
+                {assignment?.discipline?.nombre}
+                {assignment?.grades && assignment.grades.length > 0
+                  ? ` — ${assignment.grades.map((g) => g.nombre).join(", ")}`
+                  : ` — ${assignment?.grade?.nombre}`}
               </h1>
               <p className="text-xs text-surface-500">
                 {schedule?.diaSemana} {schedule?.horaInicio} - {schedule?.horaFin}
@@ -158,7 +161,9 @@ export default function TeacherAttendance() {
                     <p className="text-sm font-medium text-surface-900 dark:text-surface-100 break-words">
                       {student.nombre} {student.apellido}
                   </p>
-                  <p className="text-xs text-surface-500">{student.codigoEstudiante} · {student.grupo || "—"}</p>
+                  <p className="text-xs text-surface-500">
+                    {student.codigoEstudiante} · {student.gradoNombre ? `Grado ${student.gradoNombre} · ` : ""}{student.grupo || "—"}
+                  </p>
                   {novedades.length > 0 && (
                     <div className="mt-2 space-y-1.5">
                       {novedades.map((n) => (

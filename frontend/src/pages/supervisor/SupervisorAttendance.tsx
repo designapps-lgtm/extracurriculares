@@ -126,7 +126,10 @@ export default function SupervisorAttendance() {
                 ← Volver
               </button>
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 break-words">
-                {assignment?.discipline?.nombre} — {assignment?.grade?.nombre}
+                {assignment?.discipline?.nombre}
+                {assignment?.grades && assignment.grades.length > 0
+                  ? ` — ${assignment.grades.map((g) => g.nombre).join(", ")}`
+                  : ` — ${assignment?.grade?.nombre}`}
               </h1>
               <p className="text-xs text-surface-500">
                 {teacher?.nombre} {teacher?.apellido} · {schedule?.diaSemana} {schedule?.horaInicio} - {schedule?.horaFin}
@@ -252,7 +255,7 @@ export default function SupervisorAttendance() {
                         {student.nombre} {student.apellido}
                       </p>
                       <p className="text-xs text-surface-500">
-                        {student.codigoEstudiante} · {student.grupo || "—"}
+                        {student.codigoEstudiante} · {student.gradoNombre ? `Grado ${student.gradoNombre} · ` : ""}{student.grupo || "—"}
                         {student.origen === "quedado" && <span className="ml-1 text-brand-600">· Se queda</span>}
                         {student.origen === "trasladado" && (
                           <span className="ml-1 text-violet-600">· Trasladado desde {student.origenDisciplina || "otra clase"}</span>

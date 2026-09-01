@@ -45,52 +45,68 @@ export async function getTeacherClasses(req: Request, res: Response) {
     horaFin: string | null; aula: string | null;
   }>;
 
+  // Llamar lista es por CÓDIGO de disciplina: una tarjeta agrupa todos los grados
+  // que este profesor dicta bajo ese código en ese horario (ej: XC_23_Voleibol con
+  // grados 2 y 3). La asignación "representante" (menor grado) ancla la sesión.
+  const groupKey = (a: { codigoDisciplina: string; idHorario: string | null }) =>
+    `${a.codigoDisciplina}|${a.idHorario}`;
+
+  const groups = new Map<string, any>();
+  for (const a of assignmentRows) {
+    if (a.idHorario === null) continue;
+    const key = groupKey(a);
+    let g = groups.get(key);
+    if (!g) {
+      g = {
+        idAsignacion: a.idAsignacion,
+        discipline: { codigoDisciplina: a.codigoDisciplina, nombre: a.disciplinaNombre },
+        grades: [],
+        schedule: { idHorario: a.idHorario, diaSemana: a.diaSemana, horaInicio: a.horaInicio, horaFin: a.horaFin, aula: a.aula },
+        enrolledCount: 0,
+        stayCount: 0,
+        sessionId: null,
+        sessionEstado: null,
+        attendanceCount: 0,
+      };
+      groups.set(key, g);
+    }
+    if (!g.grades.some((x: { idGrado: number }) => x.idGrado === a.idGrado)) {
+      g.grades.push({ idGrado: a.gradoIdGrado, nombre: a.gradoNombre });
+    }
+  }
+
   const classesWithStats = await Promise.all(
-    assignmentRows
-      .filter((a) => a.idHorario !== null)
-      .map(async (a) => {
-        const enrolledCountRow = (await sql`
-          SELECT COUNT(*)::int AS cnt
-          FROM "StudentSchedule" ss
-          LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
-          WHERE ss."codigoDisciplina" = ${a.codigoDisciplina}
-            AND ss."diaSemana" = ${a.diaSemana!}
-            AND st."idGrado" = ${a.idGrado}
-        `) as unknown as Array<{ cnt: number }>;
+    Array.from(groups.values()).map(async (g) => {
+      const codes = g.grades.map((gr: { idGrado: number }) => gr.idGrado);
+      const enrolledCountRow = (await sql`
+        SELECT COUNT(*)::int AS cnt
+        FROM "StudentSchedule" ss
+        LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+        WHERE ss."codigoDisciplina" = ${g.discipline.codigoDisciplina}
+          AND ss."diaSemana" = ${g.schedule.diaSemana}
+          AND st."idGrado" = ANY(${codes})
+      `) as unknown as Array<{ cnt: number }>;
 
-        const stayCountRow = (await sql`
-          SELECT COUNT(*)::int AS cnt
-          FROM "SupervisorStay" st
-          WHERE st."idAsignacion" = ${a.idAsignacion}
-            AND st."idHorario" = ${a.idHorario!}
-            AND st."fecha" = ${todayStr}::date
-        `) as unknown as Array<{ cnt: number }>;
+      const sessionRow = await first<{
+        id: string; estado: string; attendanceCount: number;
+      }>((await sql`
+        SELECT cs."id", cs."estado",
+               COUNT(ar."id")::int AS "attendanceCount"
+        FROM "ClassSession" cs
+        LEFT JOIN "AttendanceRecord" ar ON ar."sessionId" = cs."id"
+        WHERE cs."idAsignacion" = ${g.idAsignacion}
+          AND cs."idHorario" = ${g.schedule.idHorario}
+          AND cs."fecha"::date = ${todayStr}::date
+        GROUP BY cs."id", cs."estado"
+      `) as unknown as Array<{ id: string; estado: string; attendanceCount: number }>);
 
-        const sessionRow = await first<{
-          id: string; estado: string; attendanceCount: number;
-        }>((await sql`
-          SELECT cs."id", cs."estado",
-                 COUNT(ar."id")::int AS "attendanceCount"
-          FROM "ClassSession" cs
-          LEFT JOIN "AttendanceRecord" ar ON ar."sessionId" = cs."id"
-          WHERE cs."idAsignacion" = ${a.idAsignacion}
-            AND cs."idHorario" = ${a.idHorario!}
-            AND cs."fecha"::date = ${todayStr}::date
-          GROUP BY cs."id", cs."estado"
-        `) as unknown as Array<{ id: string; estado: string; attendanceCount: number }>);
-
-        return {
-          idAsignacion: a.idAsignacion,
-          discipline: { codigoDisciplina: a.codigoDisciplina, nombre: a.disciplinaNombre },
-          grade: { idGrado: a.gradoIdGrado, nombre: a.gradoNombre },
-          schedule: { idHorario: a.idHorario, diaSemana: a.diaSemana, horaInicio: a.horaInicio, horaFin: a.horaFin, aula: a.aula },
-          enrolledCount: enrolledCountRow[0]?.cnt ?? 0,
-          stayCount: stayCountRow[0]?.cnt ?? 0,
-          sessionId: sessionRow?.id ?? null,
-          sessionEstado: sessionRow?.estado ?? null,
-          attendanceCount: sessionRow?.attendanceCount ?? 0,
-        };
-      })
+      g.enrolledCount = enrolledCountRow[0]?.cnt ?? 0;
+      g.sessionId = sessionRow?.id ?? null;
+      g.sessionEstado = sessionRow?.estado ?? null;
+      g.attendanceCount = sessionRow?.attendanceCount ?? 0;
+      g.grades.sort((x: { idGrado: number }, y: { idGrado: number }) => x.idGrado - y.idGrado);
+      return g;
+    })
   );
 
   const teacherProfile = await first<{ idProfesor: string; nombre: string; apellido: string }>(
@@ -264,17 +280,37 @@ export async function getAttendanceList(req: Request, res: Response) {
     throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
   }
 
+  // Llamar lista es por CÓDIGO de disciplina: el roster incluye todos los grados
+  // que este profesor dicta bajo ese código (ej: XC_23_Voleibol con grados 2 y 3).
+  const codeGrades = (await sql`
+    SELECT DISTINCT ea."idGrado"
+    FROM "ExtracurricularAssignment" ea
+    WHERE ea."codigoDisciplina" = ${sessionRow.codigoDisciplina}
+      AND ea."idProfesor" = ${sessionRow.idProfesor}
+      AND ea."estado" = 'activo'
+  `) as unknown as Array<{ idGrado: number }>;
+  const gradeIds = codeGrades.map((g) => g.idGrado);
+
+  const gradeNameRows = (await sql`
+    SELECT "idGrado", "nombre" FROM "Grade" WHERE "idGrado" = ANY(${gradeIds})
+  `) as unknown as Array<{ idGrado: number; nombre: string }>;
+  const gradeNameMap = new Map(gradeNameRows.map((g) => [g.idGrado, g.nombre]));
+  const sessionGrades = gradeIds
+    .slice()
+    .sort((a, b) => a - b)
+    .map((idGrado) => ({ idGrado, nombre: gradeNameMap.get(idGrado) ?? String(idGrado) }));
+
   const enrolledStudents = (await sql`
     SELECT
       ss."codigoEstudiante",
-      st."nombre", st."apellido", st."grupo", st."fotoUrl"
+      st."nombre", st."apellido", st."grupo", st."fotoUrl", st."idGrado"
     FROM "StudentSchedule" ss
     LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
     WHERE ss."codigoDisciplina" = ${sessionRow.codigoDisciplina}
       AND ss."diaSemana" = ${sessionRow.diaSemana}
-      AND st."idGrado" = ${sessionRow.gradoIdGrado}
+      AND st."idGrado" = ANY(${gradeIds})
   `) as unknown as Array<{
-    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
+    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null; idGrado: number;
   }>;
 
   const sessionFechaStr = new Date(sessionRow.fecha).toISOString().split("T")[0];
@@ -323,7 +359,11 @@ export async function getAttendanceList(req: Request, res: Response) {
   const allStudents = [
     ...enrolledStudents
       .filter((es) => !awaySet.has(es.codigoEstudiante))
-      .map((es) => ({ ...es, origen: "inscrito" as const })),
+      .map((es) => ({
+        ...es,
+        origen: "inscrito" as const,
+        gradoNombre: gradeNameMap.get(es.idGrado) ?? String(es.idGrado),
+      })),
     ...stays
       .filter((st) => !awaySet.has(st.codigoEstudiante) && !enrolledStudents.some((e) => e.codigoEstudiante === st.codigoEstudiante))
       .map((st) => ({ ...st, origen: "quedado" as const })),
@@ -354,6 +394,7 @@ export async function getAttendanceList(req: Request, res: Response) {
     fotoUrl: es.fotoUrl,
     origen: es.origen,
     origenDisciplina: (es as any).origenDisciplina,
+    gradoNombre: (es as any).gradoNombre,
     estado: attendanceMap.get(es.codigoEstudiante) || "pendiente",
   }));
 
@@ -365,6 +406,7 @@ export async function getAttendanceList(req: Request, res: Response) {
         idAsignacion: sessionRow.idAsignacion,
         discipline: { codigoDisciplina: sessionRow.codigoDisciplina, nombre: sessionRow.discNombre },
         grade: { idGrado: sessionRow.gradoIdGrado, nombre: sessionRow.gradoNombre },
+        grades: sessionGrades,
       },
       schedule: { idHorario: sessionRow.idHorario, diaSemana: sessionRow.diaSemana, horaInicio: sessionRow.horaInicio, horaFin: sessionRow.horaFin, aula: sessionRow.aula },
       students,
