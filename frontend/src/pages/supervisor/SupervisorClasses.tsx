@@ -201,7 +201,7 @@ export default function SupervisorClasses() {
                               onClick={() => navigate(`/supervisor/session-attendance/${cls.sessionId}`)}
                               className="w-full sm:w-auto px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600"
                             >
-                              {cls.sessionEstado === "finalizada" ? "Reabrir lista" : "Continuar"}
+                              Llamar lista
                             </button>
                           ) : (
                             <button

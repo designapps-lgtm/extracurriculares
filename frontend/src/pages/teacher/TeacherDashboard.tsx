@@ -78,6 +78,8 @@ export default function TeacherDashboard() {
     ...sortedDays.filter((d) => d === dayName),
     ...sortedDays.filter((d) => d !== dayName),
   ];
+  const visibleDays = showAll ? sortedDaysReordered : sortedDaysReordered.filter((d) => d === dayName);
+  const hasVisibleClasses = visibleDays.length > 0;
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
@@ -119,9 +121,22 @@ export default function TeacherDashboard() {
           <div className="card p-8 text-center">
             <p className="text-surface-500">No tienes asignaciones registradas.</p>
           </div>
+        ) : !hasVisibleClasses ? (
+          <div className="card p-8 text-center space-y-3">
+            <p className="text-surface-900 dark:text-surface-100 font-medium">No tienes clases para {showAll ? "mostrar" : "hoy"}.</p>
+            <p className="text-surface-500 text-sm">Puedes ver todos los horarios asignados para revisar las demás jornadas.</p>
+            {!showAll && (
+              <button
+                onClick={() => setShowAll(true)}
+                className="inline-flex px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+              >
+                Ver todos
+              </button>
+            )}
+          </div>
         ) : (
           <div className="space-y-6">
-            {(showAll ? sortedDaysReordered : sortedDaysReordered.filter((d) => d === dayName)).map((day) => {
+            {visibleDays.map((day) => {
               const isToday = day === dayName;
               return (
                 <div key={day}>
@@ -173,7 +188,7 @@ export default function TeacherDashboard() {
                                   }}
                                   className="w-full sm:w-auto px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600"
                                 >
-                                  {cls.sessionEstado === "finalizada" ? "Reabrir lista" : "Continuar"}
+                                  Llamar lista
                                 </button>
                               ) : (
                                 <button
