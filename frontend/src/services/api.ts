@@ -8,7 +8,37 @@ const BASE_URL = import.meta.env.PROD
 
 export interface ApiRequestOptions {
   retry?: boolean;
+  timeoutMs?: number;
   [key: string]: unknown;
+}
+
+// Timeout por defecto para cada request. En Cloudflare Workers (plan free, cold
+// starts) una request puede tardar varios segundos, así que 30s es generoso.
+// Sin este timeout, si el worker tarda muy poco (nunca resuelve ni rechaza), el
+// fetch cuelga infinito y las pantallas quedan con un spinner dando vueltas
+// (ej. "Llamar lista" / asistencia del supervisor).
+const DEFAULT_TIMEOUT_MS = 30000;
+
+function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const { signal, ...initRest } = init;
+  return fetch(input, { ...initRest, signal: signal ?? controller.signal })
+    .finally(() => clearTimeout(timer));
+}
+
+// Ejecuta un request: si el fetch interna lanza AbortError (timeout), lo
+// convierte en un ApiRequestError con mensaje claro para que las pantallas
+// muestren algo en vez de quedarse con un spinner infinito.
+async function execute(send: () => Promise<Response>): Promise<Response> {
+  try {
+    return await send();
+  } catch (e: any) {
+    if (e?.name === "AbortError") {
+      throw new ApiRequestError(0, "REQUEST_TIMEOUT", "La solicitud tardó demasiado. Intentalo de nuevo.");
+    }
+    throw e;
+  }
 }
 
 type AuthRole = "admin" | "teacher" | "supervisor";
@@ -42,7 +72,7 @@ function runRefresh(url: string): Promise<boolean> {
 
   const promise = (async () => {
     try {
-      const res = await fetch(`${BASE_URL}${url}`, {
+      const res = await fetchWithTimeout(`${BASE_URL}${url}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -79,7 +109,7 @@ export class ApiClient {
   }
 
   private async attempt<T>(send: () => Promise<Response>, path: string, retry: boolean): Promise<T> {
-    const res = await send();
+    const res = await execute(send);
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       const err = new ApiRequestError(res.status, body?.error?.code || "HTTP_ERROR", body?.error?.message || `Error ${res.status}`);
@@ -89,7 +119,7 @@ export class ApiClient {
         if (role) {
           const refreshed = await runRefresh(refreshUrlForRole(role));
           if (refreshed) {
-            const retryRes = await send();
+            const retryRes = await execute(send);
             if (retryRes.ok) return retryRes.json();
             const retryBody = await retryRes.json().catch(() => null);
             throw new ApiRequestError(
@@ -107,21 +137,21 @@ export class ApiClient {
 
   async download(path: string, params?: Record<string, string>): Promise<Blob> {
     const res = await this.sendRaw(() =>
-      fetch(this.buildUrl(path, params), { headers: this.buildHeaders(), credentials: "include" }),
+      fetchWithTimeout(this.buildUrl(path, params), { headers: this.buildHeaders(), credentials: "include" }),
       path,
     );
     return res.blob();
   }
 
   private async sendRaw(send: () => Promise<Response>, path: string): Promise<Response> {
-    const res = await send();
+    const res = await execute(send);
     if (!res.ok) {
       if (res.status === 401 && !isAuthPath(path)) {
         const role = roleForPath(path);
         if (role) {
           const refreshed = await runRefresh(refreshUrlForRole(role));
           if (refreshed) {
-            const retryRes = await send();
+            const retryRes = await execute(send);
             if (retryRes.ok) return retryRes;
             throw new ApiRequestError(
               retryRes.status,
@@ -145,7 +175,7 @@ export class ApiClient {
 
   async get<T>(path: string, params?: Record<string, string>): Promise<T> {
     return this.attempt<T>(
-      () => fetch(this.buildUrl(path, params), { headers: this.buildHeaders(), credentials: "include" }),
+      () => fetchWithTimeout(this.buildUrl(path, params), { headers: this.buildHeaders(), credentials: "include" }),
       path,
       true
     );
@@ -155,7 +185,7 @@ export class ApiClient {
     const retry = options?.retry !== false;
     return this.attempt<T>(
       () =>
-        fetch(this.buildUrl(path), {
+        fetchWithTimeout(this.buildUrl(path), {
           method: "POST",
           headers: this.buildHeaders("application/json"),
           credentials: "include",
@@ -169,7 +199,7 @@ export class ApiClient {
   async patch<T>(path: string, data?: unknown): Promise<T> {
     return this.attempt<T>(
       () =>
-        fetch(this.buildUrl(path), {
+        fetchWithTimeout(this.buildUrl(path), {
           method: "PATCH",
           headers: this.buildHeaders("application/json"),
           credentials: "include",
@@ -182,7 +212,7 @@ export class ApiClient {
 
   async delete<T>(path: string): Promise<T> {
     return this.attempt<T>(
-      () => fetch(this.buildUrl(path), { method: "DELETE", headers: this.buildHeaders(), credentials: "include" }),
+      () => fetchWithTimeout(this.buildUrl(path), { method: "DELETE", headers: this.buildHeaders(), credentials: "include" }),
       path,
       true
     );

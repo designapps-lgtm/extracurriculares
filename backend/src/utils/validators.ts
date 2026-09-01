@@ -23,6 +23,34 @@ export function validateNumericId(value: string, field: string): number {
 
 export const DIAS_VALIDOS = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 
+const DIA_ALIASES: Record<string, string> = {
+  LUN: "LUNES",
+  LUNES: "LUNES",
+  MAR: "MARTES",
+  MARTES: "MARTES",
+  MIERCOLES: "MIERCOLES",
+  MIE: "MIERCOLES",
+  JUE: "JUEVES",
+  JUEVES: "JUEVES",
+  VIE: "VIERNES",
+  VIERNES: "VIERNES",
+  SAB: "SABADO",
+  SABADO: "SABADO",
+  DOM: "DOMINGO",
+  DOMINGO: "DOMINGO",
+};
+
+export function normalizeDay(value: string | undefined): string | null {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const cleaned = raw
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toUpperCase();
+  return DIA_ALIASES[cleaned] || null;
+}
+
 export function normalizeTime(value: string | undefined): string | null {
   if (!value) return null;
   const t = String(value).trim();

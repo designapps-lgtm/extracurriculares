@@ -2,6 +2,7 @@ import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
 import { PaginationParams, paginatedResult } from "../../utils/pagination";
 import { ASSIGNMENT_SELECT, buildAssignmentList, AssignmentRow } from "../../utils/assignmentQueries";
+import { DIAS_VALIDOS, normalizeDay, normalizeTime } from "../../utils/validators";
 
 export async function getAssignments(query: {
   disciplina?: string;
@@ -74,8 +75,6 @@ export async function getAssignmentById(id: string) {
 async function resolveScheduleLinks(schedules: any): Promise<{ idHorario: string }[]> {
   if (!schedules || !Array.isArray(schedules) || schedules.length === 0) return [];
 
-  const DIAS_VALIDOS = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
-
   const links: { idHorario: string }[] = [];
   for (const s of schedules) {
     if (s.idHorario) {
@@ -88,28 +87,21 @@ async function resolveScheduleLinks(schedules: any): Promise<{ idHorario: string
     }
 
     const { diaSemana, horaInicio, horaFin, aula } = s;
-    if (!diaSemana || !DIAS_VALIDOS.includes(diaSemana)) {
+    const day = normalizeDay(diaSemana);
+    if (!day) {
       throw new AppError(400, "INVALID_DAY", `Día inválido. Use uno de: ${DIAS_VALIDOS.join(", ")}`);
     }
-
-    const normalizeTime = (value: any): string | null => {
-      if (value === null || value === undefined || value === "") return null;
-      const t = String(value).trim();
-      const m = t.match(/^(\d{1,2}):(\d{2})$/);
-      if (!m) throw new AppError(400, "INVALID_TIME", `Hora inválida: '${t}'. Use formato HH:mm`);
-      return `${String(parseInt(m[1], 10)).padStart(2, "0")}:${String(parseInt(m[2], 10)).padStart(2, "0")}`;
-    };
 
     const hi = normalizeTime(horaInicio);
     const hf = normalizeTime(horaFin);
 
     const existing = await first<any>(
-      await sql`SELECT "idHorario" FROM "Schedule" WHERE "diaSemana" = ${diaSemana} AND "horaInicio" = ${hi} AND "horaFin" = ${hf} LIMIT 1` as any[]
+      await sql`SELECT "idHorario" FROM "Schedule" WHERE "diaSemana" = ${day} AND "horaInicio" IS NOT DISTINCT FROM ${hi} AND "horaFin" IS NOT DISTINCT FROM ${hf} LIMIT 1` as any[]
     );
     if (existing) {
       links.push({ idHorario: existing.idHorario });
     } else {
-      const rows = await sql`INSERT INTO "Schedule" ("idHorario", "diaSemana", "horaInicio", "horaFin", "aula", "updatedAt") VALUES (gen_random_uuid(), ${diaSemana}, ${hi}, ${hf}, ${aula || null}, now()) RETURNING "idHorario"` as any[];
+      const rows = await sql`INSERT INTO "Schedule" ("idHorario", "diaSemana", "horaInicio", "horaFin", "aula", "updatedAt") VALUES (gen_random_uuid(), ${day}, ${hi}, ${hf}, ${aula || null}, now()) RETURNING "idHorario"` as any[];
       links.push({ idHorario: rows[0].idHorario });
     }
   }

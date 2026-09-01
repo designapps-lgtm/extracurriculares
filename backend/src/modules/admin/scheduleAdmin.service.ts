@@ -1,7 +1,7 @@
 import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
 import { PaginationParams, paginatedResult } from "../../utils/pagination";
-import { DIAS_VALIDOS, normalizeTime } from "../../utils/validators";
+import { DIAS_VALIDOS, normalizeDay, normalizeTime } from "../../utils/validators";
 
 export async function listSchedules(query: { dia?: string }, pagination: PaginationParams) {
   const { dia } = query;
@@ -49,21 +49,22 @@ export async function createSchedule(data: {
   aula?: string | null;
 }) {
   const { diaSemana, horaInicio, horaFin, aula } = data;
+  const day = normalizeDay(diaSemana);
 
-  if (!diaSemana || !DIAS_VALIDOS.includes(diaSemana)) {
+  if (!day) {
     throw new AppError(400, "INVALID_DAY", `Día inválido. Use uno de: ${DIAS_VALIDOS.join(", ")}`);
   }
   const hi = normalizeTime(horaInicio);
   const hf = horaFin === null ? null : normalizeTime(horaFin);
 
   const existing = await first<any>(
-    await sql`SELECT * FROM "Schedule" WHERE "diaSemana" = ${diaSemana} AND "horaInicio" = ${hi} AND "horaFin" = ${hf} LIMIT 1` as any[]
+    await sql`SELECT * FROM "Schedule" WHERE "diaSemana" = ${day} AND "horaInicio" = ${hi} AND "horaFin" = ${hf} LIMIT 1` as any[]
   );
   if (existing) {
     return { schedule: existing, created: false };
   }
 
-  const rows = await sql`INSERT INTO "Schedule" ("idHorario", "diaSemana", "horaInicio", "horaFin", "aula", "updatedAt") VALUES (gen_random_uuid(), ${diaSemana}, ${hi}, ${hf}, ${aula}, now()) RETURNING *` as any[];
+  const rows = await sql`INSERT INTO "Schedule" ("idHorario", "diaSemana", "horaInicio", "horaFin", "aula", "updatedAt") VALUES (gen_random_uuid(), ${day}, ${hi}, ${hf}, ${aula}, now()) RETURNING *` as any[];
 
   return { schedule: rows[0], created: true };
 }

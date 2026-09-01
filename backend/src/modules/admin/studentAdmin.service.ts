@@ -1,5 +1,6 @@
 import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
+import { normalizeDay } from "../../utils/validators";
 import { PaginationParams, paginatedResult } from "../../utils/pagination";
 
 const VALID_DAYS = new Set(["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"]);
@@ -179,13 +180,14 @@ export async function updateStudent(codigo: string, data: {
   if (schedules !== undefined) {
     const seenDays = new Set<string>();
     for (const s of schedules) {
-      if (!VALID_DAYS.has(s.diaSemana)) {
+      const day = normalizeDay(s.diaSemana);
+      if (!day || !VALID_DAYS.has(day)) {
         throw new AppError(400, "VALIDATION_ERROR", `Día inválido: ${s.diaSemana}`);
       }
-      if (seenDays.has(s.diaSemana)) {
+      if (seenDays.has(day)) {
         throw new AppError(400, "VALIDATION_ERROR", `Día duplicado: ${s.diaSemana}`);
       }
-      seenDays.add(s.diaSemana);
+      seenDays.add(day);
     }
 
     const codes = [...new Set(schedules.map((s) => s.codigoDisciplina))];
@@ -227,7 +229,7 @@ export async function updateStudent(codigo: string, data: {
       if (hasSchedules) {
         ops.push(tx`DELETE FROM "StudentSchedule" WHERE "codigoEstudiante" = ${codigo}`);
         for (const s of schedules!) {
-          ops.push(tx`INSERT INTO "StudentSchedule" ("id", "codigoEstudiante", "codigoDisciplina", "diaSemana") VALUES (gen_random_uuid(), ${codigo}, ${s.codigoDisciplina}, ${s.diaSemana})`);
+          ops.push(tx`INSERT INTO "StudentSchedule" ("id", "codigoEstudiante", "codigoDisciplina", "diaSemana") VALUES (gen_random_uuid(), ${codigo}, ${s.codigoDisciplina}, ${normalizeDay(s.diaSemana) || s.diaSemana})`);
         }
       }
 
