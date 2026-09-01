@@ -24,7 +24,6 @@ import TeacherNovedad from "./pages/teacher/TeacherNovedad";
 import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import SupervisorSession from "./pages/supervisor/SupervisorSession";
 import SupervisorSchedules from "./pages/supervisor/SupervisorSchedules";
-import SupervisorStays from "./pages/supervisor/SupervisorStays";
 import SupervisorClasses from "./pages/supervisor/SupervisorClasses";
 import SupervisorAttendance from "./pages/supervisor/SupervisorAttendance";
 import SupervisorNovedad from "./pages/supervisor/SupervisorNovedad";
@@ -35,7 +34,6 @@ import SupervisorLayout from "./pages/supervisor/SupervisorLayout";
 import SecretaryLayout from "./pages/secretary/SecretaryLayout";
 import SecretaryDashboard from "./pages/secretary/SecretaryDashboard";
 import SecretarySchedules from "./pages/secretary/SecretarySchedules";
-import SecretaryStays from "./pages/secretary/SecretaryStays";
 import SecretarySession from "./pages/secretary/SecretarySession";
 import SecretaryNovedad from "./pages/secretary/SecretaryNovedad";
 import SecretaryTransfers from "./pages/secretary/SecretaryTransfers";
@@ -74,7 +72,6 @@ function App() {
         <Route path="dashboard" element={<SupervisorDashboard />} />
         <Route path="classes" element={<SupervisorClasses />} />
         <Route path="schedules" element={<SupervisorSchedules />} />
-        <Route path="stays" element={<SupervisorStays />} />
         <Route path="session/:sessionId" element={<SupervisorSession />} />
         <Route path="session-attendance/:sessionId" element={<SupervisorAttendance />} />
         <Route path="novedad/:codigoEstudiante" element={<SupervisorNovedad />} />
@@ -84,10 +81,9 @@ function App() {
       {/* Secretary routes — mismo flujo que supervisor sin llamar lista ni gestión */}
       <Route path="/secretary" element={<SecretaryLayout />}>
         <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<SecretaryDashboard />} />
-        <Route path="schedules" element={<SecretarySchedules />} />
-        <Route path="stays" element={<SecretaryStays />} />
-        <Route path="session/:sessionId" element={<SecretarySession />} />
+          <Route path="dashboard" element={<SecretaryDashboard />} />
+          <Route path="schedules" element={<SecretarySchedules />} />
+          <Route path="session/:sessionId" element={<SecretarySession />} />
         <Route path="novedad/:codigoEstudiante" element={<SecretaryNovedad />} />
         <Route path="transfers" element={<SecretaryTransfers />} />
       </Route>
