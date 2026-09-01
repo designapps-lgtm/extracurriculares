@@ -170,10 +170,12 @@ export async function getSupervisorNovedadesBatch(
 export async function listSupervisorTransfers(params?: {
   codigoEstudiante?: string;
   fecha?: string;
+  fechaFin?: string;
 }): Promise<SupervisorTransfer[]> {
   const res = await api.get<ApiResponse<SupervisorTransfer[]>>(`/api/supervisor/transfers`, {
     codigoEstudiante: params?.codigoEstudiante || "",
     fecha: params?.fecha || "",
+    fechaFin: params?.fechaFin || "",
   });
   return res.data;
 }
@@ -184,6 +186,7 @@ export async function createSupervisorTransfer(data: {
   idAsignacionDestino: string;
   idHorarioDestino: string;
   fecha: string;
+  fechaFin?: string;
   motivo: string;
 }): Promise<{ id: string }> {
   const res = await api.post<ApiResponse<{ id: string }>>(`/api/supervisor/transfers`, data);

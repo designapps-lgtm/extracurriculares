@@ -553,9 +553,9 @@ export async function getSupervisorTeacherSchedules(req: Request, res: Response)
       });
     }
     const a = byAssign.get(r.idAsignacion)!;
-    if (r.schIdHorario) {
+    if (r.idHorario) {
       a.schedules.push({
-        schedule: { idHorario: r.schIdHorario, diaSemana: r.diaSemana, horaInicio: r.horaInicio, horaFin: r.horaFin, aula: r.aula },
+        schedule: { idHorario: r.idHorario, diaSemana: r.diaSemana, horaInicio: r.horaInicio, horaFin: r.horaFin, aula: r.aula },
       });
     }
   }
@@ -995,7 +995,8 @@ export async function getSupervisorAttendanceList(req: Request, res: Response) {
     SELECT "codigoEstudiante"
     FROM "StudentTransfer"
     WHERE "idAsignacionOrigen" = ${sessionRow.idAsignacion}
-      AND "fecha" = ${sessionFechaStr}::date
+      AND "fecha" <= ${sessionFechaStr}::date
+      AND COALESCE("fechaFin", "fecha") >= ${sessionFechaStr}::date
   `) as unknown as Array<{ codigoEstudiante: string }>;
 
   const awaySet = new Set(transferredAway.map((t) => t.codigoEstudiante));
@@ -1024,7 +1025,8 @@ export async function getSupervisorAttendanceList(req: Request, res: Response) {
     LEFT JOIN "Discipline" od ON od."codigoDisciplina" = oa."codigoDisciplina"
     WHERE t."idAsignacionDestino" = ${sessionRow.idAsignacion}
       AND t."idHorarioDestino" = ${sessionRow.idHorario}
-      AND t."fecha" = ${sessionFechaStr}::date
+      AND t."fecha" <= ${sessionFechaStr}::date
+      AND COALESCE(t."fechaFin", t."fecha") >= ${sessionFechaStr}::date
   `) as unknown as Array<{
     codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
     codigoDisciplina: string | null; origenDisciplinaNombre: string | null;
@@ -1126,7 +1128,7 @@ export async function supervisorSaveAttendance(req: Request, res: Response) {
 const TRANSFER_SELECT = `
   t."id", t."codigoEstudiante",
   st."nombre" AS "estNombre", st."apellido" AS "estApellido", st."grupo" AS "estGrupo",
-  t."fecha", t."motivo", t."createdAt",
+  t."fecha", t."fechaFin", t."motivo", t."createdAt",
   oa."idAsignacion" AS "origenIdAsignacion", oa."codigoDisciplina" AS "origenCodigoDisciplina",
   od."nombre" AS "origenDisciplinaNombre", og."nombre" AS "origenGradoNombre",
   da."idAsignacion" AS "destIdAsignacion", da."codigoDisciplina" AS "destCodigoDisciplina",
@@ -1148,6 +1150,7 @@ function shapeTransfer(r: any) {
       grupo: r.estGrupo,
     },
     fecha: r.fecha,
+    fechaFin: r.fechaFin,
     motivo: r.motivo,
     createdAt: r.createdAt,
     origen: {
@@ -1187,15 +1190,20 @@ function transferDayLabel(fechaStr: string): string {
   return SUP_DIA_MAP_COL[d.getUTCDay()];
 }
 
-// Crea un traslado puntual de un estudiante: ese día deja su clase de origen y
-// pasa a la clase destino (misma fecha), dejando trazabilidad con el motivo.
+// Crea un traslado de un estudiante: ese día (o ese rango de fechas) deja su
+// clase de origen y pasa a la clase destino, dejando trazabilidad con el motivo.
+// `fecha` es el inicio; `fechaFin` opcional define el último día (duración).
 export async function createSupervisorTransfer(req: Request, res: Response) {
-  const { codigoEstudiante, idAsignacionOrigen, idAsignacionDestino, idHorarioDestino, fecha, motivo } = req.body;
+  const { codigoEstudiante, idAsignacionOrigen, idAsignacionDestino, idHorarioDestino, fecha, fechaFin, motivo } = req.body;
   const supervisorId = (req as any).supervisor?.supervisorId;
 
   const fechaStr = typeof fecha === "string" ? fecha : "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) {
     throw new AppError(400, "VALIDATION_ERROR", "fecha debe tener formato YYYY-MM-DD");
+  }
+  const fechaFinStr = typeof fechaFin === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fechaFin) ? fechaFin : null;
+  if (fechaFinStr && fechaFinStr < fechaStr) {
+    throw new AppError(400, "VALIDATION_ERROR", "fechaFin no puede ser anterior a fecha");
   }
   if (!codigoEstudiante || !idAsignacionOrigen || !idAsignacionDestino || !idHorarioDestino) {
     throw new AppError(400, "VALIDATION_ERROR", "Faltan datos del traslado");
@@ -1266,22 +1274,26 @@ export async function createSupervisorTransfer(req: Request, res: Response) {
     throw new AppError(400, "NOT_ENROLLED_ORIGIN", "El estudiante no está inscrito en la clase de origen ese día");
   }
 
+  // Solapamiento: el estudiante no puede tener un traslado que choque con este rango.
   const existing = await first<{ id: string }>(
     (await sql`
       SELECT "id" FROM "StudentTransfer"
-      WHERE "codigoEstudiante" = ${codigoEstudiante} AND "fecha" = ${fechaStr}::date LIMIT 1
+      WHERE "codigoEstudiante" = ${codigoEstudiante}
+        AND "fecha" <= ${fechaFinStr || fechaStr}::date
+        AND COALESCE("fechaFin", "fecha") >= ${fechaStr}::date
+      LIMIT 1
     `) as unknown as Array<{ id: string }>
   );
   if (existing) {
-    throw new AppError(409, "TRANSFER_EXISTS", "Ya existe un traslado para este estudiante en esa fecha");
+    throw new AppError(409, "TRANSFER_OVERLAP", "Ya existe un traslado que se solapa con este estudiante y estas fechas");
   }
 
   const created = (await sql`
     INSERT INTO "StudentTransfer"
-      ("id", "codigoEstudiante", "idAsignacionOrigen", "idAsignacionDestino", "idHorarioDestino", "fecha", "motivo", "idSupervisor", "createdAt")
+      ("id", "codigoEstudiante", "idAsignacionOrigen", "idAsignacionDestino", "idHorarioDestino", "fecha", "fechaFin", "motivo", "idSupervisor", "createdAt")
     VALUES
-      (gen_random_uuid(), ${codigoEstudiante}, ${idAsignacionOrigen}, ${idAsignacionDestino}, ${idHorarioDestino}, ${fechaStr}::date, ${motivo.trim()}, ${supervisorId}, now())
-    RETURNING "id", "codigoEstudiante", "fecha", "motivo", "createdAt"
+      (gen_random_uuid(), ${codigoEstudiante}, ${idAsignacionOrigen}, ${idAsignacionDestino}, ${idHorarioDestino}, ${fechaStr}::date, ${fechaFinStr}::date, ${motivo.trim()}, ${supervisorId}, now())
+    RETURNING "id", "codigoEstudiante", "fecha", "fechaFin", "motivo", "createdAt"
   `) as unknown as Array<any>;
 
   res.status(201).json({ success: true, data: created[0] });
@@ -1289,7 +1301,7 @@ export async function createSupervisorTransfer(req: Request, res: Response) {
 
 // Historial de traslados (trazabilidad). Filtros opcionales: por estudiante y/o fecha.
 export async function listSupervisorTransfers(req: Request, res: Response) {
-  const { codigoEstudiante, fecha } = req.query as Record<string, string>;
+  const { codigoEstudiante, fecha, fechaFin } = req.query as Record<string, string>;
   const conditions: string[] = [];
   const params: any[] = [];
 
@@ -1299,12 +1311,16 @@ export async function listSupervisorTransfers(req: Request, res: Response) {
   }
   if (fecha) {
     params.push(fecha);
-    conditions.push(`t."fecha" = $${params.length}::date`);
+    conditions.push(`t."fecha" >= $${params.length}::date`);
+  }
+  if (fechaFin) {
+    params.push(fechaFin);
+    conditions.push(`COALESCE(t."fechaFin", t."fecha") <= $${params.length}::date`);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  const rows = (await sql`
+  const query = `
     SELECT ${TRANSFER_SELECT}
     FROM "StudentTransfer" t
     LEFT JOIN "Student" st ON st."codigoEstudiante" = t."codigoEstudiante"
@@ -1319,7 +1335,9 @@ export async function listSupervisorTransfers(req: Request, res: Response) {
     LEFT JOIN "Supervisor" sup ON sup."idSupervisor" = t."idSupervisor"
     ${where}
     ORDER BY t."fecha" DESC, t."createdAt" DESC
-  `) as unknown as Array<any>;
+  `;
+
+  const rows = (await sql(query, params)) as unknown as Array<any>;
 
   res.json({ success: true, data: rows.map(shapeTransfer) });
 }

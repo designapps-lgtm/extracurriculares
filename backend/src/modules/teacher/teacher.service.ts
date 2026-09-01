@@ -277,6 +277,18 @@ export async function getAttendanceList(req: Request, res: Response) {
     codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
   }>;
 
+  const sessionFechaStr = new Date(sessionRow.fecha).toISOString().split("T")[0];
+
+  const transferredAway = (await sql`
+    SELECT "codigoEstudiante"
+    FROM "StudentTransfer"
+    WHERE "idAsignacionOrigen" = ${sessionRow.idAsignacion}
+      AND "fecha" <= ${sessionFechaStr}::date
+      AND COALESCE("fechaFin", "fecha") >= ${sessionFechaStr}::date
+  `) as unknown as Array<{ codigoEstudiante: string }>;
+
+  const awaySet = new Set(transferredAway.map((t) => t.codigoEstudiante));
+
   const stays = (await sql`
     SELECT
       st."codigoEstudiante",
@@ -290,12 +302,40 @@ export async function getAttendanceList(req: Request, res: Response) {
     codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
   }>;
 
-  const stayCodes = new Set(stays.map((st) => st.codigoEstudiante));
+  const transferredIn = (await sql`
+    SELECT
+      t."codigoEstudiante",
+      s."nombre", s."apellido", s."grupo", s."fotoUrl",
+      oa."codigoDisciplina", od."nombre" AS "origenDisciplinaNombre"
+    FROM "StudentTransfer" t
+    LEFT JOIN "Student" s ON s."codigoEstudiante" = t."codigoEstudiante"
+    LEFT JOIN "ExtracurricularAssignment" oa ON oa."idAsignacion" = t."idAsignacionOrigen"
+    LEFT JOIN "Discipline" od ON od."codigoDisciplina" = oa."codigoDisciplina"
+    WHERE t."idAsignacionDestino" = ${sessionRow.idAsignacion}
+      AND t."idHorarioDestino" = ${sessionRow.idHorario}
+      AND t."fecha" <= ${sessionFechaStr}::date
+      AND COALESCE(t."fechaFin", t."fecha") >= ${sessionFechaStr}::date
+  `) as unknown as Array<{
+    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
+    codigoDisciplina: string | null; origenDisciplinaNombre: string | null;
+  }>;
+
   const allStudents = [
-    ...enrolledStudents.map((es) => ({ ...es, origen: "inscrito" as const })),
+    ...enrolledStudents
+      .filter((es) => !awaySet.has(es.codigoEstudiante))
+      .map((es) => ({ ...es, origen: "inscrito" as const })),
     ...stays
-      .filter((st) => !enrolledStudents.some((e) => e.codigoEstudiante === st.codigoEstudiante))
+      .filter((st) => !awaySet.has(st.codigoEstudiante) && !enrolledStudents.some((e) => e.codigoEstudiante === st.codigoEstudiante))
       .map((st) => ({ ...st, origen: "quedado" as const })),
+    ...transferredIn.map((t) => ({
+      codigoEstudiante: t.codigoEstudiante,
+      nombre: t.nombre,
+      apellido: t.apellido,
+      grupo: t.grupo,
+      fotoUrl: t.fotoUrl,
+      origen: "trasladado" as const,
+      origenDisciplina: t.origenDisciplinaNombre ?? t.codigoDisciplina ?? "",
+    })),
   ];
 
   const existingAttendance = (await sql`
@@ -313,6 +353,7 @@ export async function getAttendanceList(req: Request, res: Response) {
     grupo: es.grupo,
     fotoUrl: es.fotoUrl,
     origen: es.origen,
+    origenDisciplina: (es as any).origenDisciplina,
     estado: attendanceMap.get(es.codigoEstudiante) || "pendiente",
   }));
 

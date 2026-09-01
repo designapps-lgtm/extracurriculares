@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   getSupervisorTeacherSchedules,
   getSupervisorAssignmentHistory,
+  supervisorStartSession,
   supervisorMe,
 } from "../../services/supervisor";
 import { logout } from "../../services/auth";
@@ -188,6 +189,7 @@ export default function SupervisorSchedules() {
   const [selectedAsignacion, setSelectedAsignacion] = useState<string | null>(null);
   const [history, setHistory] = useState<SupervisorAssignmentHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [startingKey, setStartingKey] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const notify = useNotify();
@@ -225,6 +227,19 @@ export default function SupervisorSchedules() {
       .then(setHistory)
       .catch((err: any) => notify.error(err.message || "Error al cargar el historial"))
       .finally(() => setHistoryLoading(false));
+  };
+
+  const callList = async (a: SupervisorTeacherSchedule, idHorario: string) => {
+    const key = `${a.idAsignacion}-${idHorario}`;
+    setStartingKey(key);
+    try {
+      const session = await supervisorStartSession({ idAsignacion: a.idAsignacion, idHorario });
+      navigate(`/supervisor/session-attendance/${session.id}`);
+    } catch (err: any) {
+      notify.error(err.message || "Error al iniciar la sesión");
+    } finally {
+      setStartingKey(null);
+    }
   };
 
   const closeHistory = () => setSelectedAsignacion(null);
@@ -428,13 +443,15 @@ export default function SupervisorSchedules() {
           ) : (
             <div className="divide-y divide-surface-100 dark:divide-surface-800">
               {filtered.map((a) => (
-                <button
+                <div
                   key={a.idAsignacion}
-                  onClick={() => openHistory(a)}
-                  className="w-full text-left p-5 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors focus:outline-none focus:bg-surface-50 dark:focus:bg-surface-800/50"
+                  className="p-5 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
+                    <button
+                      onClick={() => openHistory(a)}
+                      className="flex-1 min-w-0 text-left focus:outline-none"
+                    >
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-surface-900 dark:text-surface-100">
                           {a.discipline.nombre}
@@ -444,17 +461,26 @@ export default function SupervisorSchedules() {
                       <div className="flex flex-wrap gap-2 mt-3">
                         {renderSchedules(a)}
                       </div>
-                    </div>
-                    <div className="sm:flex items-center gap-3 shrink-0">
-                      <span className="text-sm text-surface-500">
-                        {a.teacher.nombre} {a.teacher.apellido}
-                      </span>
+                    </button>
+                    <div className="sm:flex sm:flex-col sm:items-end gap-2 shrink-0">
+                      <div className="flex flex-wrap gap-2">
+                        {a.schedules.map((sch) => (
+                          <button
+                            key={`call-${sch.idHorario}`}
+                            onClick={() => callList(a, sch.idHorario)}
+                            disabled={startingKey !== null}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50"
+                          >
+                            {startingKey === `${a.idAsignacion}-${sch.idHorario}` ? "Iniciando..." : `Llamar lista · ${DIAS_CORTO[sch.diaSemana] || sch.diaSemana}`}
+                          </button>
+                        ))}
+                      </div>
                       <span className="text-sm text-brand-600 dark:text-brand-400 font-medium">
-                        Ver estudiantes →
+                        {a.teacher.nombre} {a.teacher.apellido} · Ver estudiantes →
                       </span>
                     </div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}

@@ -81,13 +81,12 @@ export default function SupervisorClasses() {
 
   const toggleAll = () => {
     if (!showAll) {
-      if (!data || !data.classes.some((c) => !c.isToday)) {
-        loadAll();
-      }
+      loadAll();
+      setShowAll(true);
     } else {
       load();
+      setShowAll(false);
     }
-    setShowAll((s) => !s);
   };
 
   const handleLogout = async () => {
@@ -103,11 +102,11 @@ export default function SupervisorClasses() {
     );
   }
 
-  const todayOnly = showAll
-    ? [...data!.classes].filter((c) => !c.isToday)
+  const visible = showAll
+    ? data!.classes
     : data!.classes.filter((c) => c.isToday);
 
-  const grouped = todayOnly
+  const grouped = visible
     .sort(
       (a, b) =>
         DIAS_ORDEN.indexOf(a.schedule.diaSemana) - DIAS_ORDEN.indexOf(b.schedule.diaSemana) ||
@@ -182,10 +181,10 @@ export default function SupervisorClasses() {
 
         {loading && <Loading />}
 
-        {!loading && todayOnly.length === 0 && (
+        {!loading && visible.length === 0 && (
           <div className="card p-10 text-center text-sm text-surface-500">
             {showAll
-              ? "No hay clases en otros días de la semana."
+              ? "No hay clases registradas."
               : "No hay clases programadas para hoy."}
           </div>
         )}

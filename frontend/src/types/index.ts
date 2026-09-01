@@ -300,6 +300,7 @@ export interface SupervisorTransfer {
     grupo: string | null;
   };
   fecha: string;
+  fechaFin: string | null;
   motivo: string;
   createdAt: string;
   origen: {

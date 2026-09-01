@@ -53,6 +53,8 @@ export default function SupervisorTransfers() {
   const [loading, setLoading] = useState(true);
 
   const [fecha, setFecha] = useState(todayStr());
+  const [soloHoy, setSoloHoy] = useState(true);
+  const [fechaFin, setFechaFin] = useState(todayStr());
   const [origenKey, setOrigenKey] = useState("");
   const [destinoKey, setDestinoKey] = useState("");
   const [studentQuery, setStudentQuery] = useState("");
@@ -74,7 +76,7 @@ export default function SupervisorTransfers() {
   }, [navigate]);
 
   const loadTransfers = useCallback(
-    (params?: { codigoEstudiante?: string; fecha?: string }) => {
+    (params?: { codigoEstudiante?: string; fecha?: string; fechaFin?: string }) => {
       listSupervisorTransfers(params)
         .then(setTransfers)
         .catch((err: any) => notify.error(err.message || "Error al cargar historial"));
@@ -167,6 +169,7 @@ export default function SupervisorTransfers() {
         idAsignacionDestino,
         idHorarioDestino: destinoKey.split("|")[1],
         fecha,
+        fechaFin: soloHoy ? undefined : fechaFin,
         motivo: motivo.trim(),
       });
       notify.success("Traslado registrado");
@@ -215,10 +218,10 @@ export default function SupervisorTransfers() {
             <Logo chip alt="Extracurriculares" className="h-9 w-auto" />
             <div className="min-w-0">
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
-                Traslados de deporte
+                Traslados · Niños que se quedan
               </h1>
               <p className="text-xs text-surface-500">
-                {supervisor?.nombre ? `${supervisor.nombre} ${supervisor.apellido}` : ""} · mover un estudiante de una clase a otra por fecha
+                {supervisor?.nombre ? `${supervisor.nombre} ${supervisor.apellido}` : ""} · mover un estudiante de una clase a otra por un tiempo
               </p>
             </div>
           </div>
@@ -251,15 +254,43 @@ export default function SupervisorTransfers() {
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-8">
         <section className="card p-6">
           <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base mb-1">
-            Registrar traslado puntual
+            Registrar traslado
           </h2>
           <p className="text-sm text-surface-500 mb-5">
-            El estudiante desaparece de la clase de origen y aparece en la clase de destino, SOLO para la fecha elegida.
+            El estudiante desaparece de la clase de origen y aparece en la clase de destino, por la duración elegida.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Fecha</label>
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+                Duración
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSoloHoy(true)}
+                  className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    soloHoy
+                      ? "bg-brand-600 text-white"
+                      : "bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400"
+                  }`}
+                >
+                  Solo hoy
+                </button>
+                <button
+                  onClick={() => setSoloHoy(false)}
+                  className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    !soloHoy
+                      ? "bg-brand-600 text-white"
+                      : "bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400"
+                  }`}
+                >
+                  Por un tiempo
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Fecha inicial</label>
               <input
                 type="date"
                 value={fecha}
@@ -268,6 +299,21 @@ export default function SupervisorTransfers() {
               />
               <p className="text-xs text-surface-400 mt-1">
                 {fechaDay ? DIAS_CORTO[fechaDay] || "Día inválido" : "Elegí una fecha"}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Fecha final</label>
+              <input
+                type="date"
+                value={fechaFin}
+                min={fecha}
+                onChange={(e) => setFechaFin(e.target.value)}
+                disabled={soloHoy}
+                className="w-full px-3 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm disabled:opacity-50"
+              />
+              <p className="text-xs text-surface-400 mt-1">
+                {soloHoy ? "Coincide con la fecha inicial" : "Hasta qué día se queda en la clase de destino"}
               </p>
             </div>
 
@@ -407,7 +453,10 @@ export default function SupervisorTransfers() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-surface-900 dark:text-surface-100">
                       {t.student.nombre} {t.student.apellido}
-                      <span className="ml-2 text-xs font-normal text-surface-500">{t.codigoEstudiante} · {formatFecha(t.fecha)}</span>
+                      <span className="ml-2 text-xs font-normal text-surface-500">
+                        {t.codigoEstudiante} · {formatFecha(t.fecha)}
+                        {t.fechaFin ? ` → ${formatFecha(t.fechaFin)}` : ""}
+                      </span>
                     </p>
                     <p className="text-sm text-surface-600 dark:text-surface-400 mt-1">
                       <span className="text-surface-400">{t.origen.discipline.nombre}</span>

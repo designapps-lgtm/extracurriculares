@@ -337,6 +337,7 @@ model StudentTransfer {
   idAsignacionDestino String
   idHorarioDestino    String
   fecha               DateTime @db.Date
+  fechaFin            DateTime? @db.Date
   motivo              String
   idSupervisor        String
   createdAt           DateTime @default(now())

@@ -11,6 +11,7 @@ CREATE TABLE "StudentTransfer" (
     "idAsignacionDestino" TEXT NOT NULL,
     "idHorarioDestino" TEXT NOT NULL,
     "fecha" DATE NOT NULL,
+    "fechaFin" DATE,
     "motivo" TEXT NOT NULL,
     "idSupervisor" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
