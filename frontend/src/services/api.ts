@@ -1,4 +1,4 @@
-// El backend se proxya via vercel.json (/api/* -> onrender.com) para que el
+// El backend se proxya via vercel.json (/api/* -> Cloudflare worker) para que el
 // navegador siempre hable con el MISMO dominio y las cookies sean first-party
 // (SameSite=None no se bloquea). En producción usamos ruta relativa. En dev
 // (docker o vite) apuntamos directo al backend local.

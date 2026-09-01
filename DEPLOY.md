@@ -1,11 +1,13 @@
 # Despliegue a Producción — Extracurriculares
 
-Arquitectura elegida: **Vercel** (frontend) + **Render** (backend Node) + **Neon** (PostgreSQL).
+Arquitectura elegida: **Vercel** (frontend) + **Cloudflare Workers** (backend) + **Neon** (PostgreSQL).
 
-Auth por **cookies httpOnly con `SameSite=None; Secure`**, porque el frontend y el
-backend son sitios distintos (Vercel + Render). El navegador guarda y envía la cookie
-entre dominios gracias a `SameSite=None`; el frontend manda `credentials: "include"`
-en todos los fetch. Los tokens NUNCA viven en el cliente (ni localStorage ni headers).
+Auth por **cookies httpOnly con `SameSite=None; Secure`**. El frontend y el backend
+son sitios distintos (Vercel + Workers), así que `vercel.json` proxia `/api/*` hacia
+el worker: el navegador habla SIEMPRE con el mismo dominio y las cookies son
+first-party. Los tokens NUNCA viven en el cliente (ni localStorage ni headers).
+
+> ⚠️ Render quedó **deshabilitado**: no usar. El backend solo corre en Cloudflare.
 
 ---
 
@@ -42,29 +44,39 @@ DATABASE_URL="postgresql://USER:PASS@HOST/neondb?sslmode=require" npx prisma db 
 
 ---
 
-## 3. Backend (Render)
+## 3. Backend (Cloudflare Workers)
 
-### 3.1 Variables de entorno (en el dashboard de Render o via `render.yaml`)
-| Variable | Valor |
-|----------|-------|
-| `NODE_ENV` | `production` |
-| `JWT_SECRET` | cadena aleatoria larga (obligatorio, el backend falla si falta) |
-| `DATABASE_URL` | cadena de conexión de Neon |
-| `FRONTEND_URL` | `https://TU-PROYECTO.vercel.app` (origen permitido en CORS) |
-| `ACCESS_TOKEN_EXPIRES_IN` | `15m` |
-| `SESSION_DURATION_HOURS` | `168` (7 días — expiración absoluta de la sesión) |
+### 3.1 Variables de entorno
+Las **no secretas** van en `backend/worker/wrangler.toml` → `[vars]` (`NODE_ENV`,
+`PORT`, `FRONTEND_URL`, `GOOGLE_DRIVE_FOLDER_ID`). Las **secretas** (DB, JWT,
+Google) NO van en el repo; se setean una sola vez con wrangler:
 
-> `render.yaml` marca `JWT_SECRET`, `DATABASE_URL`, `FRONTEND_URL` como `sync: false`
-> para que los ingreses manualmente en el dashboard (secretos).
+```bash
+cd backend/worker
+npx wrangler login
 
-### 3.2 Comandos (ya en `render.yaml`)
-- Build: `npm ci && npx prisma generate && npm run build`
-- Start: `npm start` → `node dist/server.js`
-- Health: `/api/health`
+npx wrangler secret put DATABASE_URL
+npx wrangler secret put JWT_SECRET
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
+```
+
+### 3.2 Build
+```bash
+cd backend/worker
+npm run build     # typecheck + wrangler deploy --dry-run
+```
 
 ### 3.3 Deploy
-- Desde el dashboard de Render: **New → Blueprint** → apuntar al repo.
-- O crear un **Web Service** manual apuntando a `backend/`.
+```bash
+cd backend/worker
+npx wrangler deploy   # → https://extracurriculares-api.<tu-sub>.workers.dev
+```
+
+> **Rate limiting**: desactivado por defecto. Si alguna vez se corre en Node fuera
+> de Workers, el limitador de Express solo se activa definiendo `AUTH_RATE_LIMIT`
+> y/o `API_RATE_LIMIT` en el entorno; sin esas vars es no-op. En Workers, el rate
+> limiting lo maneja Cloudflare en el edge.
 
 ---
 
@@ -73,10 +85,10 @@ DATABASE_URL="postgresql://USER:PASS@HOST/neondb?sslmode=require" npx prisma db 
 ### 4.1 Variables de entorno
 | Variable | Valor |
 |----------|-------|
-| `VITE_API_URL` | **Ya no se usa en producción.** El frontend llama a `/api/*` por el mismo dominio y `vercel.json` proxya hacia Render (para que las cookies sean first-party y funcionen en móvil). Solo hace falta para desarrollo local (docker usa `http://localhost:3000`). |
+| `VITE_API_URL` | **Ya no se usa en producción.** El frontend llama a `/api/*` por el mismo dominio y `vercel.json` proxya hacia el backend de Cloudflare Workers (para que las cookies sean first-party y funcionen en móvil). Solo hace falta para desarrollo local (docker usa `http://localhost:3000`). |
 
-> `vercel.json` contiene el rewrite `/api/* → https://extracurriculares.onrender.com/api/*`.
-> Si cambia el backend de Render, actualizar esa URL. Sin el proxy, los navegadores
+> `vercel.json` contiene el rewrite `/api/* → https://extracurriculares-api.gi-school.workers.dev/api/*`.
+> Si cambia el worker, actualizar esa URL. Sin el proxy, los navegadores
 > móviles bloquean las cookies `SameSite=None` (third-party) y la sesión se pierde.
 
 ### 4.2 Deploy
@@ -110,11 +122,12 @@ DATABASE_URL="..." npx ts-node src/import/cli/importOffer.ts
 
 ---
 
-## 5.5 Backend en Cloudflare Workers (alternativa a Render)
+## 5.5 Backend en Cloudflare Workers (BACKEND OFFICIAL — Render deshabilitado)
 
-> ✅ Estado: **código migrado y compila** (`wrangler deploy --dry-run` exit 0 + typecheck).
-> ⚠️ **Importante**: este es un punto de partida experimental, ver documentación
-> de Cloudflare antes de depender de él en producción.
+> ✅ **Estado: producción.** El backend vive en `extracurriculares-api.gi-school.workers.dev`
+> y es el ÚNICO backend. Render fue deshabilitado (el rewrite del frontend ya apunta al worker).
+> Limitación conocida: plan Free = 10ms de CPU por request; si bcrypt (login admin)
+> o el parseo de xlsx exceden el límite en runtime, migrar al plan pagado (~$5/mes).
 
 ### Archivos creados
 | Archivo | Qué es |
