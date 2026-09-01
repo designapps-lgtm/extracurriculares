@@ -1,14 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  getSupervisorClasses,
-  supervisorStartSession,
-  supervisorMe,
-} from "../../services/supervisor";
+import { roleApis, type RoleKind, type RoleUser } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
-import type { Supervisor, SupervisorCallableClass, SupervisorClassesResponse } from "../../types";
+import type { SupervisorCallableClass, SupervisorClassesResponse } from "../../types";
 
 const DIAS_CORTO: Record<string, string> = {
   LUNES: "Lun", MARTES: "Mar", MIERCOLES: "Mié", JUEVES: "Jue",
@@ -17,8 +13,14 @@ const DIAS_CORTO: Record<string, string> = {
 
 const DIAS_ORDEN = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 
-export default function SupervisorClasses() {
-  const [supervisor, setSupervisor] = useState<Supervisor | null>(null);
+export interface PageProps {
+  role?: RoleKind;
+}
+
+export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
+  const api = roleApis[role];
+  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
+  const [user, setUser] = useState<RoleUser | null>(null);
   const [data, setData] = useState<SupervisorClassesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export default function SupervisorClasses() {
 
   const load = useCallback(() => {
     setLoading(true);
-    getSupervisorClasses(true)
+    api.getClasses(true)
       .then(setData)
       .catch((err: any) => {
         if (err.message?.includes("401") || err.message?.includes("No autenticado")) {
@@ -38,13 +40,13 @@ export default function SupervisorClasses() {
         }
       })
       .finally(() => setLoading(false));
-  }, [navigate, notify]);
+  }, [api, navigate, notify]);
 
   useEffect(() => {
-    supervisorMe()
-      .then(setSupervisor)
+    api.me()
+      .then(setUser)
       .catch(() => navigate("/"));
-  }, [navigate]);
+  }, [api, navigate]);
 
   useEffect(() => {
     load();
@@ -54,7 +56,7 @@ export default function SupervisorClasses() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const all = await getSupervisorClasses(false);
+      const all = await api.getClasses(false);
       setData(all);
     } catch (err: any) {
       notify.error(err.message || "Error al cargar las clases");
@@ -64,18 +66,23 @@ export default function SupervisorClasses() {
   };
 
   const handleStartSession = async (cls: SupervisorCallableClass) => {
+    if (!api.canCallList || !api.startSession) return;
     setStarting(`${cls.idAsignacion}-${cls.schedule.idHorario}`);
     try {
-      const session = await supervisorStartSession({
+      const session = await api.startSession({
         idAsignacion: cls.idAsignacion,
         idHorario: cls.schedule.idHorario,
       });
-      navigate(`/supervisor/session-attendance/${session.id}`);
+      navigate(`${basePath}/session-attendance/${session.id}`);
     } catch (err: any) {
       notify.error(err.message || "Error al iniciar sesión");
     } finally {
       setStarting(null);
     }
+  };
+
+  const handleViewClass = (cls: SupervisorCallableClass) => {
+    navigate(`${basePath}/classes/${cls.idAsignacion}/${cls.schedule.idHorario}/students`);
   };
 
   const toggleAll = () => {
@@ -124,10 +131,11 @@ export default function SupervisorClasses() {
             <Logo chip alt="Extracurriculares" className="h-9 w-auto" />
             <div className="min-w-0">
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
-                {supervisor?.nombre} {supervisor?.apellido}
+                {user?.nombre} {user?.apellido}
               </h1>
               <p className="text-xs text-surface-500">
                 {showAll ? "Todas las clases de todos los profesores" : `Clases de hoy (${data?.dayName ?? ""})`}
+                {role === "secretary" && " · solo lectura"}
               </p>
             </div>
           </div>
@@ -203,9 +211,16 @@ export default function SupervisorClasses() {
                         </div>
 
                         <div className="sm:ml-4 shrink-0 sm:self-center w-full sm:w-auto">
-                          {cls.sessionId ? (
+                          {!api.canCallList ? (
                             <button
-                              onClick={() => navigate(`/supervisor/session-attendance/${cls.sessionId}`)}
+                              onClick={() => handleViewClass(cls)}
+                              className="w-full sm:w-auto px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl"
+                            >
+                              Ver estudiantes
+                            </button>
+                          ) : cls.sessionId ? (
+                            <button
+                              onClick={() => navigate(`${basePath}/session-attendance/${cls.sessionId}`)}
                               className="w-full sm:w-auto px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600"
                             >
                               Llamar lista

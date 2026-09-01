@@ -10,6 +10,9 @@ import type {
   SupervisorStay,
   SupervisorStayStudent,
   SupervisorTransfer,
+  SupervisorClassesResponse,
+  AttendanceStudent,
+  Schedule,
   StudentNovedades,
 } from "../types";
 
@@ -130,5 +133,35 @@ export async function getSecretaryNovedadesBatch(
     codigos: codigos.join(","),
     fecha: fecha || "",
   });
+  return res.data;
+}
+
+export async function getSecretaryClasses(todayOnly?: boolean): Promise<SupervisorClassesResponse> {
+  const res = await api.get<ApiResponse<SupervisorClassesResponse>>("/api/secretary/classes", {
+    ...(todayOnly ? { today: "1" } : {}),
+  });
+  return res.data;
+}
+
+export interface SecretaryClassStudentsData {
+  assignment: {
+    idAsignacion: string;
+    codigoDisciplina: string;
+    discipline: { codigoDisciplina: string; nombre: string };
+    grades: { idGrado: number; nombre: string }[];
+    teacher: { idProfesor: string; nombre: string; apellido: string };
+  };
+  schedule: Schedule;
+  date: string;
+  students: AttendanceStudent[];
+}
+
+export async function getSecretaryClassStudents(
+  asignacionId: string,
+  horarioId: string,
+): Promise<SecretaryClassStudentsData> {
+  const res = await api.get<ApiResponse<SecretaryClassStudentsData>>(
+    `/api/secretary/classes/${asignacionId}/${horarioId}/students`,
+  );
   return res.data;
 }

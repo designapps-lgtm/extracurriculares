@@ -13,6 +13,7 @@ import type {
 } from "../types";
 import * as supervisorApi from "./supervisor";
 import * as secretaryApi from "./secretary";
+import type { SecretaryClassStudentsData } from "./secretary";
 
 export type RoleKind = "supervisor" | "secretary";
 
@@ -62,8 +63,10 @@ export interface RoleApi {
   canCallList: boolean;
   canManageTransfers: boolean;
   canManageStays: boolean;
+  // Vista "Llamar lista": el supervisor la usa para llamar; la secretaria para visualizar.
+  getClasses: (todayOnly?: boolean) => Promise<SupervisorClassesResponse>;
+  getClassStudents?: (asignacionId: string, horarioId: string) => Promise<SecretaryClassStudentsData>;
   // Operaciones de escritura (solo supervisor; undefined en secretaria).
-  getClasses?: (todayOnly?: boolean) => Promise<SupervisorClassesResponse>;
   startSession?: (data: { idAsignacion: string; idHorario: string }) => Promise<{ id: string }>;
   createTransfer?: (data: TransferCreatePayload) => Promise<{ id: string }>;
   deleteTransfer?: (id: string) => Promise<void>;
@@ -117,6 +120,8 @@ const secretaryRole: RoleApi = {
   canCallList: false,
   canManageTransfers: false,
   canManageStays: false,
+  getClasses: secretaryApi.getSecretaryClasses,
+  getClassStudents: secretaryApi.getSecretaryClassStudents,
 };
 
 export const roleApis: Record<RoleKind, RoleApi> = {
