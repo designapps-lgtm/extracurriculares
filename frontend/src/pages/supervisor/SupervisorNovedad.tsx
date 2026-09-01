@@ -1,6 +1,6 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { getSupervisorNovedadesBatch } from "../../services/supervisor";
+import { roleApis, type RoleKind } from "../../services/roles";
 import Logo from "../../components/common/Logo";
 import type { Novedad } from "../../types";
 
@@ -19,7 +19,13 @@ function formatLocal(value: string): string {
   return d.toLocaleString("es-CO", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function SupervisorNovedad() {
+export interface PageProps {
+  role?: RoleKind;
+}
+
+export default function SupervisorNovedad({ role = "supervisor" }: PageProps) {
+  const api = roleApis[role];
+  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
   const { codigoEstudiante } = useParams<{ codigoEstudiante: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -34,7 +40,7 @@ export default function SupervisorNovedad() {
     if (state?.novedades && state.novedades.length > 0) return;
     setLoading(true);
     setError(null);
-    getSupervisorNovedadesBatch([codigoEstudiante])
+    api.getNovedadesBatch([codigoEstudiante])
       .then((res) => {
         const item = res.find((i) => i.codigoEstudiante === codigoEstudiante);
         setNovedades(item?.novedades || []);
@@ -45,7 +51,14 @@ export default function SupervisorNovedad() {
       .finally(() => setLoading(false));
   }, [codigoEstudiante, state]);
 
-  const backTo = state?.sessionId ? `/supervisor/session-attendance/${state.sessionId}` : "/supervisor/classes";
+  // La secretaría no tiene flujo de llamar lista: vuelve a la sesión leída o al dashboard.
+  const backTo = state?.sessionId
+    ? role === "secretary"
+      ? `${basePath}/session/${state.sessionId}`
+      : `${basePath}/session-attendance/${state.sessionId}`
+    : role === "secretary"
+      ? `${basePath}/dashboard`
+      : `${basePath}/classes`;
   const nombre = state?.nombre;
   const apellido = state?.apellido;
   const grupo = state?.grupo;

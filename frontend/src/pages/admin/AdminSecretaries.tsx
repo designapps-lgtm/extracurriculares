@@ -1,19 +1,19 @@
 import { useState, useEffect } from "react";
-import { getAdminSupervisors, createAdminSupervisor, updateAdminSupervisor, deleteAdminSupervisor } from "../../services/admin";
+import { getAdminSecretaries, createAdminSecretary, updateAdminSecretary, deleteAdminSecretary } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
 import { Pagination } from "../../components/common/Pagination";
 import { Loading } from "../../components/common/States";
 import { Avatar } from "../../components/common/Avatar";
-import type { Supervisor } from "../../types";
+import type { Secretary } from "../../types";
 import { createPortal } from "react-dom";
 
-export default function AdminSupervisors() {
-  const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
+export default function AdminSecretaries() {
+  const [secretaries, setSecretaries] = useState<Secretary[]>([]);
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [editing, setEditing] = useState<Supervisor | null>(null);
+  const [editing, setEditing] = useState<Secretary | null>(null);
   const [form, setForm] = useState({ nombre: "", apellido: "", correo: "" });
 
   const notify = useNotify();
@@ -23,9 +23,9 @@ export default function AdminSupervisors() {
     const params: Record<string, string> = { page: String(page), limit: "20" };
     if (search) params.search = search;
 
-    getAdminSupervisors(params)
+    getAdminSecretaries(params)
       .then((res) => {
-        setSupervisors(res.data);
+        setSecretaries(res.data);
         setMeta(res.meta);
       })
       .catch(console.error)
@@ -37,7 +37,7 @@ export default function AdminSupervisors() {
   const handleCreate = async () => {
     if (!form.nombre || !form.apellido) return notify.info("Nombre y apellido requeridos");
     try {
-      await createAdminSupervisor(form);
+      await createAdminSecretary(form);
       setShowCreate(false);
       setForm({ nombre: "", apellido: "", correo: "" });
       load();
@@ -47,34 +47,34 @@ export default function AdminSupervisors() {
   const handleEdit = async () => {
     if (!editing) return;
     try {
-      await updateAdminSupervisor(editing.idSupervisor, form);
+      await updateAdminSecretary(editing.idSecretary, form);
       setEditing(null);
       load(meta.page);
     } catch (err: any) { notify.error(err.message); }
   };
 
-  const handleToggleStatus = async (s: Supervisor) => {
+  const handleToggleStatus = async (s: Secretary) => {
     const newStatus = s.estado === "activo" ? "inactivo" : "activo";
     try {
-      await updateAdminSupervisor(s.idSupervisor, { estado: newStatus });
+      await updateAdminSecretary(s.idSecretary, { estado: newStatus });
       load(meta.page);
     } catch (err: any) { notify.error(err.message); }
   };
 
-  const handleDelete = async (s: Supervisor) => {
+  const handleDelete = async (s: Secretary) => {
     const confirmed = await notify.confirm(
-      "Eliminar supervisora",
+      "Eliminar secretaria",
       `¿Eliminar a ${s.nombre} ${s.apellido}?`,
       { confirmLabel: "Eliminar", variant: "danger" },
     );
     if (!confirmed) return;
     try {
-      await deleteAdminSupervisor(s.idSupervisor);
+      await deleteAdminSecretary(s.idSecretary);
       load(meta.page);
     } catch (err: any) { notify.error(err.message); }
   };
 
-  const openEdit = (s: Supervisor) => {
+  const openEdit = (s: Secretary) => {
     setEditing(s);
     setForm({ nombre: s.nombre, apellido: s.apellido, correo: s.correo || "" });
   };
@@ -85,14 +85,14 @@ export default function AdminSupervisors() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">Supervisoras</h1>
-          <p className="text-sm text-surface-500 mt-1">Gestiona los correos con acceso al panel de supervisión</p>
+          <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">Secretarias</h1>
+          <p className="text-sm text-surface-500 mt-1">Gestiona los correos con acceso al panel de secretaría</p>
         </div>
         <button
           onClick={() => { setShowCreate(true); resetForm(); }}
           className="self-start sm:self-auto px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
         >
-          + Nueva supervisora
+          + Nueva secretaria
         </button>
       </div>
 
@@ -115,14 +115,14 @@ export default function AdminSupervisors() {
       <div className="card overflow-hidden p-4">
         {loading ? (
           <Loading />
-        ) : supervisors.length === 0 ? (
-          <div className="text-center py-12 text-sm text-surface-500">No se encontraron supervisoras.</div>
+        ) : secretaries.length === 0 ? (
+          <div className="text-center py-12 text-sm text-surface-500">No se encontraron secretarias.</div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {supervisors.map((s) => (
-              <div key={s.idSupervisor} className="bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 p-5">
+            {secretaries.map((s) => (
+              <div key={s.idSecretary} className="bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 p-5">
                 <div className="flex items-center gap-4">
-                  <Avatar seed={s.idSupervisor} className={`w-11 h-11 rounded-xl ${s.estado === "inactivo" ? "opacity-50" : ""}`}>
+                  <Avatar seed={s.idSecretary} className={`w-11 h-11 rounded-xl ${s.estado === "inactivo" ? "opacity-50" : ""}`}>
                     {s.nombre.charAt(0)}{s.apellido.charAt(0)}
                   </Avatar>
                   <div className="min-w-0 flex-1">
@@ -160,7 +160,7 @@ export default function AdminSupervisors() {
       {showCreate && createPortal(
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
           <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">Nueva supervisora</h2>
+            <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">Nueva secretaria</h2>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -174,7 +174,7 @@ export default function AdminSupervisors() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-surface-500 mb-1">Correo</label>
-                <input type="email" value={form.correo} onChange={(e) => setForm({ ...form, correo: e.target.value })} placeholder="supervisora@colegio.edu.co" className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm" />
+                <input type="email" value={form.correo} onChange={(e) => setForm({ ...form, correo: e.target.value })} placeholder="secretaria@colegio.edu.co" className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm" />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
@@ -189,7 +189,7 @@ export default function AdminSupervisors() {
       {editing && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setEditing(null)}>
           <div className="bg-white dark:bg-surface-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">Editar supervisora</h2>
+            <h2 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 mb-4">Editar secretaria</h2>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>

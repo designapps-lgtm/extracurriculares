@@ -1,18 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  getSupervisorClasses,
-  listSupervisorTransfers,
-  createSupervisorTransfer as createTransfer,
-  deleteSupervisorTransfer,
-  searchSupervisorStudents,
-  supervisorMe,
-} from "../../services/supervisor";
+import { roleApis, type RoleKind, type RoleUser } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
 import type {
-  Supervisor,
   SupervisorCallableClass,
   SupervisorTransfer,
   SupervisorStayStudent,
@@ -45,8 +37,13 @@ function formatFecha(fecha: string): string {
   return d.toLocaleDateString("es-CO", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-export default function SupervisorTransfers() {
-  const [supervisor, setSupervisor] = useState<Supervisor | null>(null);
+export interface PageProps {
+  role?: RoleKind;
+}
+
+export default function SupervisorTransfers({ role = "supervisor" }: PageProps) {
+  const api = roleApis[role];
+  const [user, setUser] = useState<RoleUser | null>(null);
   const [classes, setClasses] = useState<SupervisorCallableClass[]>([]);
   const [transfers, setTransfers] = useState<SupervisorTransfer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,30 +66,36 @@ export default function SupervisorTransfers() {
   const notify = useNotify();
 
   useEffect(() => {
-    supervisorMe()
-      .then(setSupervisor)
+    api.me()
+      .then(setUser)
       .catch(() => navigate("/"));
-  }, [navigate]);
+  }, [api, navigate]);
 
   const loadTransfers = useCallback(
     (params?: { codigoEstudiante?: string; fecha?: string; fechaFin?: string }) => {
-      listSupervisorTransfers(params)
+      api.listTransfers(params)
         .then(setTransfers)
         .catch((err: any) => notify.error(err.message || "Error al cargar historial"));
     },
-    [notify],
+    [api, notify],
   );
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([getSupervisorClasses(false)])
-      .then(([cls]) => setClasses(cls.classes))
-      .catch((err: any) => notify.error(err.message || "Error al cargar clases"))
-      .finally(() => {
-        setLoading(false);
-        loadTransfers();
-      });
-  }, [loadTransfers, notify]);
+    if (api.canManageTransfers && api.getClasses) {
+      api
+        .getClasses(false)
+        .then((res) => setClasses(res.classes))
+        .catch((err: any) => notify.error(err.message || "Error al cargar clases"))
+        .finally(() => {
+          setLoading(false);
+          loadTransfers();
+        });
+    } else {
+      setLoading(false);
+      loadTransfers();
+    }
+  }, [api, loadTransfers, notify]);
 
   const filterStudentStr = filterStudent.trim();
   const filterFechaStr = filterFecha.trim();
@@ -123,12 +126,12 @@ export default function SupervisorTransfers() {
 
   const handleStudentSearch = async (q: string) => {
     setStudentQuery(q);
-    if (!q.trim()) {
+    if (!q.trim() || !api.searchStudents) {
       setStudentResults([]);
       return;
     }
     try {
-      setStudentResults(await searchSupervisorStudents(q));
+      setStudentResults(await api.searchStudents(q));
     } catch {
       setStudentResults([]);
     }
@@ -160,9 +163,10 @@ export default function SupervisorTransfers() {
     const [idAsignacionOrigen, idHorarioOrigen] = origenKey.split("|");
     const [idAsignacionDestino] = destinoKey.split("|");
     if (!idAsignacionOrigen || !idHorarioOrigen || !idAsignacionDestino) return;
+    if (!api.createTransfer) return;
     setSubmitting(true);
     try {
-      await createTransfer({
+      await api.createTransfer({
         codigoEstudiante: selectedStudent.codigoEstudiante,
         idAsignacionOrigen,
         idAsignacionDestino,
@@ -186,9 +190,10 @@ export default function SupervisorTransfers() {
   };
 
   const handleDelete = async (t: SupervisorTransfer) => {
+    if (!api.deleteTransfer) return;
     if (!window.confirm(`¿Eliminar el traslado de ${t.student.nombre} ${t.student.apellido} del ${formatFecha(t.fecha)}?`)) return;
     try {
-      await deleteSupervisorTransfer(t.id);
+      await api.deleteTransfer(t.id);
       notify.success("Traslado eliminado");
       loadTransfers();
     } catch (err: any) {
@@ -215,7 +220,7 @@ export default function SupervisorTransfers() {
                 Traslados · Niños que se quedan
               </h1>
               <p className="text-xs text-surface-500">
-                {supervisor?.nombre ? `${supervisor.nombre} ${supervisor.apellido}` : ""} · mover un estudiante de una clase a otra por un tiempo
+                {user?.nombre ? `${user.nombre} ${user.apellido}` : ""} · mover un estudiante de una clase a otra por un tiempo
               </p>
             </div>
           </div>
@@ -223,6 +228,7 @@ export default function SupervisorTransfers() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-8">
+        {api.canManageTransfers && (
         <section className="card p-6">
           <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base mb-1">
             Registrar traslado
@@ -392,6 +398,7 @@ export default function SupervisorTransfers() {
             {submitting ? "Registrando..." : "Registrar traslado"}
           </button>
         </section>
+        )}
 
         <section className="card p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -444,12 +451,14 @@ export default function SupervisorTransfers() {
                       Registrado por {t.supervisor.nombre} {t.supervisor.apellido}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleDelete(t)}
-                    className="shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
-                  >
-                    Eliminar
-                  </button>
+                  {api.canManageTransfers && (
+                    <button
+                      onClick={() => handleDelete(t)}
+                      className="shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
+                    >
+                      Eliminar
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

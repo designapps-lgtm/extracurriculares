@@ -6,7 +6,7 @@ import { generateRefreshToken, hashRefreshToken, hoursToMs } from "../../utils/t
 import { AppError } from "../../middlewares/errorHandler";
 
 interface RefreshServiceOptions {
-  userIdField: "teacherId" | "adminId" | "supervisorId";
+  userIdField: "teacherId" | "adminId" | "supervisorId" | "secretaryId";
   tableName: string;
   buildAccessToken: (identity: { id: string; email: string }) => string;
 }

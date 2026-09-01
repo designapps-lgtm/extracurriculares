@@ -1,31 +1,39 @@
 import { Outlet, Link, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { supervisorMe } from "../../services/supervisor";
+import { roleApis, type RoleKind, type RoleUser } from "../../services/roles";
 import { logout } from "../../services/auth";
 import Logo from "../../components/common/Logo";
-import type { Supervisor } from "../../types";
 
-const NAV_ITEMS = [
-  { path: "/supervisor/dashboard", label: "Asistencias", icon: "M3 13l4-4m0 0l4 4m-4-4v10m8-6l4 4m0 0l4-4m-4 4V3" },
-  { path: "/supervisor/classes", label: "Llamar lista", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
-  { path: "/supervisor/schedules", label: "Horarios", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
-  { path: "/supervisor/transfers", label: "Traslados", icon: "M9 13h6m2 0-2-2m2 2-2 2M7 13h.01M4 6h16M4 18h16" },
-  { path: "/supervisor/stays", label: "Niños que se quedan", icon: "M4 7h16M4 12h10M4 17h16" },
-];
+export interface PageProps {
+  role?: RoleKind;
+}
 
-export default function SupervisorLayout() {
+export default function SupervisorLayout({ role = "supervisor" }: PageProps) {
+  const api = roleApis[role];
+  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
+
+  const NAV_ITEMS = [
+    { path: `${basePath}/dashboard`, label: "Asistencias", icon: "M3 13l4-4m0 0l4 4m-4-4v10m8-6l4 4m0 0l4-4m-4 4V3" },
+    ...(api.canCallList
+      ? [{ path: `${basePath}/classes`, label: "Llamar lista", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" }]
+      : []),
+    { path: `${basePath}/schedules`, label: "Horarios", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
+    { path: `${basePath}/transfers`, label: "Traslados", icon: "M9 13h6m2 0-2-2m2 2-2 2M7 13h.01M4 6h16M4 18h16" },
+    { path: `${basePath}/stays`, label: "Niños que se quedan", icon: "M4 7h16M4 12h10M4 17h16" },
+  ];
+
   const location = useLocation();
   const navigate = useNavigate();
-  const [supervisor, setSupervisor] = useState<Supervisor | null>(null);
+  const [user, setUser] = useState<RoleUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    supervisorMe()
-      .then(setSupervisor)
-      .catch(() => setSupervisor(null))
+    api.me()
+      .then(setUser)
+      .catch(() => setUser(null))
       .finally(() => setLoading(false));
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -39,7 +47,7 @@ export default function SupervisorLayout() {
     );
   }
 
-  if (!supervisor) {
+  if (!user) {
     return <Navigate to="/" replace />;
   }
 
@@ -53,9 +61,9 @@ export default function SupervisorLayout() {
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 bg-surface-900 dark:bg-surface-950 text-surface-100 z-40">
         <div className="px-6 py-5 border-b border-surface-800">
-          <Link to="/supervisor/dashboard" className="inline-flex items-center gap-2">
+          <Link to={`${basePath}/dashboard`} className="inline-flex items-center gap-2">
             <Logo chip alt="Extracurriculares" className="h-8 w-auto" />
-            <span className="font-display font-bold text-lg text-white">Supervisor</span>
+            <span className="font-display font-bold text-lg text-white">{api.label}</span>
           </Link>
         </div>
 
@@ -83,8 +91,8 @@ export default function SupervisorLayout() {
 
         <div className="px-3 py-4 border-t border-surface-800">
           <div className="px-3 mb-3">
-            <p className="text-sm font-medium text-white">{supervisor.nombre} {supervisor.apellido}</p>
-            <p className="text-xs text-surface-400 truncate">{supervisor.correo}</p>
+            <p className="text-sm font-medium text-white">{user.nombre} {user.apellido}</p>
+            <p className="text-xs text-surface-400 truncate">{user.correo}</p>
           </div>
           <button
             onClick={handleLogout}
@@ -120,9 +128,9 @@ export default function SupervisorLayout() {
       {sidebarOpen && (
         <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-surface-900 text-surface-100 flex flex-col shadow-2xl shadow-black/30">
           <div className="px-6 py-5 border-b border-surface-800 pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] flex items-center justify-between gap-3">
-            <Link to="/supervisor/dashboard" className="inline-flex items-center gap-2" onClick={() => setSidebarOpen(false)}>
+            <Link to={`${basePath}/dashboard`} className="inline-flex items-center gap-2" onClick={() => setSidebarOpen(false)}>
               <Logo chip alt="Extracurriculares" className="h-8 w-auto" />
-              <span className="font-display font-bold text-lg text-white">Supervisor</span>
+              <span className="font-display font-bold text-lg text-white">{api.label}</span>
             </Link>
             <button
               type="button"
@@ -159,8 +167,8 @@ export default function SupervisorLayout() {
 
           <div className="px-3 py-4 border-t border-surface-800">
             <div className="px-3 mb-3">
-              <p className="text-sm font-medium text-white">{supervisor.nombre} {supervisor.apellido}</p>
-              <p className="text-xs text-surface-400 truncate">{supervisor.correo}</p>
+              <p className="text-sm font-medium text-white">{user.nombre} {user.apellido}</p>
+              <p className="text-xs text-surface-400 truncate">{user.correo}</p>
             </div>
             <button
               onClick={handleLogout}

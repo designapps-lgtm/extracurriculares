@@ -5,9 +5,9 @@ import { sql, first } from "../../config/db";
 import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { createRefreshService } from "./refreshTokens";
-import { setAuthCookies, clearAuthCookies, TEACHER_REFRESH_COOKIE, SUPERVISOR_REFRESH_COOKIE, ADMIN_REFRESH_COOKIE } from "../../utils/authCookies";
+import { setAuthCookies, clearAuthCookies, TEACHER_REFRESH_COOKIE, SUPERVISOR_REFRESH_COOKIE, ADMIN_REFRESH_COOKIE, SECRETARY_REFRESH_COOKIE } from "../../utils/authCookies";
 
-type Role = "admin" | "teacher" | "supervisor";
+type Role = "admin" | "teacher" | "supervisor" | "secretary";
 
 const teacherRefresh = createRefreshService({
   userIdField: "teacherId",
@@ -23,6 +23,15 @@ const supervisorRefresh = createRefreshService({
   tableName: "SupervisorRefreshToken",
   buildAccessToken: ({ id, email }) =>
     jwt.sign({ supervisorId: id, email }, config.jwtSecret, {
+      expiresIn: config.accessTokenExpiresIn,
+    } as jwt.SignOptions),
+});
+
+const secretaryRefresh = createRefreshService({
+  userIdField: "secretaryId",
+  tableName: "SecretaryRefreshToken",
+  buildAccessToken: ({ id, email }) =>
+    jwt.sign({ secretaryId: id, email }, config.jwtSecret, {
       expiresIn: config.accessTokenExpiresIn,
     } as jwt.SignOptions),
 });
@@ -81,10 +90,11 @@ async function resolveRoleByEmail(email: string): Promise<UserIdentity> {
 
   // Las 3 búsquedas son independientes: se ejecutan en paralelo (1 round-trip
   // HTTP de Neón en vez de 3 secuenciales).
-  const [adminRows, supRows, teacherRows] = await Promise.all([
+  const [adminRows, supRows, teacherRows, secRows] = await Promise.all([
     sql`SELECT "id", "email", "nombre", "apellido", "estado" FROM "AdminUser" WHERE "email" = ${email} LIMIT 1`,
     sql`SELECT "idSupervisor", "correo", "nombre", "apellido", "estado" FROM "Supervisor" WHERE "correo" = ${email} LIMIT 1`,
     sql`SELECT "idProfesor", "correo", "nombre", "apellido", "estado" FROM "Teacher" WHERE "correo" = ${email} LIMIT 1`,
+    sql`SELECT "idSecretary", "correo", "nombre", "apellido", "estado" FROM "Secretary" WHERE "correo" = ${email} LIMIT 1`,
   ]);
 
   if (adminRows.length > 0) {
@@ -102,7 +112,12 @@ async function resolveRoleByEmail(email: string): Promise<UserIdentity> {
     matches.push({ role: "teacher", id: t.idProfesor, email: t.correo || email, nombre: t.nombre, apellido: t.apellido, estado: t.estado });
   }
 
-  const priority: Record<Role, number> = { admin: 0, supervisor: 1, teacher: 2 };
+  if (secRows.length > 0) {
+    const s = secRows[0];
+    matches.push({ role: "secretary", id: s.idSecretary, email: s.correo || email, nombre: s.nombre, apellido: s.apellido, estado: s.estado });
+  }
+
+  const priority: Record<Role, number> = { admin: 0, supervisor: 1, secretary: 2, teacher: 3 };
   matches.sort((a, b) => priority[a.role] - priority[b.role]);
 
   const match = matches[0];
@@ -111,8 +126,8 @@ async function resolveRoleByEmail(email: string): Promise<UserIdentity> {
   }
 
   if (match.estado !== "activo") {
-    const code = match.role === "teacher" ? "TEACHER_INACTIVE" : match.role === "supervisor" ? "SUPERVISOR_INACTIVE" : "ACCOUNT_DISABLED";
-    const label = match.role === "teacher" ? "profesor" : match.role === "supervisor" ? "supervisor" : "administrador";
+    const code = match.role === "teacher" ? "TEACHER_INACTIVE" : match.role === "supervisor" ? "SUPERVISOR_INACTIVE" : match.role === "secretary" ? "SECRETARY_INACTIVE" : "ACCOUNT_DISABLED";
+    const label = match.role === "teacher" ? "profesor" : match.role === "supervisor" ? "supervisor" : match.role === "secretary" ? "secretaria" : "administrador";
     throw new AppError(403, code, `Tu cuenta de ${label} está desactivada`);
   }
 
@@ -127,6 +142,9 @@ async function issueSession(res: Response, identity: UserIdentity) {
       break;
     case "supervisor":
       tokens = await supervisorRefresh.issue(identity.id, identity.email);
+      break;
+    case "secretary":
+      tokens = await secretaryRefresh.issue(identity.id, identity.email);
       break;
     default:
       tokens = await adminRefresh.issue(identity.id, identity.email);
@@ -165,6 +183,7 @@ export async function logout(req: Request, res: Response) {
   const services: Record<Role, { revoke: (t: string) => Promise<void> }> = {
     teacher: teacherRefresh,
     supervisor: supervisorRefresh,
+    secretary: secretaryRefresh,
     admin: adminRefresh,
   };
   for (const role of Object.keys(refreshMap) as Role[]) {
@@ -180,17 +199,24 @@ export async function logout(req: Request, res: Response) {
 const refreshMap: Record<Role, string> = {
   teacher: TEACHER_REFRESH_COOKIE,
   supervisor: SUPERVISOR_REFRESH_COOKIE,
+  secretary: SECRETARY_REFRESH_COOKIE,
   admin: ADMIN_REFRESH_COOKIE,
 };
 
 export async function me(req: Request, res: Response) {
-  for (const role of ["admin", "supervisor", "teacher"] as Role[]) {
+  for (const role of ["admin", "supervisor", "teacher", "secretary"] as Role[]) {
     const cookie = req.cookies?.[refreshMap[role]];
     if (!cookie) continue;
 
     try {
       const refreshService =
-        role === "teacher" ? teacherRefresh : role === "supervisor" ? supervisorRefresh : adminRefresh;
+        role === "teacher"
+          ? teacherRefresh
+          : role === "supervisor"
+            ? supervisorRefresh
+            : role === "secretary"
+              ? secretaryRefresh
+              : adminRefresh;
       const { userId } = await refreshService.validate(cookie);
 
       let identity: UserIdentity | null = null;
@@ -205,6 +231,12 @@ export async function me(req: Request, res: Response) {
         const s = rows[0] ?? null;
         if (s && s.estado === "activo") {
           identity = { role: "supervisor", id: s.idSupervisor, email: s.correo || "", nombre: s.nombre, apellido: s.apellido };
+        }
+      } else if (role === "secretary") {
+        const rows = await sql`SELECT "idSecretary", "correo", "nombre", "apellido", "estado" FROM "Secretary" WHERE "idSecretary" = ${userId} LIMIT 1`;
+        const s = rows[0] ?? null;
+        if (s && s.estado === "activo") {
+          identity = { role: "secretary", id: s.idSecretary, email: s.correo || "", nombre: s.nombre, apellido: s.apellido };
         }
       } else {
         const rows = await sql`SELECT "id", "email", "nombre", "apellido", "estado" FROM "AdminUser" WHERE "id" = ${userId} LIMIT 1`;

@@ -10,6 +10,7 @@ import type {
   Schedule,
   Assignment,
   Supervisor,
+  Secretary,
 } from "../types";
 
 export interface AdminUser {
@@ -182,4 +183,21 @@ export async function updateAdminSupervisor(id: string, data: Record<string, unk
 
 export async function deleteAdminSupervisor(id: string) {
   return api.delete<ApiResponse<{ id: string }>>(`/api/admin/supervisors/${id}`);
+}
+
+// Secretary management
+export async function getAdminSecretaries(params?: Record<string, string>) {
+  return api.get<PaginatedResponse<Secretary>>("/api/admin/secretaries", params);
+}
+
+export async function createAdminSecretary(data: { codigoSecretary?: string; nombre: string; apellido: string; correo?: string; fotoUrl?: string }) {
+  return api.post<ApiResponse<Secretary>>("/api/admin/secretaries", data);
+}
+
+export async function updateAdminSecretary(id: string, data: Record<string, unknown>) {
+  return api.patch<ApiResponse<Secretary>>(`/api/admin/secretaries/${id}`, data);
+}
+
+export async function deleteAdminSecretary(id: string) {
+  return api.delete<ApiResponse<{ id: string }>>(`/api/admin/secretaries/${id}`);
 }

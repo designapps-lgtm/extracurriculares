@@ -28,6 +28,7 @@ import { adminGradeRouter } from "./modules/admin/gradeAdmin.routes";
 import { adminUserRouter } from "./modules/admin/adminUser.routes";
 import { adminDashboardRouter } from "./modules/admin/dashboardAdmin.routes";
 import { adminSupervisorRouter } from "./modules/admin/supervisorAdmin.routes";
+import { adminSecretaryRouter } from "./modules/admin/secretaryAdmin.routes";
 
 // Teacher routes
 import { teacherAuthRouter } from "./modules/teacher/auth.routes";
@@ -38,6 +39,11 @@ import { authenticateTeacher, requireActiveTeacher } from "./middlewares/teacher
 import { supervisorAuthRouter } from "./modules/supervisor/auth.routes";
 import { supervisorDashboardRouter } from "./modules/supervisor/supervisor.routes";
 import { authenticateSupervisor, requireActiveSupervisor } from "./middlewares/supervisorAuth";
+
+// Secretary routes
+import { secretaryAuthRouter } from "./modules/secretary/auth.routes";
+import { secretaryDashboardRouter } from "./modules/secretary/secretary.routes";
+import { authenticateSecretary, requireActiveSecretary } from "./middlewares/secretaryAuth";
 
 const app = express();
 
@@ -92,6 +98,7 @@ app.use("/api/admin/schedules", authenticate, requireAdmin, adminScheduleRouter)
 app.use("/api/admin/grades", authenticate, requireAdmin, adminGradeRouter);
 app.use("/api/admin/admins", authenticate, requireAdmin, adminUserRouter);
 app.use("/api/admin/supervisors", authenticate, requireAdmin, adminSupervisorRouter);
+app.use("/api/admin/secretaries", authenticate, requireAdmin, adminSecretaryRouter);
 
 // Teacher auth (login/logout don't need auth)
 app.use("/api/teacher/auth", teacherAuthRouter);
@@ -104,6 +111,12 @@ app.use("/api/supervisor/auth", supervisorAuthRouter);
 
 // Protected supervisor routes
 app.use("/api/supervisor", authenticateSupervisor, requireActiveSupervisor, supervisorDashboardRouter);
+
+// Secretary auth (login/logout don't need auth)
+app.use("/api/secretary/auth", secretaryAuthRouter);
+
+// Protected secretary routes
+app.use("/api/secretary", authenticateSecretary, requireActiveSecretary, secretaryDashboardRouter);
 
 // 404 + error handler
 app.use(notFound);

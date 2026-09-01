@@ -380,6 +380,16 @@ export interface Supervisor {
   estado: string;
 }
 
+export interface Secretary {
+  idSecretary: string;
+  codigoSecretary: string | null;
+  nombre: string;
+  apellido: string;
+  correo: string | null;
+  fotoUrl: string | null;
+  estado: string;
+}
+
 export interface SupervisorSessionItem {
   id: string;
   fecha: string;

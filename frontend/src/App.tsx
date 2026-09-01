@@ -31,8 +31,18 @@ import SupervisorNovedad from "./pages/supervisor/SupervisorNovedad";
 import SupervisorTransfers from "./pages/supervisor/SupervisorTransfers";
 import SupervisorLayout from "./pages/supervisor/SupervisorLayout";
 
+// Secretary
+import SecretaryLayout from "./pages/secretary/SecretaryLayout";
+import SecretaryDashboard from "./pages/secretary/SecretaryDashboard";
+import SecretarySchedules from "./pages/secretary/SecretarySchedules";
+import SecretaryStays from "./pages/secretary/SecretaryStays";
+import SecretarySession from "./pages/secretary/SecretarySession";
+import SecretaryNovedad from "./pages/secretary/SecretaryNovedad";
+import SecretaryTransfers from "./pages/secretary/SecretaryTransfers";
+
 // Admin
 import AdminSupervisors from "./pages/admin/AdminSupervisors";
+import AdminSecretaries from "./pages/admin/AdminSecretaries";
 
 function App() {
   return (
@@ -71,6 +81,17 @@ function App() {
         <Route path="transfers" element={<SupervisorTransfers />} />
       </Route>
 
+      {/* Secretary routes — mismo flujo que supervisor sin llamar lista ni gestión */}
+      <Route path="/secretary" element={<SecretaryLayout />}>
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<SecretaryDashboard />} />
+        <Route path="schedules" element={<SecretarySchedules />} />
+        <Route path="stays" element={<SecretaryStays />} />
+        <Route path="session/:sessionId" element={<SecretarySession />} />
+        <Route path="novedad/:codigoEstudiante" element={<SecretaryNovedad />} />
+        <Route path="transfers" element={<SecretaryTransfers />} />
+      </Route>
+
       {/* Admin routes — AdminLayout handles auth + sidebar */}
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Navigate to="dashboard" replace />} />
@@ -84,6 +105,7 @@ function App() {
         <Route path="teachers" element={<AdminTeachers />} />
         <Route path="teachers/:id" element={<TeacherDetail />} />
         <Route path="supervisors" element={<AdminSupervisors />} />
+        <Route path="secretaries" element={<AdminSecretaries />} />
         <Route path="assignments" element={<AdminAssignments />} />
         <Route path="admins" element={<AdminUsers />} />
       </Route>

@@ -1,20 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  getSupervisorSessions,
-  getSupervisorFilters,
-  exportSupervisorAttendance,
-  supervisorMe,
-  type SupervisorFilterData,
-} from "../../services/supervisor";
+import { roleApis, type RoleKind, type RoleUser, type RoleFilters } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import { Pagination } from "../../components/common/Pagination";
 import Logo from "../../components/common/Logo";
-import type {
-  Supervisor,
-  SupervisorSessionItem,
-} from "../../types";
+import type { SupervisorSessionItem } from "../../types";
 
 function formatFecha(iso: string): string {
   const d = new Date(iso);
@@ -27,11 +18,17 @@ const ESTADO_LABEL: Record<string, { label: string; className: string }> = {
   justificado: { label: "Justificado", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400" },
 };
 
-export default function SupervisorDashboard() {
-  const [supervisor, setSupervisor] = useState<Supervisor | null>(null);
+export interface PageProps {
+  role?: RoleKind;
+}
+
+export default function SupervisorDashboard({ role = "supervisor" }: PageProps) {
+  const api = roleApis[role];
+  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
+  const [user, setUser] = useState<RoleUser | null>(null);
   const [sessions, setSessions] = useState<SupervisorSessionItem[]>([]);
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
-  const [filterData, setFilterData] = useState<SupervisorFilterData | null>(null);
+  const [filterData, setFilterData] = useState<RoleFilters | null>(null);
   const [fecha, setFecha] = useState("");
   const [disciplina, setDisciplina] = useState("");
   const [profesor, setProfesor] = useState("");
@@ -48,7 +45,7 @@ export default function SupervisorDashboard() {
       if (disciplina) params.disciplina = disciplina;
       if (profesor) params.profesor = profesor;
 
-      getSupervisorSessions(params)
+      api.getSessions(params)
         .then((res) => {
           setSessions(res.data);
           setMeta(res.meta);
@@ -62,14 +59,14 @@ export default function SupervisorDashboard() {
         })
         .finally(() => setLoading(false));
     },
-    [fecha, disciplina, profesor, navigate, notify],
+    [api, fecha, disciplina, profesor, navigate, notify],
   );
 
   useEffect(() => {
-    supervisorMe()
-      .then(setSupervisor)
+    api.me()
+      .then(setUser)
       .catch(() => navigate("/"));
-  }, [navigate]);
+  }, [api, navigate]);
 
   useEffect(() => {
     load();
@@ -77,10 +74,10 @@ export default function SupervisorDashboard() {
   }, []);
 
   useEffect(() => {
-    getSupervisorFilters()
+    api.getFilters()
       .then(setFilterData)
       .catch(() => notify.error("No se pudieron cargar los filtros"));
-  }, [notify]);
+  }, [api, notify]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -90,7 +87,7 @@ export default function SupervisorDashboard() {
       if (disciplina) params.disciplina = disciplina;
       if (profesor) params.profesor = profesor;
 
-      const blob = await exportSupervisorAttendance(params);
+      const blob = await api.exportAttendance(params);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -115,7 +112,7 @@ export default function SupervisorDashboard() {
             <Logo chip alt="Extracurriculares" className="h-9 w-auto" />
             <div className="min-w-0">
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
-                {supervisor?.nombre} {supervisor?.apellido}
+                {user?.nombre} {user?.apellido}
               </h1>
               <p className="text-xs text-surface-500">Asistencias registradas por los profesores</p>
             </div>
@@ -195,7 +192,7 @@ export default function SupervisorDashboard() {
               {sessions.map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => navigate(`/supervisor/session/${s.id}`)}
+                  onClick={() => navigate(`${basePath}/session/${s.id}`)}
                   className="w-full text-left block bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 hover:border-brand-300 dark:hover:border-brand-700 transition-colors p-4"
                 >
                   <div className="flex items-start justify-between gap-4">

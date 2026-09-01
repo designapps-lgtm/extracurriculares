@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { getSupervisorSession, exportSupervisorSession } from "../../services/supervisor";
+import { roleApis, type RoleKind } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
@@ -17,7 +17,13 @@ const ESTADO_LABEL: Record<string, { label: string; className: string }> = {
   justificado: { label: "Justificado", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400" },
 };
 
-export default function SupervisorSession() {
+export interface PageProps {
+  role?: RoleKind;
+}
+
+export default function SupervisorSession({ role = "supervisor" }: PageProps) {
+  const api = roleApis[role];
+  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
   const { sessionId } = useParams<{ sessionId: string }>();
   const [data, setData] = useState<SupervisorSessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +33,7 @@ export default function SupervisorSession() {
 
   useEffect(() => {
     if (!sessionId) return;
-    getSupervisorSession(sessionId)
+    api.getSession(sessionId)
       .then(setData)
       .catch((err: any) => {
         if (err.message?.includes("401") || err.message?.includes("No autenticado")) {
@@ -35,13 +41,13 @@ export default function SupervisorSession() {
         }
       })
       .finally(() => setLoading(false));
-  }, [sessionId, navigate]);
+  }, [api, sessionId, navigate]);
 
   const handleExport = async () => {
     if (!sessionId || exporting) return;
     setExporting(true);
     try {
-      const blob = await exportSupervisorSession(sessionId);
+      const blob = await api.exportSession(sessionId);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -83,7 +89,7 @@ export default function SupervisorSession() {
   );
 
   const openNovedad = (r: { codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null }) => {
-    navigate(`/supervisor/novedad/${r.codigoEstudiante}`, {
+    navigate(`${basePath}/novedad/${r.codigoEstudiante}`, {
       state: {
         sessionId,
         codigoEstudiante: r.codigoEstudiante,
@@ -100,12 +106,12 @@ export default function SupervisorSession() {
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <Logo chip alt="Extracurriculares" className="h-8 w-auto shrink-0" />
-            <Link to="/supervisor/dashboard" className="text-sm text-brand-600 dark:text-brand-400 font-medium hover:underline">
+            <Link to={`${basePath}/dashboard`} className="text-sm text-brand-600 dark:text-brand-400 font-medium hover:underline">
               ← Volver
             </Link>
           </div>
           <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">Asistencia</h1>
-          <button onClick={() => navigate("/supervisor/dashboard")} className="text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300">
+          <button onClick={() => navigate(`${basePath}/dashboard`)} className="text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300">
             Salir
           </button>
         </div>

@@ -1,16 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  getSupervisorTeacherSchedules,
-  getSupervisorAssignmentHistory,
-  supervisorStartSession,
-  supervisorMe,
-} from "../../services/supervisor";
+import { roleApis, type RoleKind, type RoleUser } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
 import type {
-  Supervisor,
   SupervisorTeacherSchedule,
   SupervisorAssignmentHistory,
   SupervisorEnrolledStudent,
@@ -176,8 +170,14 @@ function ScheduleBlock({
   );
 }
 
-export default function SupervisorSchedules() {
-  const [supervisor, setSupervisor] = useState<Supervisor | null>(null);
+export interface PageProps {
+  role?: RoleKind;
+}
+
+export default function SupervisorSchedules({ role = "supervisor" }: PageProps) {
+  const api = roleApis[role];
+  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
+  const [user, setUser] = useState<RoleUser | null>(null);
   const [assignments, setAssignments] = useState<SupervisorTeacherSchedule[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -196,7 +196,7 @@ export default function SupervisorSchedules() {
 
   const load = useCallback(() => {
     setLoading(true);
-    getSupervisorTeacherSchedules()
+    api.getTeacherSchedules()
       .then(setAssignments)
       .catch((err: any) => {
         if (err.message?.includes("401") || err.message?.includes("No autenticado")) {
@@ -206,13 +206,13 @@ export default function SupervisorSchedules() {
         }
       })
       .finally(() => setLoading(false));
-  }, [navigate, notify]);
+  }, [api, navigate, notify]);
 
   useEffect(() => {
-    supervisorMe()
-      .then(setSupervisor)
+    api.me()
+      .then(setUser)
       .catch(() => navigate("/"));
-  }, [navigate]);
+  }, [api, navigate]);
 
   useEffect(() => {
     load();
@@ -223,18 +223,19 @@ export default function SupervisorSchedules() {
     setSelectedAsignacion(a.idAsignacion);
     setHistory(null);
     setHistoryLoading(true);
-    getSupervisorAssignmentHistory(a.idAsignacion)
+    api.getAssignmentHistory(a.idAsignacion)
       .then(setHistory)
       .catch((err: any) => notify.error(err.message || "Error al cargar el historial"))
       .finally(() => setHistoryLoading(false));
   };
 
   const callList = async (a: SupervisorTeacherSchedule, idHorario: string) => {
+    if (!api.canCallList || !api.startSession) return;
     const key = `${a.idAsignacion}-${idHorario}`;
     setStartingKey(key);
     try {
-      const session = await supervisorStartSession({ idAsignacion: a.idAsignacion, idHorario });
-      navigate(`/supervisor/session-attendance/${session.id}`);
+      const session = await api.startSession({ idAsignacion: a.idAsignacion, idHorario });
+      navigate(`${basePath}/session-attendance/${session.id}`);
     } catch (err: any) {
       notify.error(err.message || "Error al iniciar la sesión");
     } finally {
@@ -314,7 +315,7 @@ export default function SupervisorSchedules() {
             <Logo chip alt="Extracurriculares" className="h-9 w-auto" />
             <div className="min-w-0">
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
-                {supervisor?.nombre} {supervisor?.apellido}
+                {user?.nombre} {user?.apellido}
               </h1>
               <p className="text-xs text-surface-500">Horarios de todos los profesores</p>
             </div>
@@ -446,19 +447,21 @@ export default function SupervisorSchedules() {
                         {renderSchedules(a)}
                       </div>
                     </button>
-                    <div className="sm:flex sm:flex-col sm:items-end gap-2 shrink-0">
-                      <div className="flex flex-wrap gap-2">
-                        {a.schedules.map((sch) => (
-                          <button
-                            key={`call-${sch.idHorario}`}
-                            onClick={() => callList(a, sch.idHorario)}
-                            disabled={startingKey !== null}
-                            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50"
-                          >
-                            {startingKey === `${a.idAsignacion}-${sch.idHorario}` ? "Iniciando..." : `Llamar lista · ${DIAS_CORTO[sch.diaSemana] || sch.diaSemana}`}
-                          </button>
-                        ))}
-                      </div>
+                      <div className="sm:flex sm:flex-col sm:items-end gap-2 shrink-0">
+                      {api.canCallList && (
+                        <div className="flex flex-wrap gap-2">
+                          {a.schedules.map((sch) => (
+                            <button
+                              key={`call-${sch.idHorario}`}
+                              onClick={() => callList(a, sch.idHorario)}
+                              disabled={startingKey !== null}
+                              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50"
+                            >
+                              {startingKey === `${a.idAsignacion}-${sch.idHorario}` ? "Iniciando..." : `Llamar lista · ${DIAS_CORTO[sch.diaSemana] || sch.diaSemana}`}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <span className="text-sm text-brand-600 dark:text-brand-400 font-medium">
                         {a.teacher.nombre} {a.teacher.apellido} · Ver estudiantes →
                       </span>
@@ -513,7 +516,7 @@ export default function SupervisorSchedules() {
                     schedule={h.schedule}
                     students={h.students}
                     sessions={h.sessions}
-                    onViewSession={(sessionId) => navigate(`/supervisor/session/${sessionId}`)}
+                    onViewSession={(sessionId) => navigate(`${basePath}/session/${sessionId}`)}
                   />
                 ))
               )}

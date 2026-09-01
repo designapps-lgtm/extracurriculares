@@ -8,6 +8,8 @@ export const TEACHER_ACCESS_COOKIE = "teacher_access";
 export const TEACHER_REFRESH_COOKIE = "teacher_refresh";
 export const SUPERVISOR_ACCESS_COOKIE = "supervisor_access";
 export const SUPERVISOR_REFRESH_COOKIE = "supervisor_refresh";
+export const SECRETARY_ACCESS_COOKIE = "secretary_access";
+export const SECRETARY_REFRESH_COOKIE = "secretary_refresh";
 
 const isProduction = config.nodeEnv === "production";
 
@@ -23,7 +25,7 @@ const cookieBase = {
 
 export function setAuthCookies(
   res: Response,
-  role: "admin" | "teacher" | "supervisor",
+  role: "admin" | "teacher" | "supervisor" | "secretary",
   accessToken: string,
   refreshToken: string
 ) {
@@ -38,7 +40,7 @@ export function setAuthCookies(
   });
 }
 
-export function clearAuthCookies(res: Response, role: "admin" | "teacher" | "supervisor") {
+export function clearAuthCookies(res: Response, role: "admin" | "teacher" | "supervisor" | "secretary") {
   const prefix = role === "supervisor" ? "supervisor" : role;
   res.clearCookie(`${prefix}_access`, cookieBase);
   res.clearCookie(`${prefix}_refresh`, cookieBase);

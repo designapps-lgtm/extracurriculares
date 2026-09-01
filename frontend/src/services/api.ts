@@ -41,7 +41,7 @@ async function execute(send: () => Promise<Response>): Promise<Response> {
   }
 }
 
-type AuthRole = "admin" | "teacher" | "supervisor";
+type AuthRole = "admin" | "teacher" | "supervisor" | "secretary";
 
 function isAuthPath(path: string): boolean {
   return path.includes("/auth/refresh") || path.includes("/auth/logout") || path.includes("/auth/login") || path.includes("/auth/google");
@@ -51,15 +51,21 @@ function roleForPath(path: string): AuthRole | null {
   if (path.startsWith("/api/admin/")) return "admin";
   if (path.startsWith("/api/teacher/")) return "teacher";
   if (path.startsWith("/api/supervisor/")) return "supervisor";
+  if (path.startsWith("/api/secretary/")) return "secretary";
   return null;
 }
 
 function refreshUrlForRole(role: AuthRole): string {
-  return role === "admin"
-    ? "/api/admin/auth/refresh"
-    : role === "teacher"
-      ? "/api/teacher/auth/refresh"
-      : "/api/supervisor/auth/refresh";
+  switch (role) {
+    case "admin":
+      return "/api/admin/auth/refresh";
+    case "teacher":
+      return "/api/teacher/auth/refresh";
+    case "secretary":
+      return "/api/secretary/auth/refresh";
+    default:
+      return "/api/supervisor/auth/refresh";
+  }
 }
 
 let pendingRefresh: { url: string; promise: Promise<boolean> } | null = null;

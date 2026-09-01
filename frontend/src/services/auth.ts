@@ -1,7 +1,7 @@
 import { api } from "./api";
 import type { ApiResponse } from "../types";
 
-export type AuthRole = "admin" | "teacher" | "supervisor";
+export type AuthRole = "admin" | "teacher" | "supervisor" | "secretary";
 
 export interface AuthUser {
   id: string;
@@ -34,5 +34,14 @@ export async function logout(): Promise<void> {
 }
 
 export function homePathForRole(role: AuthRole): string {
-  return role === "admin" ? "/admin/dashboard" : role === "teacher" ? "/teacher/dashboard" : "/supervisor/dashboard";
+  switch (role) {
+    case "admin":
+      return "/admin/dashboard";
+    case "teacher":
+      return "/teacher/dashboard";
+    case "secretary":
+      return "/secretary/dashboard";
+    default:
+      return "/supervisor/dashboard";
+  }
 }

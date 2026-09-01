@@ -198,6 +198,39 @@ model SupervisorRefreshToken {
   @@index([familyId])
 }
 
+model Secretary {
+  idSecretary String   @id @default(uuid())
+  codigoSecretary String? @unique
+  nombre      String
+  apellido    String
+  correo      String?  @unique
+  fotoUrl     String?
+  estado      String   @default("activo")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  refreshTokens SecretaryRefreshToken[]
+
+  @@index([codigoSecretary])
+  @@index([nombre, apellido])
+}
+
+model SecretaryRefreshToken {
+  id          String    @id @default(uuid())
+  secretaryId String
+  tokenHash   String    @unique
+  familyId    String
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime  @default(now())
+
+  secretary Secretary @relation(fields: [secretaryId], references: [idSecretary], onDelete: Cascade)
+
+  @@index([secretaryId])
+  @@index([familyId])
+}
+
 model AdminUser {
   id           String   @id @default(uuid())
   email        String   @unique
