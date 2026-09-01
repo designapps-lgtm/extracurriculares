@@ -19,6 +19,7 @@ export default function TeacherDashboard() {
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const navigate = useNavigate();
   const notify = useNotify();
 
@@ -91,20 +92,36 @@ export default function TeacherDashboard() {
               <p className="text-xs text-surface-500 truncate">Hoy es {DIAS_ES[dayName] || dayName} · {date}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
-            Salir
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowAll((s) => !s)}
+              className="px-3 py-2 text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg"
+            >
+              {showAll ? "Ver solo hoy" : "Ver todos"}
+            </button>
+            <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6">
+        {!showAll && (
+          <button
+            onClick={() => setShowAll(true)}
+            className="w-full mb-6 px-4 py-2.5 border border-dashed border-brand-300 dark:border-brand-700 text-brand-600 dark:text-brand-400 text-sm font-medium rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20"
+          >
+            Ver todos los horarios asignados →
+          </button>
+        )}
         {classes.length === 0 ? (
           <div className="card p-8 text-center">
             <p className="text-surface-500">No tienes asignaciones registradas.</p>
           </div>
         ) : (
           <div className="space-y-6">
-            {sortedDaysReordered.map((day) => {
+            {(showAll ? sortedDaysReordered : sortedDaysReordered.filter((d) => d === dayName)).map((day) => {
               const isToday = day === dayName;
               return (
                 <div key={day}>
