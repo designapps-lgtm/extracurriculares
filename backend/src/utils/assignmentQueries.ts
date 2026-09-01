@@ -22,6 +22,7 @@ export interface AssignmentRow {
 }
 
 interface ScheduleLinkRow {
+  idHorario: string;
   idAsignacion: string;
   diaSemana: string;
   horaInicio: string | null;
@@ -36,7 +37,7 @@ export async function buildAssignmentList(rows: AssignmentRow[]) {
 
   const ids = rows.map((r) => r.idAsignacion);
   const scheduleLinks = await sql(
-    `SELECT asch."idAsignacion", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula"
+    `SELECT asch."idAsignacion", sc."idHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula"
      FROM "AssignmentSchedule" asch
      LEFT JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
      WHERE asch."idAsignacion" = ANY($1)
@@ -50,7 +51,7 @@ export async function buildAssignmentList(rows: AssignmentRow[]) {
     byAssignment[sl.idAsignacion].push(sl);
   }
 
-  return rows.map((r) => ({
+    return rows.map((r) => ({
     idAsignacion: r.idAsignacion,
     idProfesor: r.idProfesor,
     codigoDisciplina: r.codigoDisciplina,
@@ -61,9 +62,9 @@ export async function buildAssignmentList(rows: AssignmentRow[]) {
     updatedAt: r.updatedAt,
     teacher: { idProfesor: r.idProfesor, nombre: r.profesorNombre, apellido: r.profesorApellido },
     discipline: { codigoDisciplina: r.codigoDisciplina, nombre: r.disciplinaNombre },
-    grade: { idGrado: r.idGrado, nombre: r.gradoNombre },
-    schedules: (byAssignment[r.idAsignacion] ?? []).map((sl) => ({
-      schedule: { diaSemana: sl.diaSemana, horaInicio: sl.horaInicio, horaFin: sl.horaFin, aula: sl.aula },
-    })),
-  }));
+      grade: { idGrado: r.idGrado, nombre: r.gradoNombre },
+      schedules: (byAssignment[r.idAsignacion] ?? []).map((sl) => ({
+      schedule: { idHorario: sl.idHorario, diaSemana: sl.diaSemana, horaInicio: sl.horaInicio, horaFin: sl.horaFin, aula: sl.aula },
+      })),
+    }));
 }
