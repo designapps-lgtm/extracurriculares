@@ -200,6 +200,7 @@ interface AttendanceRow {
   nombre: string;
   apellido: string;
   grupo: string | null;
+  fotoUrl?: string | null;
   estado: string;
 }
 
@@ -221,7 +222,7 @@ export async function getSupervisorSessionAttendance(req: Request, res: Response
   }
 
   const records = await sql(
-    `SELECT a."codigoEstudiante", st."nombre", st."apellido", st."grupo", a."estado"
+    `SELECT a."codigoEstudiante", st."nombre", st."apellido", st."grupo", st."fotoUrl", a."estado"
      FROM "AttendanceRecord" a
      LEFT JOIN "Student" st ON st."codigoEstudiante" = a."codigoEstudiante"
      WHERE a."sessionId" = $1
@@ -245,6 +246,7 @@ export async function getSupervisorSessionAttendance(req: Request, res: Response
         nombre: a.nombre,
         apellido: a.apellido,
         grupo: a.grupo,
+        fotoUrl: a.fotoUrl,
         estado: a.estado,
       })),
     },
@@ -416,6 +418,109 @@ export async function exportSupervisorSessionAttendance(req: Request, res: Respo
     })
   );
   sendWorkbook(res, rows);
+}
+
+function supervisorNowColombia() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Bogota",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "0";
+  return new Date(`${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`);
+}
+
+const SUP_DIA_MAP_COL: Record<string, string> = {
+  0: "DOMINGO", 1: "LUNES", 2: "MARTES", 3: "MIERCOLES",
+  4: "JUEVES", 5: "VIERNES", 6: "SABADO",
+};
+
+// Clases de todos los profesores. Con `today=1` devuelve solo las del día de
+// hoy; si no, todas (el supervisor puede llamar a lista en cualquiera).
+export async function getSupervisorClasses(req: Request, res: Response) {
+  const todayOnly = String(req.query.today || "") === "1";
+  const today = supervisorNowColombia();
+  const todayStr = today.toISOString().split("T")[0];
+  const todayDay = SUP_DIA_MAP_COL[today.getDay()];
+
+  const assignmentRows = (await sql`
+    SELECT
+      ea."idAsignacion", ea."codigoDisciplina", ea."idGrado",
+      d."nombre" AS "disciplinaNombre",
+      g."idGrado" AS "gradoIdGrado", g."nombre" AS "gradoNombre",
+      t."idProfesor", t."nombre" AS "profesorNombre", t."apellido" AS "profesorApellido",
+      sc."idHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula"
+    FROM "ExtracurricularAssignment" ea
+    LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+    LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+    LEFT JOIN "Teacher" t ON t."idProfesor" = ea."idProfesor"
+    LEFT JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
+    LEFT JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
+    WHERE ea."estado" = 'activo'
+    ORDER BY sc."diaSemana" ASC, t."apellido" ASC, t."nombre" ASC
+  `) as unknown as Array<{
+    idAsignacion: string; codigoDisciplina: string; idGrado: number;
+    disciplinaNombre: string; gradoIdGrado: number; gradoNombre: string;
+    idProfesor: string; profesorNombre: string; profesorApellido: string;
+    idHorario: string | null; diaSemana: string | null; horaInicio: string | null;
+    horaFin: string | null; aula: string | null;
+  }>;
+
+  const classesWithStats = await Promise.all(
+    assignmentRows
+      .filter((a) => a.idHorario !== null)
+      .map(async (a) => {
+        const enrolledCountRow = (await sql`
+          SELECT COUNT(*)::int AS cnt
+          FROM "StudentSchedule" ss
+          LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+          WHERE ss."codigoDisciplina" = ${a.codigoDisciplina}
+            AND ss."diaSemana" = ${a.diaSemana!}
+            AND st."idGrado" = ${a.idGrado}
+        `) as unknown as Array<{ cnt: number }>;
+
+        const sessionRow = await first<{
+          id: string; estado: string; attendanceCount: number;
+        }>((await sql`
+          SELECT cs."id", cs."estado",
+                 COUNT(ar."id")::int AS "attendanceCount"
+          FROM "ClassSession" cs
+          LEFT JOIN "AttendanceRecord" ar ON ar."sessionId" = cs."id"
+          WHERE cs."idAsignacion" = ${a.idAsignacion}
+            AND cs."idHorario" = ${a.idHorario!}
+            AND cs."fecha"::date = ${todayStr}::date
+          GROUP BY cs."id", cs."estado"
+        `) as unknown as Array<{ id: string; estado: string; attendanceCount: number }>);
+
+        return {
+          idAsignacion: a.idAsignacion,
+          discipline: { codigoDisciplina: a.codigoDisciplina, nombre: a.disciplinaNombre },
+          grade: { idGrado: a.gradoIdGrado, nombre: a.gradoNombre },
+          teacher: { idProfesor: a.idProfesor, nombre: a.profesorNombre, apellido: a.profesorApellido },
+          schedule: { idHorario: a.idHorario, diaSemana: a.diaSemana, horaInicio: a.horaInicio, horaFin: a.horaFin, aula: a.aula },
+          isToday: a.diaSemana === todayDay,
+          enrolledCount: enrolledCountRow[0]?.cnt ?? 0,
+          sessionId: sessionRow?.id ?? null,
+          sessionEstado: sessionRow?.estado ?? null,
+          attendanceCount: sessionRow?.attendanceCount ?? 0,
+        };
+      })
+  );
+
+  const classes = todayOnly
+    ? classesWithStats.filter((c) => c.isToday)
+    : classesWithStats;
+
+  res.json({
+    success: true,
+    data: {
+      date: todayStr,
+      dayName: todayDay,
+      classes,
+    },
+  });
 }
 
 export async function getSupervisorTeacherSchedules(req: Request, res: Response) {
@@ -773,5 +878,461 @@ export async function deleteSupervisorStay(req: Request, res: Response) {
     throw new AppError(404, "STAY_NOT_FOUND", "Registro no encontrado");
   }
 
+  res.json({ success: true, data: { id: deleted[0].id } });
+}
+
+// ---- Toma de asistencia por el supervisor ----
+
+export async function supervisorStartSession(req: Request, res: Response) {
+  const { idAsignacion, idHorario } = req.body;
+
+  if (!idAsignacion || !idHorario) {
+    throw new AppError(400, "VALIDATION_ERROR", "idAsignacion e idHorario son requeridos");
+  }
+
+  const assignment = await first<{ idProfesor: string }>(
+    (await sql`
+      SELECT "idProfesor"
+      FROM "ExtracurricularAssignment"
+      WHERE "idAsignacion" = ${idAsignacion}
+      LIMIT 1
+    `) as unknown as Array<{ idProfesor: string }>
+  );
+
+  if (!assignment) {
+    throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Asignación no encontrada");
+  }
+
+  const scheduleLink = await first<{ id: string }>(
+    (await sql`
+      SELECT "id"
+      FROM "AssignmentSchedule"
+      WHERE "idAsignacion" = ${idAsignacion} AND "idHorario" = ${idHorario}
+      LIMIT 1
+    `) as unknown as Array<{ id: string }>
+  );
+
+  if (!scheduleLink) {
+    throw new AppError(400, "INVALID_SCHEDULE", "El horario no pertenece a esta asignación");
+  }
+
+  const today = supervisorNowColombia();
+
+  let session = await first<{ id: string; estado: string }>(
+    (await sql`
+      SELECT "id", "estado"
+      FROM "ClassSession"
+      WHERE "idAsignacion" = ${idAsignacion}
+        AND "idHorario" = ${idHorario}
+        AND "fecha"::date = ${today.toISOString().split("T")[0]}::date
+      LIMIT 1
+    `) as unknown as Array<{ id: string; estado: string }>
+  );
+
+  if (!session) {
+    const created = (await sql`
+      INSERT INTO "ClassSession" ("id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt")
+      VALUES (gen_random_uuid(), ${idAsignacion}, ${idHorario}, ${assignment.idProfesor}, ${today}, 'en_curso', now(), now())
+      RETURNING "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt"
+    `) as unknown as Array<any>;
+    session = created[0];
+  } else if (session.estado === "programada") {
+    const updated = (await sql`
+      UPDATE "ClassSession"
+      SET "estado" = 'en_curso', "updatedAt" = now()
+      WHERE "id" = ${session.id}
+      RETURNING "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt"
+    `) as unknown as Array<any>;
+    session = updated[0];
+  }
+
+  res.json({ success: true, data: session });
+}
+
+export async function getSupervisorAttendanceList(req: Request, res: Response) {
+  const sessionId = param(req, "sessionId");
+
+  const sessionRow = await first<any>(
+    (await sql`
+      SELECT
+        cs."id", cs."estado", cs."fecha", cs."idProfesor",
+        ea."idAsignacion", ea."codigoDisciplina",
+        d."nombre" AS "discNombre",
+        g."idGrado" AS "gradoIdGrado", g."nombre" AS "gradoNombre",
+        sc."idHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula",
+        t."nombre" AS "profesorNombre", t."apellido" AS "profesorApellido"
+      FROM "ClassSession" cs
+      LEFT JOIN "ExtracurricularAssignment" ea ON ea."idAsignacion" = cs."idAsignacion"
+      LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
+      LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+      LEFT JOIN "Schedule" sc ON sc."idHorario" = cs."idHorario"
+      LEFT JOIN "Teacher" t ON t."idProfesor" = cs."idProfesor"
+      WHERE cs."id" = ${sessionId}
+      LIMIT 1
+    `) as unknown as Array<any>
+  );
+
+  if (!sessionRow) {
+    throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
+  }
+
+  const sessionFechaStr = new Date(sessionRow.fecha).toISOString().split("T")[0];
+
+  const enrolledStudents = (await sql`
+    SELECT
+      ss."codigoEstudiante",
+      st."nombre", st."apellido", st."grupo", st."fotoUrl"
+    FROM "StudentSchedule" ss
+    LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+    WHERE ss."codigoDisciplina" = ${sessionRow.codigoDisciplina}
+      AND ss."diaSemana" = ${sessionRow.diaSemana}
+      AND st."idGrado" = ${sessionRow.gradoIdGrado}
+  `) as unknown as Array<{
+    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
+  }>;
+
+  const transferredAway = (await sql`
+    SELECT "codigoEstudiante"
+    FROM "StudentTransfer"
+    WHERE "idAsignacionOrigen" = ${sessionRow.idAsignacion}
+      AND "fecha" = ${sessionFechaStr}::date
+  `) as unknown as Array<{ codigoEstudiante: string }>;
+
+  const awaySet = new Set(transferredAway.map((t) => t.codigoEstudiante));
+
+  const stays = (await sql`
+    SELECT
+      st."codigoEstudiante",
+      s."nombre", s."apellido", s."grupo", s."fotoUrl"
+    FROM "SupervisorStay" st
+    LEFT JOIN "Student" s ON s."codigoEstudiante" = st."codigoEstudiante"
+    WHERE st."idAsignacion" = ${sessionRow.idAsignacion}
+      AND st."idHorario" = ${sessionRow.idHorario}
+      AND st."fecha" = ${sessionRow.fecha}::date
+  `) as unknown as Array<{
+    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
+  }>;
+
+  const transferredIn = (await sql`
+    SELECT
+      t."codigoEstudiante",
+      s."nombre", s."apellido", s."grupo", s."fotoUrl",
+      oa."codigoDisciplina", od."nombre" AS "origenDisciplinaNombre"
+    FROM "StudentTransfer" t
+    LEFT JOIN "Student" s ON s."codigoEstudiante" = t."codigoEstudiante"
+    LEFT JOIN "ExtracurricularAssignment" oa ON oa."idAsignacion" = t."idAsignacionOrigen"
+    LEFT JOIN "Discipline" od ON od."codigoDisciplina" = oa."codigoDisciplina"
+    WHERE t."idAsignacionDestino" = ${sessionRow.idAsignacion}
+      AND t."idHorarioDestino" = ${sessionRow.idHorario}
+      AND t."fecha" = ${sessionFechaStr}::date
+  `) as unknown as Array<{
+    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
+    codigoDisciplina: string | null; origenDisciplinaNombre: string | null;
+  }>;
+
+  const allStudents = [
+    ...enrolledStudents
+      .filter((es) => !awaySet.has(es.codigoEstudiante))
+      .map((es) => ({ ...es, origen: "inscrito" as const })),
+    ...stays
+      .filter((st) => !awaySet.has(st.codigoEstudiante) && !enrolledStudents.some((e) => e.codigoEstudiante === st.codigoEstudiante))
+      .map((st) => ({ ...st, origen: "quedado" as const })),
+    ...transferredIn.map((t) => ({
+      codigoEstudiante: t.codigoEstudiante,
+      nombre: t.nombre,
+      apellido: t.apellido,
+      grupo: t.grupo,
+      fotoUrl: t.fotoUrl,
+      origen: "trasladado" as const,
+      origenDisciplina: t.origenDisciplinaNombre ?? t.codigoDisciplina ?? "",
+    })),
+  ];
+
+  const existingAttendance = (await sql`
+    SELECT "codigoEstudiante", "estado"
+    FROM "AttendanceRecord"
+    WHERE "sessionId" = ${sessionId}
+  `) as unknown as Array<{ codigoEstudiante: string; estado: string }>;
+
+  const attendanceMap = new Map(existingAttendance.map((a) => [a.codigoEstudiante, a.estado]));
+
+  const students = allStudents.map((es) => ({
+    codigoEstudiante: es.codigoEstudiante,
+    nombre: es.nombre,
+    apellido: es.apellido,
+    grupo: es.grupo,
+    fotoUrl: es.fotoUrl,
+    origen: es.origen,
+    origenDisciplina: (es as any).origenDisciplina,
+    estado: attendanceMap.get(es.codigoEstudiante) || "pendiente",
+  }));
+
+  res.json({
+    success: true,
+    data: {
+      session: { id: sessionRow.id, estado: sessionRow.estado, fecha: sessionRow.fecha },
+      assignment: {
+        idAsignacion: sessionRow.idAsignacion,
+        discipline: { codigoDisciplina: sessionRow.codigoDisciplina, nombre: sessionRow.discNombre },
+        grade: { idGrado: sessionRow.gradoIdGrado, nombre: sessionRow.gradoNombre },
+      },
+      teacher: { idProfesor: sessionRow.idProfesor, nombre: sessionRow.profesorNombre, apellido: sessionRow.profesorApellido },
+      schedule: { idHorario: sessionRow.idHorario, diaSemana: sessionRow.diaSemana, horaInicio: sessionRow.horaInicio, horaFin: sessionRow.horaFin, aula: sessionRow.aula },
+      students,
+    },
+  });
+}
+
+export async function supervisorSaveAttendance(req: Request, res: Response) {
+  const sessionId = param(req, "sessionId");
+  const { records } = req.body;
+
+  if (!records || !Array.isArray(records)) {
+    throw new AppError(400, "VALIDATION_ERROR", "records debe ser un array");
+  }
+
+  const session = await first<{ id: string }>(
+    (await sql`
+      SELECT "id"
+      FROM "ClassSession"
+      WHERE "id" = ${sessionId}
+      LIMIT 1
+    `) as unknown as Array<{ id: string }>
+  );
+  if (!session) {
+    throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
+  }
+
+  await sql`DELETE FROM "AttendanceRecord" WHERE "sessionId" = ${sessionId}`;
+
+  const validRecords = records.filter((r: any) =>
+    r.estado === "presente" || r.estado === "ausente" || r.estado === "justificado"
+  );
+
+  if (validRecords.length > 0) {
+    await sql.transaction((tx) =>
+      validRecords.map((r: any) =>
+        tx`INSERT INTO "AttendanceRecord" ("id", "sessionId", "codigoEstudiante", "estado", "createdAt")
+           VALUES (gen_random_uuid(), ${sessionId}, ${r.codigoEstudiante}, ${r.estado}, now())`
+      )
+    );
+  }
+
+  await sql`UPDATE "ClassSession" SET "estado" = 'finalizada', "updatedAt" = now() WHERE "id" = ${sessionId}`;
+
+  res.json({ success: true, data: { message: "Asistencia guardada", total: validRecords.length } });
+}
+
+const TRANSFER_SELECT = `
+  t."id", t."codigoEstudiante",
+  st."nombre" AS "estNombre", st."apellido" AS "estApellido", st."grupo" AS "estGrupo",
+  t."fecha", t."motivo", t."createdAt",
+  oa."idAsignacion" AS "origenIdAsignacion", oa."codigoDisciplina" AS "origenCodigoDisciplina",
+  od."nombre" AS "origenDisciplinaNombre", og."nombre" AS "origenGradoNombre",
+  da."idAsignacion" AS "destIdAsignacion", da."codigoDisciplina" AS "destCodigoDisciplina",
+  dd."nombre" AS "destDisciplinaNombre", dg."nombre" AS "destGradoNombre",
+  dt."idProfesor" AS "destIdProfesor", dt."nombre" AS "destProfesorNombre", dt."apellido" AS "destProfesorApellido",
+  ds."idHorario" AS "destIdHorario", ds."diaSemana" AS "destDiaSemana",
+  ds."horaInicio" AS "destHoraInicio", ds."horaFin" AS "destHoraFin", ds."aula" AS "destAula",
+  sup."idSupervisor" AS "supId", sup."nombre" AS "supNombre", sup."apellido" AS "supApellido"
+`;
+
+function shapeTransfer(r: any) {
+  return {
+    id: r.id,
+    codigoEstudiante: r.codigoEstudiante,
+    student: {
+      codigoEstudiante: r.codigoEstudiante,
+      nombre: r.estNombre,
+      apellido: r.estApellido,
+      grupo: r.estGrupo,
+    },
+    fecha: r.fecha,
+    motivo: r.motivo,
+    createdAt: r.createdAt,
+    origen: {
+      idAsignacion: r.origenIdAsignacion,
+      codigoDisciplina: r.origenCodigoDisciplina,
+      discipline: { nombre: r.origenDisciplinaNombre },
+      grade: { nombre: r.origenGradoNombre },
+    },
+    destino: {
+      idAsignacion: r.destIdAsignacion,
+      idHorario: r.destIdHorario,
+      discipline: { nombre: r.destDisciplinaNombre },
+      grade: { nombre: r.destGradoNombre },
+      teacher: {
+        idProfesor: r.destIdProfesor,
+        nombre: r.destProfesorNombre,
+        apellido: r.destProfesorApellido,
+      },
+      schedule: {
+        idHorario: r.destIdHorario,
+        diaSemana: r.destDiaSemana,
+        horaInicio: r.destHoraInicio,
+        horaFin: r.destHoraFin,
+        aula: r.destAula,
+      },
+    },
+    supervisor: {
+      idSupervisor: r.supId,
+      nombre: r.supNombre,
+      apellido: r.supApellido,
+    },
+  };
+}
+
+function transferDayLabel(fechaStr: string): string {
+  const d = new Date(`${fechaStr}T00:00:00.000Z`);
+  return SUP_DIA_MAP_COL[d.getUTCDay()];
+}
+
+// Crea un traslado puntual de un estudiante: ese día deja su clase de origen y
+// pasa a la clase destino (misma fecha), dejando trazabilidad con el motivo.
+export async function createSupervisorTransfer(req: Request, res: Response) {
+  const { codigoEstudiante, idAsignacionOrigen, idAsignacionDestino, idHorarioDestino, fecha, motivo } = req.body;
+  const supervisorId = (req as any).supervisor?.supervisorId;
+
+  const fechaStr = typeof fecha === "string" ? fecha : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) {
+    throw new AppError(400, "VALIDATION_ERROR", "fecha debe tener formato YYYY-MM-DD");
+  }
+  if (!codigoEstudiante || !idAsignacionOrigen || !idAsignacionDestino || !idHorarioDestino) {
+    throw new AppError(400, "VALIDATION_ERROR", "Faltan datos del traslado");
+  }
+  if (!motivo || !motivo.trim()) {
+    throw new AppError(400, "VALIDATION_ERROR", "Debe indicar el motivo del traslado");
+  }
+  if (!supervisorId) {
+    throw new AppError(401, "UNAUTHORIZED", "Supervisor no autenticado");
+  }
+
+  const student = await first<{ codigoEstudiante: string }>(
+    (await sql`
+      SELECT "codigoEstudiante" FROM "Student" WHERE "codigoEstudiante" = ${codigoEstudiante} LIMIT 1
+    `) as unknown as Array<{ codigoEstudiante: string }>
+  );
+  if (!student) throw new AppError(404, "STUDENT_NOT_FOUND", "Estudiante no encontrado");
+
+  const origen = await first<any>(
+    (await sql`
+      SELECT ea."idAsignacion", ea."codigoDisciplina", ea."idGrado"
+      FROM "ExtracurricularAssignment" ea
+      WHERE ea."idAsignacion" = ${idAsignacionOrigen} AND ea."estado" = 'activo' LIMIT 1
+    `) as unknown as Array<any>
+  );
+  if (!origen) throw new AppError(404, "ORIGIN_NOT_FOUND", "Clase de origen no encontrada");
+
+  const destino = await first<any>(
+    (await sql`
+      SELECT ea."idAsignacion", ea."codigoDisciplina", ea."idGrado", ea."idProfesor"
+      FROM "ExtracurricularAssignment" ea
+      WHERE ea."idAsignacion" = ${idAsignacionDestino} AND ea."estado" = 'activo' LIMIT 1
+    `) as unknown as Array<any>
+  );
+  if (!destino) throw new AppError(404, "DEST_NOT_FOUND", "Clase de destino no encontrada");
+
+  if (idAsignacionOrigen === idAsignacionDestino) {
+    throw new AppError(400, "SAME_ASSIGNMENT", "La clase de destino debe ser distinta a la de origen");
+  }
+
+  const scheduleLink = await first<{ id: string; diaSemana: string }>(
+    (await sql`
+      SELECT asc2."id", sc."diaSemana"
+      FROM "AssignmentSchedule" asc2
+      JOIN "Schedule" sc ON sc."idHorario" = asc2."idHorario"
+      WHERE asc2."idAsignacion" = ${idAsignacionDestino} AND asc2."idHorario" = ${idHorarioDestino} LIMIT 1
+    `) as unknown as Array<{ id: string; diaSemana: string }>
+  );
+  if (!scheduleLink) {
+    throw new AppError(400, "INVALID_SCHEDULE", "El horario de destino no pertenece a la clase de destino");
+  }
+
+  const fechaDay = transferDayLabel(fechaStr);
+  if (scheduleLink.diaSemana !== fechaDay) {
+    throw new AppError(400, "DAY_MISMATCH", `La clase de destino es de ${scheduleLink.diaSemana} y la fecha es ${fechaDay}`);
+  }
+
+  const enrolled = await first<{ codigoEstudiante: string }>(
+    (await sql`
+      SELECT ss."codigoEstudiante"
+      FROM "StudentSchedule" ss
+      WHERE ss."codigoEstudiante" = ${codigoEstudiante}
+        AND ss."codigoDisciplina" = ${origen.codigoDisciplina}
+        AND ss."diaSemana" = ${fechaDay} LIMIT 1
+    `) as unknown as Array<{ codigoEstudiante: string }>
+  );
+  if (!enrolled) {
+    throw new AppError(400, "NOT_ENROLLED_ORIGIN", "El estudiante no está inscrito en la clase de origen ese día");
+  }
+
+  const existing = await first<{ id: string }>(
+    (await sql`
+      SELECT "id" FROM "StudentTransfer"
+      WHERE "codigoEstudiante" = ${codigoEstudiante} AND "fecha" = ${fechaStr}::date LIMIT 1
+    `) as unknown as Array<{ id: string }>
+  );
+  if (existing) {
+    throw new AppError(409, "TRANSFER_EXISTS", "Ya existe un traslado para este estudiante en esa fecha");
+  }
+
+  const created = (await sql`
+    INSERT INTO "StudentTransfer"
+      ("id", "codigoEstudiante", "idAsignacionOrigen", "idAsignacionDestino", "idHorarioDestino", "fecha", "motivo", "idSupervisor", "createdAt")
+    VALUES
+      (gen_random_uuid(), ${codigoEstudiante}, ${idAsignacionOrigen}, ${idAsignacionDestino}, ${idHorarioDestino}, ${fechaStr}::date, ${motivo.trim()}, ${supervisorId}, now())
+    RETURNING "id", "codigoEstudiante", "fecha", "motivo", "createdAt"
+  `) as unknown as Array<any>;
+
+  res.status(201).json({ success: true, data: created[0] });
+}
+
+// Historial de traslados (trazabilidad). Filtros opcionales: por estudiante y/o fecha.
+export async function listSupervisorTransfers(req: Request, res: Response) {
+  const { codigoEstudiante, fecha } = req.query as Record<string, string>;
+  const conditions: string[] = [];
+  const params: any[] = [];
+
+  if (codigoEstudiante) {
+    params.push(codigoEstudiante);
+    conditions.push(`t."codigoEstudiante" = $${params.length}`);
+  }
+  if (fecha) {
+    params.push(fecha);
+    conditions.push(`t."fecha" = $${params.length}::date`);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const rows = (await sql`
+    SELECT ${TRANSFER_SELECT}
+    FROM "StudentTransfer" t
+    LEFT JOIN "Student" st ON st."codigoEstudiante" = t."codigoEstudiante"
+    LEFT JOIN "ExtracurricularAssignment" oa ON oa."idAsignacion" = t."idAsignacionOrigen"
+    LEFT JOIN "Discipline" od ON od."codigoDisciplina" = oa."codigoDisciplina"
+    LEFT JOIN "Grade" og ON og."idGrado" = oa."idGrado"
+    LEFT JOIN "ExtracurricularAssignment" da ON da."idAsignacion" = t."idAsignacionDestino"
+    LEFT JOIN "Discipline" dd ON dd."codigoDisciplina" = da."codigoDisciplina"
+    LEFT JOIN "Grade" dg ON dg."idGrado" = da."idGrado"
+    LEFT JOIN "Teacher" dt ON dt."idProfesor" = da."idProfesor"
+    LEFT JOIN "Schedule" ds ON ds."idHorario" = t."idHorarioDestino"
+    LEFT JOIN "Supervisor" sup ON sup."idSupervisor" = t."idSupervisor"
+    ${where}
+    ORDER BY t."fecha" DESC, t."createdAt" DESC
+  `) as unknown as Array<any>;
+
+  res.json({ success: true, data: rows.map(shapeTransfer) });
+}
+
+// Cancela un traslado (quita la trazabilidad activa de ese día).
+export async function deleteSupervisorTransfer(req: Request, res: Response) {
+  const transferId = param(req, "id");
+  const deleted = (await sql`
+    DELETE FROM "StudentTransfer" WHERE "id" = ${transferId} RETURNING "id"
+  `) as unknown as Array<{ id: string }>;
+
+  if (!deleted[0]) {
+    throw new AppError(404, "TRANSFER_NOT_FOUND", "Traslado no encontrado");
+  }
   res.json({ success: true, data: { id: deleted[0].id } });
 }

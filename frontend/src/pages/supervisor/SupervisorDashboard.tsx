@@ -128,6 +128,18 @@ export default function SupervisorDashboard() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
+              onClick={() => navigate("/supervisor/classes")}
+              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+            >
+              Llamar lista
+            </button>
+            <button
+              onClick={() => navigate("/supervisor/transfers")}
+              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+            >
+              Traslados
+            </button>
+            <button
               onClick={() => navigate("/supervisor/schedules")}
               className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
             >

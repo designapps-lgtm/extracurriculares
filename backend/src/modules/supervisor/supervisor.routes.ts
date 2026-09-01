@@ -14,16 +14,39 @@ import {
   getSupervisorStays,
   createSupervisorStay,
   deleteSupervisorStay,
+  getSupervisorClasses,
+  supervisorStartSession,
+  getSupervisorAttendanceList,
+  supervisorSaveAttendance,
+  createSupervisorTransfer,
+  listSupervisorTransfers,
+  deleteSupervisorTransfer,
 } from "./supervisor.service";
+import { getNovedadesBatch } from "../novedades/novedades.controller";
 
 const router = Router();
 
 router.use(authenticateSupervisor, requireActiveSupervisor);
 
+router.get("/classes", asyncHandler(getSupervisorClasses));
+
+// Toma de asistencia del supervisor
+router.post("/sessions/start", asyncHandler(supervisorStartSession));
+router.get("/sessions/:sessionId/attendance", asyncHandler(getSupervisorAttendanceList));
+router.post("/sessions/:sessionId/attendance", asyncHandler(supervisorSaveAttendance));
+
+// Novedades para el supervisor (mismo batch de los profesores)
+router.get("/novedades/batch", asyncHandler(getNovedadesBatch));
+
 router.get("/stays/search", asyncHandler(searchSupervisorStudents));
 router.get("/stays", asyncHandler(getSupervisorStays));
 router.post("/stays", asyncHandler(createSupervisorStay));
 router.delete("/stays/:stayId", asyncHandler(deleteSupervisorStay));
+
+// Traslados de estudiantes por fecha (trazabilidad)
+router.get("/transfers", asyncHandler(listSupervisorTransfers));
+router.post("/transfers", asyncHandler(createSupervisorTransfer));
+router.delete("/transfers/:id", asyncHandler(deleteSupervisorTransfer));
 
 router.get("/schedules", asyncHandler(getSupervisorTeacherSchedules));
 router.get("/schedules/:asignacionId/:horarioId", asyncHandler(getSupervisorScheduleHistory));

@@ -10,6 +10,10 @@ import type {
   SupervisorAssignmentHistory,
   SupervisorStay,
   SupervisorStayStudent,
+  SupervisorClassesResponse,
+  AttendanceResponse,
+  StudentNovedades,
+  SupervisorTransfer,
 } from "../types";
 
 export async function supervisorLogin(email: string): Promise<{ supervisor: Supervisor }> {
@@ -117,4 +121,75 @@ export async function createSupervisorStay(payload: {
 
 export async function deleteSupervisorStay(stayId: string): Promise<void> {
   await api.delete<ApiResponse<{ id: string }>>(`/api/supervisor/stays/${stayId}`);
+}
+
+export async function getSupervisorClasses(todayOnly?: boolean): Promise<SupervisorClassesResponse> {
+  const res = await api.get<ApiResponse<SupervisorClassesResponse>>("/api/supervisor/classes", {
+    ...(todayOnly ? { today: "1" } : {}),
+  });
+  return res.data;
+}
+
+export async function supervisorStartSession(data: {
+  idAsignacion: string;
+  idHorario: string;
+}): Promise<{ id: string }> {
+  const res = await api.post<ApiResponse<{ id: string }>>("/api/supervisor/sessions/start", data);
+  return res.data;
+}
+
+export async function getSupervisorAttendanceList(sessionId: string): Promise<AttendanceResponse> {
+  const res = await api.get<ApiResponse<AttendanceResponse>>(
+    `/api/supervisor/sessions/${sessionId}/attendance`,
+  );
+  return res.data;
+}
+
+export async function supervisorSaveAttendance(
+  sessionId: string,
+  records: { codigoEstudiante: string; estado: string }[],
+): Promise<{ id: string }> {
+  const res = await api.post<ApiResponse<{ id: string }>>(
+    `/api/supervisor/sessions/${sessionId}/attendance`,
+    { records },
+  );
+  return res.data;
+}
+
+export async function getSupervisorNovedadesBatch(
+  codigos: string[],
+  fecha?: string,
+): Promise<StudentNovedades[]> {
+  const res = await api.get<ApiResponse<StudentNovedades[]>>(`/api/supervisor/novedades/batch`, {
+    codigos: codigos.join(","),
+    fecha: fecha || "",
+  });
+  return res.data;
+}
+
+export async function listSupervisorTransfers(params?: {
+  codigoEstudiante?: string;
+  fecha?: string;
+}): Promise<SupervisorTransfer[]> {
+  const res = await api.get<ApiResponse<SupervisorTransfer[]>>(`/api/supervisor/transfers`, {
+    codigoEstudiante: params?.codigoEstudiante || "",
+    fecha: params?.fecha || "",
+  });
+  return res.data;
+}
+
+export async function createSupervisorTransfer(data: {
+  codigoEstudiante: string;
+  idAsignacionOrigen: string;
+  idAsignacionDestino: string;
+  idHorarioDestino: string;
+  fecha: string;
+  motivo: string;
+}): Promise<{ id: string }> {
+  const res = await api.post<ApiResponse<{ id: string }>>(`/api/supervisor/transfers`, data);
+  return res.data;
+}
+
+export async function deleteSupervisorTransfer(id: string): Promise<void> {
+  await api.delete<ApiResponse<{ id: string }>>(`/api/supervisor/transfers/${id}`);
 }

@@ -24,6 +24,7 @@ model Student {
   studentSchedules StudentSchedule[]
   attendances      AttendanceRecord[]
   supervisorStays  SupervisorStay[]
+  studentTransfers StudentTransfer[]
 
   @@index([idGrado])
   @@index([nombre, apellido])
@@ -118,6 +119,7 @@ model Schedule {
   assignmentSchedules AssignmentSchedule[]
   sessions            ClassSession[]
   stays               SupervisorStay[]
+  transfersDestino    StudentTransfer[]   @relation("TransferDestino")
 
   @@index([diaSemana])
 }
@@ -138,6 +140,8 @@ model ExtracurricularAssignment {
   schedules  AssignmentSchedule[]
   sessions   ClassSession[]
   stays      SupervisorStay[]
+  transfersOrigen  StudentTransfer[] @relation("TransferOrigen")
+  transfersDestino StudentTransfer[] @relation("TransferDestino")
 
   @@unique([idProfesor, codigoDisciplina, idGrado])
   @@index([codigoDisciplina])
@@ -172,6 +176,7 @@ model Supervisor {
 
   refreshTokens SupervisorRefreshToken[]
   stays         SupervisorStay[]
+  transfers     StudentTransfer[]
 
   @@index([codigoSupervisor])
   @@index([nombre, apellido])
@@ -322,5 +327,30 @@ model SupervisorStay {
   @@unique([idAsignacion, idHorario, codigoEstudiante, fecha])
   @@index([idAsignacion, idHorario])
   @@index([codigoEstudiante])
+  @@index([fecha])
+}
+
+model StudentTransfer {
+  id                  String   @id @default(uuid())
+  codigoEstudiante    String
+  idAsignacionOrigen  String
+  idAsignacionDestino String
+  idHorarioDestino    String
+  fecha               DateTime @db.Date
+  motivo              String
+  idSupervisor        String
+  createdAt           DateTime @default(now())
+
+  student          Student                  @relation(fields: [codigoEstudiante], references: [codigoEstudiante])
+  assignmentOrigen  ExtracurricularAssignment @relation("TransferOrigen", fields: [idAsignacionOrigen], references: [idAsignacion])
+  assignmentDestino ExtracurricularAssignment @relation("TransferDestino", fields: [idAsignacionDestino], references: [idAsignacion])
+  scheduleDestino   Schedule                 @relation("TransferDestino", fields: [idHorarioDestino], references: [idHorario])
+  supervisor        Supervisor               @relation(fields: [idSupervisor], references: [idSupervisor])
+
+  @@unique([codigoEstudiante, fecha])
+  @@index([idAsignacionOrigen])
+  @@index([idAsignacionDestino])
+  @@index([idHorarioDestino])
+  @@index([idSupervisor])
   @@index([fecha])
 }

@@ -82,6 +82,18 @@ export default function SupervisorSession() {
     {} as Record<string, number>,
   );
 
+  const openNovedad = (r: { codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null }) => {
+    navigate(`/supervisor/novedad/${r.codigoEstudiante}`, {
+      state: {
+        sessionId,
+        codigoEstudiante: r.codigoEstudiante,
+        nombre: r.nombre,
+        apellido: r.apellido,
+        grupo: r.grupo,
+      },
+    });
+  };
+
   return (
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
@@ -143,11 +155,25 @@ export default function SupervisorSession() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-surface-100 dark:bg-surface-800">
               {data.records.map((r) => (
                 <div key={r.codigoEstudiante} className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-surface-900">
+                  {r.fotoUrl ? (
+                    <img src={r.fotoUrl} alt="" className="h-10 w-10 rounded-xl object-cover shrink-0" />
+                  ) : (
+                    <div className="h-10 w-10 rounded-xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center text-xs font-semibold text-surface-500 shrink-0">
+                      {(r.nombre[0] ?? "?").toUpperCase()}
+                      {(r.apellido[0] ?? "").toUpperCase()}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">
                       {r.apellido}, {r.nombre}
                     </p>
                     <p className="text-xs text-surface-500">{r.codigoEstudiante}{r.grupo ? ` · ${r.grupo}` : ""}</p>
+                    <button
+                      onClick={() => openNovedad(r)}
+                      className="mt-1 inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/60"
+                    >
+                      Novedades
+                    </button>
                   </div>
                   <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_LABEL[r.estado]?.className || ""}`}>
                     {ESTADO_LABEL[r.estado]?.label || r.estado}

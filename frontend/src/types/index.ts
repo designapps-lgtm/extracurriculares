@@ -255,6 +255,8 @@ export interface AttendanceStudent {
   grupo: string | null;
   fotoUrl: string | null;
   estado: string;
+  origen?: string;
+  origenDisciplina?: string;
 }
 
 export interface AttendanceResponse {
@@ -265,6 +267,65 @@ export interface AttendanceResponse {
     id: string;
     estado: string;
     fecha: string;
+  };
+  teacher?: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
+}
+
+export interface SupervisorCallableClass {
+  idAsignacion: string;
+  discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
+  grade: Pick<Grade, "idGrado" | "nombre">;
+  teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
+  schedule: Schedule;
+  isToday: boolean;
+  enrolledCount: number;
+  sessionId: string | null;
+  sessionEstado: string | null;
+  attendanceCount: number;
+}
+
+export interface SupervisorClassesResponse {
+  date: string;
+  dayName: string;
+  classes: SupervisorCallableClass[];
+}
+
+export interface SupervisorTransfer {
+  id: string;
+  codigoEstudiante: string;
+  student: {
+    codigoEstudiante: string;
+    nombre: string;
+    apellido: string;
+    grupo: string | null;
+  };
+  fecha: string;
+  motivo: string;
+  createdAt: string;
+  origen: {
+    idAsignacion: string;
+    codigoDisciplina: string;
+    discipline: { nombre: string };
+    grade: { nombre: string };
+  };
+  destino: {
+    idAsignacion: string;
+    idHorario: string;
+    discipline: { nombre: string };
+    grade: { nombre: string };
+    teacher: { idProfesor: string; nombre: string; apellido: string };
+    schedule: {
+      idHorario: string;
+      diaSemana: string;
+      horaInicio: string | null;
+      horaFin: string | null;
+      aula: string | null;
+    };
+  };
+  supervisor: {
+    idSupervisor: string;
+    nombre: string;
+    apellido: string;
   };
 }
 
@@ -346,6 +407,7 @@ export interface SupervisorSessionDetail {
     nombre: string;
     apellido: string;
     grupo: string | null;
+    fotoUrl?: string | null;
     estado: string;
   }[];
 }

@@ -25,6 +25,10 @@ import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import SupervisorSession from "./pages/supervisor/SupervisorSession";
 import SupervisorSchedules from "./pages/supervisor/SupervisorSchedules";
 import SupervisorStays from "./pages/supervisor/SupervisorStays";
+import SupervisorClasses from "./pages/supervisor/SupervisorClasses";
+import SupervisorAttendance from "./pages/supervisor/SupervisorAttendance";
+import SupervisorNovedad from "./pages/supervisor/SupervisorNovedad";
+import SupervisorTransfers from "./pages/supervisor/SupervisorTransfers";
 
 // Admin
 import AdminSupervisors from "./pages/admin/AdminSupervisors";
@@ -55,9 +59,13 @@ function App() {
 
       {/* Supervisor routes */}
       <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
+      <Route path="/supervisor/classes" element={<SupervisorClasses />} />
       <Route path="/supervisor/schedules" element={<SupervisorSchedules />} />
       <Route path="/supervisor/stays" element={<SupervisorStays />} />
       <Route path="/supervisor/session/:sessionId" element={<SupervisorSession />} />
+      <Route path="/supervisor/session-attendance/:sessionId" element={<SupervisorAttendance />} />
+      <Route path="/supervisor/novedad/:codigoEstudiante" element={<SupervisorNovedad />} />
+      <Route path="/supervisor/transfers" element={<SupervisorTransfers />} />
 
       {/* Admin routes — AdminLayout handles auth + sidebar */}
       <Route path="/admin" element={<AdminLayout />}>
