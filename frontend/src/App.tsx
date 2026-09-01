@@ -29,6 +29,7 @@ import SupervisorClasses from "./pages/supervisor/SupervisorClasses";
 import SupervisorAttendance from "./pages/supervisor/SupervisorAttendance";
 import SupervisorNovedad from "./pages/supervisor/SupervisorNovedad";
 import SupervisorTransfers from "./pages/supervisor/SupervisorTransfers";
+import SupervisorLayout from "./pages/supervisor/SupervisorLayout";
 
 // Admin
 import AdminSupervisors from "./pages/admin/AdminSupervisors";
@@ -58,14 +59,17 @@ function App() {
       <Route path="/teachers/:id" element={<TeacherDetail />} />
 
       {/* Supervisor routes */}
-      <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
-      <Route path="/supervisor/classes" element={<SupervisorClasses />} />
-      <Route path="/supervisor/schedules" element={<SupervisorSchedules />} />
-      <Route path="/supervisor/stays" element={<SupervisorStays />} />
-      <Route path="/supervisor/session/:sessionId" element={<SupervisorSession />} />
-      <Route path="/supervisor/session-attendance/:sessionId" element={<SupervisorAttendance />} />
-      <Route path="/supervisor/novedad/:codigoEstudiante" element={<SupervisorNovedad />} />
-      <Route path="/supervisor/transfers" element={<SupervisorTransfers />} />
+      <Route path="/supervisor" element={<SupervisorLayout />}>
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<SupervisorDashboard />} />
+        <Route path="classes" element={<SupervisorClasses />} />
+        <Route path="schedules" element={<SupervisorSchedules />} />
+        <Route path="stays" element={<SupervisorStays />} />
+        <Route path="session/:sessionId" element={<SupervisorSession />} />
+        <Route path="session-attendance/:sessionId" element={<SupervisorAttendance />} />
+        <Route path="novedad/:codigoEstudiante" element={<SupervisorNovedad />} />
+        <Route path="transfers" element={<SupervisorTransfers />} />
+      </Route>
 
       {/* Admin routes — AdminLayout handles auth + sidebar */}
       <Route path="/admin" element={<AdminLayout />}>
@@ -91,4 +95,3 @@ function App() {
 }
 
 export default App;
-
