@@ -5,6 +5,24 @@ import { parsePagination } from "../../utils/pagination";
 import { param } from "../../utils/reqParams";
 import { AppError } from "../../middlewares/errorHandler";
 
+const STAY_ACCENT_FROM = "áéíóúüñÁÉÍÓÚÜÑ";
+const STAY_ACCENT_TO = "aeiouunAEIOUUN";
+function stayNormalizedExpr(expr: string): string {
+  return `LOWER(TRANSLATE(${expr}, '${STAY_ACCENT_FROM}', '${STAY_ACCENT_TO}'))`;
+}
+
+function parseDateOnly(value?: string | null): Date | null {
+  if (!value) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  const [, y, mo, d] = m;
+  return new Date(`${y}-${mo}-${d}T00:00:00.000Z`);
+}
+
+function toDateOnlyISO(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
 function parseDateFilter(value?: string): Date | undefined {
   if (!value) return undefined;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -597,4 +615,163 @@ export async function getSupervisorScheduleHistory(req: Request, res: Response) 
       })),
     },
   });
+}
+
+// ---- Novedades de "quedarse" (niños no inscritos que se quedan) ----
+
+export async function searchSupervisorStudents(req: Request, res: Response) {
+  const q = String(req.query.q || "").trim();
+
+  if (q.length === 0 || q.length < 3) {
+    res.json({ success: true, data: [] });
+    return;
+  }
+
+  const fullName = stayNormalizedExpr(`COALESCE(s."nombre", '') || ' ' || COALESCE(s."apellido", '')`);
+  const code = stayNormalizedExpr(`s."codigoEstudiante"`);
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const params: any[] = [];
+  let idx = 0;
+  const conditions = tokens.map((token) => {
+    idx++;
+    params.push(`%${token}%`);
+    return `(${fullName} LIKE $${idx} OR ${code} LIKE $${idx})`;
+  });
+  idx++;
+  params.push(10);
+
+  const students = (await sql(
+    `SELECT
+       s."codigoEstudiante", s."nombre", s."apellido", s."idGrado", s."grupo", s."fotoUrl",
+       g."nombre" AS "gradoNombre",
+       EXISTS (SELECT 1 FROM "StudentSchedule" ss WHERE ss."codigoEstudiante" = s."codigoEstudiante") AS "inscrito"
+     FROM "Student" s
+     LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
+     WHERE s."estado" = 'activo' AND (${conditions.join(" AND ")})
+     ORDER BY s."apellido" ASC, s."nombre" ASC
+     LIMIT $${idx}`,
+    params
+  )) as unknown as Array<{
+    codigoEstudiante: string;
+    nombre: string;
+    apellido: string;
+    idGrado: number;
+    grupo: string | null;
+    fotoUrl: string | null;
+    gradoNombre: string | null;
+    inscrito: boolean;
+  }>;
+
+  res.json({
+    success: true,
+    data: students.map((s) => ({
+      codigoEstudiante: s.codigoEstudiante,
+      nombre: s.nombre,
+      apellido: s.apellido,
+      idGrado: s.idGrado,
+      grupo: s.grupo,
+      fotoUrl: s.fotoUrl,
+      gradoNombre: s.gradoNombre,
+      inscrito: s.inscrito,
+    })),
+  });
+}
+
+export async function getSupervisorStays(req: Request, res: Response) {
+  const { idAsignacion, idHorario, fecha } = req.query as Record<string, string>;
+  const fechaDate = parseDateOnly(fecha);
+
+  if (!idAsignacion || !idHorario || !fechaDate) {
+    throw new AppError(400, "VALIDATION_ERROR", "idAsignacion, idHorario y fecha son requeridos");
+  }
+
+  const stays = (await sql`
+    SELECT st."id", st."idAsignacion", st."idHorario", st."fecha",
+           st."codigoEstudiante", st."idSupervisor", st."createdAt",
+           s."nombre", s."apellido", s."idGrado", s."grupo", s."fotoUrl",
+           g."nombre" AS "gradoNombre"
+    FROM "SupervisorStay" st
+    LEFT JOIN "Student" s ON s."codigoEstudiante" = st."codigoEstudiante"
+    LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
+    WHERE st."idAsignacion" = ${idAsignacion}
+      AND st."idHorario" = ${idHorario}
+      AND st."fecha" = ${fechaDate}::date
+    ORDER BY s."apellido" ASC, s."nombre" ASC
+  `) as unknown as any[];
+
+  res.json({
+    success: true,
+    data: stays.map((st) => ({
+      id: st.id,
+      idAsignacion: st.idAsignacion,
+      idHorario: st.idHorario,
+      fecha: toDateOnlyISO(st.fecha),
+      createdAt: st.createdAt,
+      idSupervisor: st.idSupervisor,
+      student: {
+        codigoEstudiante: st.codigoEstudiante,
+        nombre: st.nombre,
+        apellido: st.apellido,
+        idGrado: st.idGrado,
+        grupo: st.grupo,
+        fotoUrl: st.fotoUrl,
+        gradoNombre: st.gradoNombre,
+      },
+    })),
+  });
+}
+
+export async function createSupervisorStay(req: Request, res: Response) {
+  const supervisorId = req.supervisor!.supervisorId;
+  const { idAsignacion, idHorario, codigoEstudiante, fecha } = req.body as {
+    idAsignacion?: string;
+    idHorario?: string;
+    codigoEstudiante?: string;
+    fecha?: string;
+  };
+  const fechaDate = parseDateOnly(fecha);
+
+  if (!idAsignacion || !idHorario || !codigoEstudiante || !fechaDate) {
+    throw new AppError(400, "VALIDATION_ERROR", "idAsignacion, idHorario, codigoEstudiante y fecha son requeridos");
+  }
+
+  const student = await first<any>(
+    (await sql`SELECT "codigoEstudiante" FROM "Student" WHERE "codigoEstudiante" = ${codigoEstudiante} LIMIT 1`) as any[]
+  );
+  if (!student) {
+    throw new AppError(404, "STUDENT_NOT_FOUND", "Estudiante no encontrado");
+  }
+
+  const scheduleLink = await first<any>(
+    (await sql`
+      SELECT "id" FROM "AssignmentSchedule"
+      WHERE "idAsignacion" = ${idAsignacion} AND "idHorario" = ${idHorario} LIMIT 1
+    `) as any[]
+  );
+  if (!scheduleLink) {
+    throw new AppError(400, "INVALID_SCHEDULE", "El horario no pertenece a esta asignación");
+  }
+
+  const created = (await sql`
+    INSERT INTO "SupervisorStay" ("id", "idAsignacion", "idHorario", "codigoEstudiante", "fecha", "idSupervisor", "createdAt")
+    VALUES (gen_random_uuid(), ${idAsignacion}, ${idHorario}, ${codigoEstudiante}, ${fechaDate}::date, ${supervisorId}, now())
+    ON CONFLICT ("idAsignacion", "idHorario", "codigoEstudiante", "fecha") DO NOTHING
+    RETURNING "id"
+  `) as unknown as Array<{ id: string }>;
+
+  res.json({ success: true, data: { id: created[0]?.id ?? null } });
+}
+
+export async function deleteSupervisorStay(req: Request, res: Response) {
+  const stayId = param(req, "stayId");
+  const deleted = (await sql`
+    DELETE FROM "SupervisorStay" WHERE "id" = ${stayId}
+    RETURNING "id"
+  `) as unknown as Array<{ id: string }>;
+
+  if (deleted.length === 0) {
+    throw new AppError(404, "STAY_NOT_FOUND", "Registro no encontrado");
+  }
+
+  res.json({ success: true, data: { id: deleted[0].id } });
 }

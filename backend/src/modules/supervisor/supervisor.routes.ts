@@ -10,11 +10,20 @@ import {
   getSupervisorTeacherSchedules,
   getSupervisorScheduleHistory,
   getSupervisorAssignmentHistory,
+  searchSupervisorStudents,
+  getSupervisorStays,
+  createSupervisorStay,
+  deleteSupervisorStay,
 } from "./supervisor.service";
 
 const router = Router();
 
 router.use(authenticateSupervisor, requireActiveSupervisor);
+
+router.get("/stays/search", asyncHandler(searchSupervisorStudents));
+router.get("/stays", asyncHandler(getSupervisorStays));
+router.post("/stays", asyncHandler(createSupervisorStay));
+router.delete("/stays/:stayId", asyncHandler(deleteSupervisorStay));
 
 router.get("/schedules", asyncHandler(getSupervisorTeacherSchedules));
 router.get("/schedules/:asignacionId/:horarioId", asyncHandler(getSupervisorScheduleHistory));

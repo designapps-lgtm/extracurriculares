@@ -8,6 +8,8 @@ import type {
   SupervisorTeacherSchedule,
   SupervisorScheduleHistory,
   SupervisorAssignmentHistory,
+  SupervisorStay,
+  SupervisorStayStudent,
 } from "../types";
 
 export async function supervisorLogin(email: string): Promise<{ supervisor: Supervisor }> {
@@ -87,4 +89,32 @@ export async function exportSupervisorAttendance(params?: Record<string, string>
 
 export async function exportSupervisorSession(sessionId: string): Promise<Blob> {
   return api.download(`/api/supervisor/sessions/${sessionId}/export`);
+}
+
+export async function searchSupervisorStudents(q: string): Promise<SupervisorStayStudent[]> {
+  const res = await api.get<ApiResponse<SupervisorStayStudent[]>>("/api/supervisor/stays/search", { q });
+  return res.data;
+}
+
+export async function getSupervisorStays(
+  idAsignacion: string,
+  idHorario: string,
+  fecha: string,
+): Promise<SupervisorStay[]> {
+  const res = await api.get<ApiResponse<SupervisorStay[]>>("/api/supervisor/stays", { idAsignacion, idHorario, fecha });
+  return res.data;
+}
+
+export async function createSupervisorStay(payload: {
+  idAsignacion: string;
+  idHorario: string;
+  codigoEstudiante: string;
+  fecha: string;
+}): Promise<{ id: string | null }> {
+  const res = await api.post<ApiResponse<{ id: string | null }>>("/api/supervisor/stays", payload);
+  return res.data;
+}
+
+export async function deleteSupervisorStay(stayId: string): Promise<void> {
+  await api.delete<ApiResponse<{ id: string }>>(`/api/supervisor/stays/${stayId}`);
 }

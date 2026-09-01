@@ -23,6 +23,7 @@ model Student {
   grade            Grade              @relation(fields: [idGrado], references: [idGrado])
   studentSchedules StudentSchedule[]
   attendances      AttendanceRecord[]
+  supervisorStays  SupervisorStay[]
 
   @@index([idGrado])
   @@index([nombre, apellido])
@@ -116,6 +117,7 @@ model Schedule {
 
   assignmentSchedules AssignmentSchedule[]
   sessions            ClassSession[]
+  stays               SupervisorStay[]
 
   @@index([diaSemana])
 }
@@ -135,6 +137,7 @@ model ExtracurricularAssignment {
   grade      Grade                @relation(fields: [idGrado], references: [idGrado])
   schedules  AssignmentSchedule[]
   sessions   ClassSession[]
+  stays      SupervisorStay[]
 
   @@unique([idProfesor, codigoDisciplina, idGrado])
   @@index([codigoDisciplina])
@@ -168,6 +171,7 @@ model Supervisor {
   updatedAt        DateTime @updatedAt
 
   refreshTokens SupervisorRefreshToken[]
+  stays         SupervisorStay[]
 
   @@index([codigoSupervisor])
   @@index([nombre, apellido])
@@ -299,4 +303,24 @@ model Novedad {
   @@index([codigoEstudiante])
   @@index([archivo])
   @@unique([novedadId, codigoEstudiante])
+}
+
+model SupervisorStay {
+  id               String   @id @default(uuid())
+  idAsignacion     String
+  idHorario        String
+  codigoEstudiante String
+  fecha            DateTime @db.Date
+  idSupervisor     String
+  createdAt        DateTime @default(now())
+
+  student    Student                  @relation(fields: [codigoEstudiante], references: [codigoEstudiante])
+  assignment ExtracurricularAssignment @relation(fields: [idAsignacion], references: [idAsignacion])
+  schedule   Schedule                 @relation(fields: [idHorario], references: [idHorario])
+  supervisor Supervisor              @relation(fields: [idSupervisor], references: [idSupervisor])
+
+  @@unique([idAsignacion, idHorario, codigoEstudiante, fecha])
+  @@index([idAsignacion, idHorario])
+  @@index([codigoEstudiante])
+  @@index([fecha])
 }

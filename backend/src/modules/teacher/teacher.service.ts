@@ -58,6 +58,14 @@ export async function getTeacherClasses(req: Request, res: Response) {
             AND st."idGrado" = ${a.idGrado}
         `) as unknown as Array<{ cnt: number }>;
 
+        const stayCountRow = (await sql`
+          SELECT COUNT(*)::int AS cnt
+          FROM "SupervisorStay" st
+          WHERE st."idAsignacion" = ${a.idAsignacion}
+            AND st."idHorario" = ${a.idHorario!}
+            AND st."fecha" = ${todayStr}::date
+        `) as unknown as Array<{ cnt: number }>;
+
         const sessionRow = await first<{
           id: string; estado: string; attendanceCount: number;
         }>((await sql`
@@ -77,6 +85,7 @@ export async function getTeacherClasses(req: Request, res: Response) {
           grade: { idGrado: a.gradoIdGrado, nombre: a.gradoNombre },
           schedule: { idHorario: a.idHorario, diaSemana: a.diaSemana, horaInicio: a.horaInicio, horaFin: a.horaFin, aula: a.aula },
           enrolledCount: enrolledCountRow[0]?.cnt ?? 0,
+          stayCount: stayCountRow[0]?.cnt ?? 0,
           sessionId: sessionRow?.id ?? null,
           sessionEstado: sessionRow?.estado ?? null,
           attendanceCount: sessionRow?.attendanceCount ?? 0,
@@ -268,6 +277,27 @@ export async function getAttendanceList(req: Request, res: Response) {
     codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
   }>;
 
+  const stays = (await sql`
+    SELECT
+      st."codigoEstudiante",
+      s."nombre", s."apellido", s."grupo", s."fotoUrl"
+    FROM "SupervisorStay" st
+    LEFT JOIN "Student" s ON s."codigoEstudiante" = st."codigoEstudiante"
+    WHERE st."idAsignacion" = ${sessionRow.idAsignacion}
+      AND st."idHorario" = ${sessionRow.idHorario}
+      AND st."fecha" = ${sessionRow.fecha}::date
+  `) as unknown as Array<{
+    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
+  }>;
+
+  const stayCodes = new Set(stays.map((st) => st.codigoEstudiante));
+  const allStudents = [
+    ...enrolledStudents.map((es) => ({ ...es, origen: "inscrito" as const })),
+    ...stays
+      .filter((st) => !enrolledStudents.some((e) => e.codigoEstudiante === st.codigoEstudiante))
+      .map((st) => ({ ...st, origen: "quedado" as const })),
+  ];
+
   const existingAttendance = (await sql`
     SELECT "codigoEstudiante", "estado"
     FROM "AttendanceRecord"
@@ -276,12 +306,13 @@ export async function getAttendanceList(req: Request, res: Response) {
 
   const attendanceMap = new Map(existingAttendance.map((a) => [a.codigoEstudiante, a.estado]));
 
-  const students = enrolledStudents.map((es) => ({
+  const students = allStudents.map((es) => ({
     codigoEstudiante: es.codigoEstudiante,
     nombre: es.nombre,
     apellido: es.apellido,
     grupo: es.grupo,
     fotoUrl: es.fotoUrl,
+    origen: es.origen,
     estado: attendanceMap.get(es.codigoEstudiante) || "pendiente",
   }));
 

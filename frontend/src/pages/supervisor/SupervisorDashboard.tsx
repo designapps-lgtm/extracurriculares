@@ -133,6 +133,12 @@ export default function SupervisorDashboard() {
             >
               Ver horarios
             </button>
+            <button
+              onClick={() => navigate("/supervisor/stays")}
+              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+            >
+              Niños que se quedan
+            </button>
             <button onClick={handleLogout} className="px-3 py-2 -mr-2 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800">
               Salir
             </button>

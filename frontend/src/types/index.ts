@@ -201,6 +201,35 @@ export interface SupervisorAssignmentHistory {
   }[];
 }
 
+export interface SupervisorStayStudent {
+  codigoEstudiante: string;
+  nombre: string;
+  apellido: string;
+  idGrado: number;
+  grupo: string | null;
+  fotoUrl: string | null;
+  gradoNombre: string | null;
+  inscrito: boolean;
+}
+
+export interface SupervisorStay {
+  id: string;
+  idAsignacion: string;
+  idHorario: string;
+  fecha: string;
+  createdAt: string;
+  idSupervisor: string;
+  student: {
+    codigoEstudiante: string;
+    nombre: string;
+    apellido: string;
+    idGrado: number;
+    grupo: string | null;
+    fotoUrl: string | null;
+    gradoNombre: string | null;
+  };
+}
+
 export interface TeacherClass {
   idAsignacion: string;
   discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;

@@ -24,6 +24,7 @@ import TeacherNovedad from "./pages/teacher/TeacherNovedad";
 import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import SupervisorSession from "./pages/supervisor/SupervisorSession";
 import SupervisorSchedules from "./pages/supervisor/SupervisorSchedules";
+import SupervisorStays from "./pages/supervisor/SupervisorStays";
 
 // Admin
 import AdminSupervisors from "./pages/admin/AdminSupervisors";
@@ -55,6 +56,7 @@ function App() {
       {/* Supervisor routes */}
       <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
       <Route path="/supervisor/schedules" element={<SupervisorSchedules />} />
+      <Route path="/supervisor/stays" element={<SupervisorStays />} />
       <Route path="/supervisor/session/:sessionId" element={<SupervisorSession />} />
 
       {/* Admin routes — AdminLayout handles auth + sidebar */}
