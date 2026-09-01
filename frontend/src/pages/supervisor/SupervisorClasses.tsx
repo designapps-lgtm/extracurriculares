@@ -178,9 +178,10 @@ export default function SupervisorClasses() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium text-surface-900 dark:text-surface-100">
-                              {cls.discipline.nombre}
+                            <p className="font-semibold text-surface-900 dark:text-surface-100">
+                              {cls.discipline.codigoDisciplina}
                             </p>
+                            <span className="text-sm text-surface-400 font-normal">{cls.discipline.nombre}</span>
                             {cls.grades && cls.grades.length > 0 ? (
                               <span className="badge-neutral text-xs">
                                 {cls.grades.map((g) => g.nombre).join(", ")}

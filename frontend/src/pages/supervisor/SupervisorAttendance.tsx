@@ -126,9 +126,10 @@ export default function SupervisorAttendance() {
                 ← Volver
               </button>
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 break-words">
-                {assignment?.discipline?.nombre}
+                {assignment?.discipline?.codigoDisciplina}
+                <span className="ml-2 text-sm font-normal text-surface-500">{assignment?.discipline?.nombre}</span>
                 {assignment?.grades && assignment.grades.length > 0
-                  ? ` — ${assignment.grades.map((g) => g.nombre).join(", ")}`
+                  ? ` — Grados ${assignment.grades.map((g) => g.nombre).join(", ")}`
                   : ` — ${assignment?.grade?.nombre}`}
               </h1>
               <p className="text-xs text-surface-500">
