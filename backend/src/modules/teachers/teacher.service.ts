@@ -16,7 +16,7 @@ interface TeacherRow {
   count: number;
 }
 
-interface TeacherWithCount extends Omit<TeacherRow, "count"> {
+interface TeacherWithCount extends Omit<TeacherRow, "count" | "correo"> {
   _count: { assignments: number };
 }
 
@@ -69,7 +69,6 @@ export async function getTeachers(query: TeacherQuery, pagination: PaginationPar
     codigoProfesor: t.codigoProfesor,
     nombre: t.nombre,
     apellido: t.apellido,
-    correo: t.correo,
     fotoUrl: t.fotoUrl,
     estado: t.estado,
     createdAt: t.createdAt,
@@ -100,7 +99,17 @@ export async function getTeacherById(id: string) {
     throw new AppError(404, "TEACHER_NOT_FOUND", "No se encontró el profesor");
   }
 
-  return teacher;
+  return {
+    idProfesor: teacher.idProfesor,
+    codigoProfesor: teacher.codigoProfesor,
+    nombre: teacher.nombre,
+    apellido: teacher.apellido,
+    fotoUrl: teacher.fotoUrl,
+    estado: teacher.estado,
+    createdAt: teacher.createdAt,
+    updatedAt: teacher.updatedAt,
+    _count: { assignments: teacher.count },
+  };
 }
 
 export async function getTeacherAssignments(id: string) {

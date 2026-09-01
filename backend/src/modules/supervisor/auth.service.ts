@@ -5,6 +5,7 @@ import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { createRefreshService } from "../../modules/auth/refreshTokens";
 import { setAuthCookies, clearAuthCookies, SUPERVISOR_REFRESH_COOKIE } from "../../utils/authCookies";
+import { assertTrustedOrigin } from "../../utils/originGuard";
 
 const supervisorRefresh = createRefreshService({
   userIdField: "supervisorId",
@@ -15,45 +16,8 @@ const supervisorRefresh = createRefreshService({
     } as jwt.SignOptions),
 });
 
-export async function supervisorLogin(req: Request, res: Response) {
-  const { email } = req.body;
-
-  if (!email) {
-    throw new AppError(400, "VALIDATION_ERROR", "Email es requerido");
-  }
-
-  const rows = await sql`SELECT * FROM "Supervisor" WHERE "correo" = ${email} LIMIT 1`;
-  const supervisor = rows[0] ?? null;
-
-  if (!supervisor) {
-    throw new AppError(401, "INVALID_CREDENTIALS", "Correo no registrado como supervisor");
-  }
-
-  if (supervisor.estado !== "activo") {
-    throw new AppError(403, "SUPERVISOR_INACTIVE", "La cuenta está desactivada");
-  }
-
-  const { accessToken, refreshToken } = await supervisorRefresh.issue(
-    supervisor.idSupervisor,
-    supervisor.correo || ""
-  );
-
-  setAuthCookies(res, "supervisor", accessToken, refreshToken);
-
-  res.json({
-    success: true,
-    data: {
-      supervisor: {
-        idSupervisor: supervisor.idSupervisor,
-        nombre: supervisor.nombre,
-        apellido: supervisor.apellido,
-        email: supervisor.correo,
-      },
-    },
-  });
-}
-
 export async function supervisorRefreshSession(req: Request, res: Response) {
+  assertTrustedOrigin(req);
   const refreshToken = req.cookies?.[SUPERVISOR_REFRESH_COOKIE];
 
   if (!refreshToken) {
@@ -91,6 +55,7 @@ export async function supervisorRefreshSession(req: Request, res: Response) {
 }
 
 export async function supervisorLogout(req: Request, res: Response) {
+  assertTrustedOrigin(req);
   const refreshToken = req.cookies?.[SUPERVISOR_REFRESH_COOKIE];
   await supervisorRefresh.revoke(refreshToken);
   clearAuthCookies(res, "supervisor");

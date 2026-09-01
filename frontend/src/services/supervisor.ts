@@ -16,11 +16,6 @@ import type {
   SupervisorTransfer,
 } from "../types";
 
-export async function supervisorLogin(email: string): Promise<{ supervisor: Supervisor }> {
-  const res = await api.post<ApiResponse<{ supervisor: Supervisor }>>("/api/supervisor/auth/login", { email });
-  return { supervisor: res.data.supervisor };
-}
-
 export async function supervisorLogout(): Promise<void> {
   try {
     await api.post<ApiResponse<null>>("/api/supervisor/auth/logout", {});

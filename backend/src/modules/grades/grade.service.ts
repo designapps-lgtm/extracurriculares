@@ -78,7 +78,7 @@ export async function getGradeStudents(id: number, pagination: PaginationParams)
 
   const data = await sql(
     `SELECT s."codigoEstudiante", s."nombre", s."apellido", s."idGrado", s."grupo",
-            s."correo", s."fotoUrl", s."estado", s."createdAt", s."updatedAt",
+            s."fotoUrl", s."estado", s."createdAt", s."updatedAt",
             g."idGrado" AS "idGradoRel", g."nombre" AS "nombreGrado", g."nivel"
      FROM "Student" s
      LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"

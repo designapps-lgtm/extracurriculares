@@ -6,6 +6,7 @@ import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { createRefreshService } from "./refreshTokens";
 import { setAuthCookies, clearAuthCookies, TEACHER_REFRESH_COOKIE, SUPERVISOR_REFRESH_COOKIE, ADMIN_REFRESH_COOKIE, SECRETARY_REFRESH_COOKIE } from "../../utils/authCookies";
+import { assertTrustedOrigin } from "../../utils/originGuard";
 
 type Role = "admin" | "teacher" | "supervisor" | "secretary";
 
@@ -184,6 +185,8 @@ export async function googleLogin(req: Request, res: Response) {
 }
 
 export async function logout(req: Request, res: Response) {
+  assertTrustedOrigin(req);
+
   const services: Record<Role, { revoke: (t: string) => Promise<void> }> = {
     teacher: teacherRefresh,
     supervisor: supervisorRefresh,

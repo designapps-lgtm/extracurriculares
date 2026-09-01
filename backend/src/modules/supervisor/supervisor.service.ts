@@ -910,8 +910,9 @@ export async function createSupervisorStay(req: Request, res: Response) {
 
 export async function deleteSupervisorStay(req: Request, res: Response) {
   const stayId = param(req, "stayId");
+  const supervisorId = req.supervisor!.supervisorId;
   const deleted = (await sql`
-    DELETE FROM "SupervisorStay" WHERE "id" = ${stayId}
+    DELETE FROM "SupervisorStay" WHERE "id" = ${stayId} AND "idSupervisor" = ${supervisorId}
     RETURNING "id"
   `) as unknown as Array<{ id: string }>;
 
@@ -1448,8 +1449,9 @@ export async function listSupervisorTransfers(req: Request, res: Response) {
 // Cancela un traslado (quita la trazabilidad activa de ese día).
 export async function deleteSupervisorTransfer(req: Request, res: Response) {
   const transferId = param(req, "id");
+  const supervisorId = req.supervisor!.supervisorId;
   const deleted = (await sql`
-    DELETE FROM "StudentTransfer" WHERE "id" = ${transferId} RETURNING "id"
+    DELETE FROM "StudentTransfer" WHERE "id" = ${transferId} AND "idSupervisor" = ${supervisorId} RETURNING "id"
   `) as unknown as Array<{ id: string }>;
 
   if (!deleted[0]) {

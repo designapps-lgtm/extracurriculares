@@ -5,6 +5,7 @@ import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { createRefreshService } from "../../modules/auth/refreshTokens";
 import { setAuthCookies, clearAuthCookies, SECRETARY_REFRESH_COOKIE } from "../../utils/authCookies";
+import { assertTrustedOrigin } from "../../utils/originGuard";
 
 const secretaryRefresh = createRefreshService({
   userIdField: "secretaryId",
@@ -16,6 +17,7 @@ const secretaryRefresh = createRefreshService({
 });
 
 export async function secretaryRefreshSession(req: Request, res: Response) {
+  assertTrustedOrigin(req);
   const refreshToken = req.cookies?.[SECRETARY_REFRESH_COOKIE];
 
   if (!refreshToken) {
@@ -53,6 +55,7 @@ export async function secretaryRefreshSession(req: Request, res: Response) {
 }
 
 export async function secretaryLogout(req: Request, res: Response) {
+  assertTrustedOrigin(req);
   const refreshToken = req.cookies?.[SECRETARY_REFRESH_COOKIE];
   await secretaryRefresh.revoke(refreshToken);
   clearAuthCookies(res, "secretary");

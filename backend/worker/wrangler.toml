@@ -22,3 +22,10 @@ ACCESS_TOKEN_EXPIRES_IN = "15m"
 SESSION_DURATION_HOURS = "168"
 GOOGLE_INSTITUTION_DOMAIN = "gi.edu.co"
 NOVEDADES_SYNC_MINUTES = "10"
+# Rate limiting a nivel de app (además del de Cloudflare). El limiter in-memory
+# de Express se activa cuando estas vars existen. AUTH_RATE_LIMIT: intentos de
+# login/google/logout por ventana de 15 min. API_RATE_LIMIT: requests generales.
+# En Workers edge no persiste entre instancias, pero con la config de Workers +
+# un solo punto de entrada alcanza para frenar fuerza bruta y abuso.
+AUTH_RATE_LIMIT = "30"
+API_RATE_LIMIT = "300"

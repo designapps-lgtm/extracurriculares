@@ -115,13 +115,15 @@ function dbMessage(err: Error): string {
   if (clientCode === "NOT_FOUND") return "El registro solicitado no existe.";
   const code = (err as any).code as string;
   switch (code) {
-    case "23505": {
-      const detail = (err as any).detail as string | undefined;
-      return `Ya existe un registro con ese valor.${detail ? ` ${detail}` : ""}`;
-    }
+    case "23505": return "Ya existe un registro con ese valor.";
     case "P2025": return "El registro solicitado no existe.";
     case "23503": return "Referencia a un registro inexistente.";
-    default: return err.message;
+    default: {
+      // No filtrar detalles de la base (el mensaje del driver incluye el SQL y
+      // nombres de tablas/columnas). Log interno + mensaje genérico.
+      console.error("[DbError]", err.message);
+      return "Error de base de datos.";
+    }
   }
 }
 

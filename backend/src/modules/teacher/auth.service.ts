@@ -6,6 +6,7 @@ import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { createRefreshService } from "../../modules/auth/refreshTokens";
 import { setAuthCookies, clearAuthCookies, TEACHER_REFRESH_COOKIE } from "../../utils/authCookies";
+import { assertTrustedOrigin } from "../../utils/originGuard";
 
 const teacherRefresh = createRefreshService({
   userIdField: "teacherId",
@@ -15,44 +16,6 @@ const teacherRefresh = createRefreshService({
       expiresIn: config.accessTokenExpiresIn,
     } as jwt.SignOptions),
 });
-
-export async function teacherLogin(req: Request, res: Response) {
-  const { email } = req.body;
-
-  if (!email) {
-    throw new AppError(400, "VALIDATION_ERROR", "Email es requerido");
-  }
-
-  const rows = await sql`SELECT * FROM "Teacher" WHERE "correo" = ${email} LIMIT 1`;
-  const teacher = rows[0] ?? null;
-
-  if (!teacher) {
-    throw new AppError(401, "INVALID_CREDENTIALS", "Correo no registrado como profesor");
-  }
-
-  if (teacher.estado !== "activo") {
-    throw new AppError(403, "TEACHER_INACTIVE", "La cuenta está desactivada");
-  }
-
-  const { accessToken, refreshToken } = await teacherRefresh.issue(
-    teacher.idProfesor,
-    teacher.correo || ""
-  );
-
-  setAuthCookies(res, "teacher", accessToken, refreshToken);
-
-  res.json({
-    success: true,
-    data: {
-      teacher: {
-        idProfesor: teacher.idProfesor,
-        nombre: teacher.nombre,
-        apellido: teacher.apellido,
-        email: teacher.correo,
-      },
-    },
-  });
-}
 
 export async function teacherGoogleLogin(req: Request, res: Response) {
   const { credential } = req.body;
@@ -118,6 +81,8 @@ export async function teacherGoogleLogin(req: Request, res: Response) {
 }
 
 export async function teacherRefreshSession(req: Request, res: Response) {
+  assertTrustedOrigin(req);
+
   const refreshToken = req.cookies?.[TEACHER_REFRESH_COOKIE];
 
   if (!refreshToken) {
@@ -155,6 +120,7 @@ export async function teacherRefreshSession(req: Request, res: Response) {
 }
 
 export async function teacherLogout(req: Request, res: Response) {
+  assertTrustedOrigin(req);
   const refreshToken = req.cookies?.[TEACHER_REFRESH_COOKIE];
   await teacherRefresh.revoke(refreshToken);
   clearAuthCookies(res, "teacher");

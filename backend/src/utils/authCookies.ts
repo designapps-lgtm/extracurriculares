@@ -13,13 +13,15 @@ export const SECRETARY_REFRESH_COOKIE = "secretary_refresh";
 
 const isProduction = config.nodeEnv === "production";
 
-// Frontend (Vercel) y backend (Render) son sitios distintos. Para que el
-// navegador guarde y envíe la cookie entre dominios hace falta SameSite=None.
-// En desarrollo (localhost) SameSite=Lax alcanza y no requiere HTTPS.
+// Frontend (Vercel) y backend (Worker) son sitios distintos, pero el navegador
+// SOLO habla con Vercel: vercel.json reescribe /api/* al worker, así que las
+// cookies viajan first-party (mismo dominio). Por eso SameSite=Lax alcanza y
+// bloquea el envío de cookies en requests cross-site (mitiga CSRF). En
+// desarrollo (localhost) SameSite=Lax también alcanza.
 const cookieBase = {
   httpOnly: true,
   secure: isProduction,
-  sameSite: isProduction ? ("none" as const) : ("lax" as const),
+  sameSite: "lax" as const,
   path: "/",
 };
 

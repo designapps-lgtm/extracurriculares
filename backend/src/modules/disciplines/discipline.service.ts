@@ -125,7 +125,7 @@ export async function getDisciplineStudents(codigo: string, pagination: Paginati
 
   const data = await sql(
     `SELECT s."codigoEstudiante", s."nombre", s."apellido", s."idGrado", s."grupo",
-            s."correo", s."fotoUrl", s."estado", s."createdAt", s."updatedAt",
+            s."fotoUrl", s."estado", s."createdAt", s."updatedAt",
             g."idGrado" AS "idGradoRel", g."nombre" AS "nombreGrado", g."nivel"
      FROM "Student" s
      LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
@@ -177,7 +177,6 @@ export async function getDisciplineTeachers(codigo: string) {
         idProfesor: r.idProfesor,
         nombre: r.nombre,
         apellido: r.apellido,
-        correo: r.correo,
         grade: { idGrado: r.idGrado, nombre: r.gradoNombre },
         schedules: [],
       });

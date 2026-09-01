@@ -14,11 +14,6 @@ export interface TeacherUser {
   email: string | null;
 }
 
-export async function teacherLogin(email: string): Promise<{ teacher: TeacherUser }> {
-  const res = await api.post<ApiResponse<{ teacher: TeacherUser }>>("/api/teacher/auth/login", { email });
-  return { teacher: res.data.teacher };
-}
-
 export async function teacherGoogleLogin(credential: string): Promise<{ teacher: TeacherUser }> {
   const res = await api.post<ApiResponse<{ teacher: TeacherUser }>>("/api/teacher/auth/google", { credential });
   return { teacher: res.data.teacher };
