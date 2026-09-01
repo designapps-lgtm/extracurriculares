@@ -8,7 +8,7 @@ import {
 import { useNotify } from "../../components/common/Notify";
 import Logo from "../../components/common/Logo";
 import { Avatar } from "../../components/common/Avatar";
-import type { AttendanceStudent as Student, Schedule, Assignment, Novedad } from "../../types";
+import type { AttendanceStudent as Student, Schedule, Assignment, Novedad, AttendanceResponse } from "../../types";
 
 export default function SupervisorAttendance() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -18,6 +18,8 @@ export default function SupervisorAttendance() {
   const [teacher, setTeacher] = useState<{ nombre: string; apellido: string } | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [novedadesMap, setNovedadesMap] = useState<Record<string, Novedad[]>>({});
+  const [transfers, setTransfers] = useState<NonNullable<AttendanceResponse["transfers"]>>([]);
+  const transferCount = transfers.length;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -31,6 +33,7 @@ export default function SupervisorAttendance() {
         setSchedule(data.schedule);
         setTeacher(data.teacher ?? null);
         setStudents(data.students);
+        setTransfers(data.transfers ?? []);
         const codigos = data.students.map((s) => s.codigoEstudiante);
         if (codigos.length === 0) return;
         const novedades = await getSupervisorNovedadesBatch(codigos, data.session?.fecha);
@@ -142,6 +145,64 @@ export default function SupervisorAttendance() {
             Limpiar
           </button>
         </div>
+
+        {(() => {
+          const allNovedades = Object.entries(novedadesMap).flatMap(([codigo, list]) =>
+            list.map((n) => ({ codigo, novedad: n })),
+          );
+          return allNovedades.length > 0 ? (
+            <section className="card p-5 mb-6">
+              <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base mb-3">
+                Novedades del día
+              </h2>
+              <div className="space-y-2">
+                {allNovedades.map(({ codigo, novedad }) => {
+                  const st = students.find((s) => s.codigoEstudiante === codigo);
+                  return (
+                    <div key={novedad.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
+                      {st && (
+                        <p className="text-amber-900 dark:text-amber-200 font-semibold">
+                          {st.nombre} {st.apellido} {st.grupo ? `· ${st.grupo}` : ""}
+                        </p>
+                      )}
+                      {novedad.descripcion && (
+                        <p className="text-amber-800 dark:text-amber-300 font-medium">{novedad.descripcion}</p>
+                      )}
+                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
+                        {novedad.seAusentaCon && <span>Se ausenta con: {novedad.seAusentaCon}</span>}
+                        <span>
+                          {novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}
+                          {novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null;
+        })()}
+
+        {transferCount > 0 && (
+          <section className="card p-5 mb-6">
+            <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base mb-3">
+              Cambios de disciplina del día
+            </h2>
+            <div className="space-y-2">
+              {transfers.map((t) => (
+                <div key={t.id} className="rounded-lg bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-800 px-3 py-2 text-xs">
+                  <p className="text-violet-900 dark:text-violet-200 font-semibold">
+                    {t.student.nombre} {t.student.apellido} {t.student.grupo ? `· ${t.student.grupo}` : ""}
+                  </p>
+                  <p className="text-violet-700 dark:text-violet-400 mt-0.5">
+                    {t.origen.nombre || t.origen.codigoDisciplina || "Clase de origen"} → {t.destino.nombre || t.destino.codigoDisciplina || "Clase de destino"}
+                  </p>
+                  {t.motivo && <p className="text-violet-600 dark:text-violet-300 mt-0.5 italic">“{t.motivo}”</p>}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className="space-y-1">
           {students.map((student, i) => {
