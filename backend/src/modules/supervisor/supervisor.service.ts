@@ -628,20 +628,22 @@ export async function getSupervisorAssignmentHistory(req: Request, res: Response
 
   const enrolled = (await sql`
     SELECT ss."diaSemana", ss."codigoEstudiante",
-           st."nombre", st."apellido", st."idGrado", st."grupo", st."correo", st."fotoUrl"
+           st."nombre", st."apellido", st."idGrado", st."grupo", st."correo", st."fotoUrl",
+           g."nombre" AS "gradoNombre"
     FROM "StudentSchedule" ss
     LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+    LEFT JOIN "Grade" g ON g."idGrado" = st."idGrado"
     WHERE ss."codigoDisciplina" = ${assignment.codigoDisciplina}
       AND st."idGrado" = ${assignment.idGrado}
     ORDER BY st."apellido" ASC, st."nombre" ASC
   `) as unknown as Array<{
     diaSemana: string; codigoEstudiante: string; nombre: string; apellido: string;
-    idGrado: number; grupo: string | null; correo: string | null; fotoUrl: string | null;
+    idGrado: number; gradoNombre: string | null; grupo: string | null; correo: string | null; fotoUrl: string | null;
   }>;
 
   const byDay = new Map<string, Array<{
     codigoEstudiante: string; nombre: string; apellido: string; idGrado: number;
-    grupo: string | null; correo: string | null; fotoUrl: string | null;
+    gradoNombre: string | null; grupo: string | null; correo: string | null; fotoUrl: string | null;
   }>>();
   for (const e of enrolled) {
     if (!byDay.has(e.diaSemana)) byDay.set(e.diaSemana, []);
@@ -650,6 +652,7 @@ export async function getSupervisorAssignmentHistory(req: Request, res: Response
       nombre: e.nombre,
       apellido: e.apellido,
       idGrado: e.idGrado,
+      gradoNombre: e.gradoNombre,
       grupo: e.grupo,
       correo: e.correo,
       fotoUrl: e.fotoUrl,
@@ -1045,6 +1048,30 @@ export async function getSupervisorAttendanceList(req: Request, res: Response) {
     codigoDisciplina: string | null; origenDisciplinaNombre: string | null;
   }>;
 
+  // Traslados activos ese día para el panel "Cambios de disciplina" de la toma
+  // de lista: todos los que tocan esta clase (como origen o como destino).
+  const dayTransfers = (await sql`
+    SELECT
+      t."id", t."codigoEstudiante", t."fecha", t."fechaFin", t."motivo",
+      s."nombre", s."apellido", s."grupo",
+      oa."codigoDisciplina" AS "origenCodigo", od."nombre" AS "origenNombre",
+      da."codigoDisciplina" AS "destCodigo", dd."nombre" AS "destNombre"
+    FROM "StudentTransfer" t
+    LEFT JOIN "Student" s ON s."codigoEstudiante" = t."codigoEstudiante"
+    LEFT JOIN "ExtracurricularAssignment" oa ON oa."idAsignacion" = t."idAsignacionOrigen"
+    LEFT JOIN "Discipline" od ON od."codigoDisciplina" = oa."codigoDisciplina"
+    LEFT JOIN "ExtracurricularAssignment" da ON da."idAsignacion" = t."idAsignacionDestino"
+    LEFT JOIN "Discipline" dd ON dd."codigoDisciplina" = da."codigoDisciplina"
+    WHERE t."fecha" <= ${sessionFechaStr}::date
+      AND COALESCE(t."fechaFin", t."fecha") >= ${sessionFechaStr}::date
+    ORDER BY t."fecha" DESC, t."createdAt" DESC
+  `) as unknown as Array<{
+    id: string; codigoEstudiante: string; fecha: string; fechaFin: string | null; motivo: string | null;
+    nombre: string; apellido: string; grupo: string | null;
+    origenCodigo: string | null; origenNombre: string | null;
+    destCodigo: string | null; destNombre: string | null;
+  }>;
+
   const allStudents = [
     ...enrolledStudents
       .filter((es) => !awaySet.has(es.codigoEstudiante))
@@ -1079,6 +1106,7 @@ export async function getSupervisorAttendanceList(req: Request, res: Response) {
     fotoUrl: es.fotoUrl,
     origen: es.origen,
     origenDisciplina: (es as any).origenDisciplina,
+    gradoNombre: (es as any).gradoNombre,
     estado: attendanceMap.get(es.codigoEstudiante) || "pendiente",
   }));
 
@@ -1094,6 +1122,16 @@ export async function getSupervisorAttendanceList(req: Request, res: Response) {
       teacher: { idProfesor: sessionRow.idProfesor, nombre: sessionRow.profesorNombre, apellido: sessionRow.profesorApellido },
       schedule: { idHorario: sessionRow.idHorario, diaSemana: sessionRow.diaSemana, horaInicio: sessionRow.horaInicio, horaFin: sessionRow.horaFin, aula: sessionRow.aula },
       students,
+      transfers: dayTransfers.map((t) => ({
+        id: t.id,
+        codigoEstudiante: t.codigoEstudiante,
+        fecha: t.fecha,
+        fechaFin: t.fechaFin,
+        motivo: t.motivo,
+        student: { nombre: t.nombre, apellido: t.apellido, grupo: t.grupo },
+        origen: { codigoDisciplina: t.origenCodigo, nombre: t.origenNombre },
+        destino: { codigoDisciplina: t.destCodigo, nombre: t.destNombre },
+      })),
     },
   });
 }

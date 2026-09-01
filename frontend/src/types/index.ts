@@ -178,6 +178,7 @@ export interface SupervisorEnrolledStudent {
   nombre: string;
   apellido: string;
   idGrado: number;
+  gradoNombre?: string | null;
   grupo: string | null;
   correo: string | null;
   fotoUrl: string | null;
@@ -269,6 +270,16 @@ export interface AttendanceResponse {
     fecha: string;
   };
   teacher?: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
+  transfers?: Array<{
+    id: string;
+    codigoEstudiante: string;
+    fecha: string;
+    fechaFin: string | null;
+    motivo: string | null;
+    student: { nombre: string; apellido: string; grupo: string | null };
+    origen: { codigoDisciplina: string | null; nombre: string | null };
+    destino: { codigoDisciplina: string | null; nombre: string | null };
+  }>;
 }
 
 export interface SupervisorCallableClass {

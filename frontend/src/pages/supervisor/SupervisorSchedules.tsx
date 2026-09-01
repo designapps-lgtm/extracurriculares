@@ -31,9 +31,10 @@ const DIAS_CORTO: Record<string, string> = {
 const DIAS_ORDEN = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 
 function diaDeFecha(fecha: string): string {
-  const d = new Date(`${fecha}T00:00:00`);
-  const idx = d.getDay();
-  return ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"][idx];
+  const d = new Date(`${fecha}T12:00:00Z`);
+  return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "America/Bogota" })
+    .format(d)
+    .toUpperCase();
 }
 
 function hoyInput(): string {
@@ -45,7 +46,7 @@ function hoyInput(): string {
 
 function formatFecha(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" });
+  return d.toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric", timeZone: "America/Bogota" });
 }
 
 function SessionRow({ session, onView }: { session: { id: string; fecha: string; estado: string; counts: { total: number; presente: number; ausente: number; justificado: number } }; onView: () => void }) {
@@ -112,7 +113,7 @@ function StudentRow({ student }: { student: SupervisorEnrolledStudent }) {
           {student.grupo ? ` · ${student.grupo}` : ""}
         </p>
       </div>
-      <span className="text-xs text-surface-400 shrink-0">Grado {student.idGrado}</span>
+      <span className="text-xs text-surface-400 shrink-0">Grado {student.gradoNombre || student.idGrado}</span>
     </li>
   );
 }

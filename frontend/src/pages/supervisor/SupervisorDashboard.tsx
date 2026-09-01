@@ -19,7 +19,7 @@ import type {
 
 function formatFecha(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" });
+  return d.toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric", timeZone: "America/Bogota" });
 }
 
 const ESTADO_LABEL: Record<string, { label: string; className: string }> = {
