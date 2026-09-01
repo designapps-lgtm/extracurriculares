@@ -120,10 +120,14 @@ async function resolveRoleByEmail(email: string): Promise<UserIdentity> {
   const priority: Record<Role, number> = { admin: 0, supervisor: 1, secretary: 2, teacher: 3 };
   matches.sort((a, b) => priority[a.role] - priority[b.role]);
 
-  const match = matches[0];
-  if (!match) {
+  if (matches.length === 0) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Este correo no está registrado en el sistema");
   }
+
+  // Si el mismo correo es supervisor Y secretaria (o admin, etc.), se entra con
+  // el rol de mayor prioridad que esté ACTIVO. Un rol desactivado no debe
+  // bloquear la entrada por otro rol que siga activo.
+  const match = matches.find((m) => m.estado === "activo") ?? matches[0];
 
   if (match.estado !== "activo") {
     const code = match.role === "teacher" ? "TEACHER_INACTIVE" : match.role === "supervisor" ? "SUPERVISOR_INACTIVE" : match.role === "secretary" ? "SECRETARY_INACTIVE" : "ACCOUNT_DISABLED";
