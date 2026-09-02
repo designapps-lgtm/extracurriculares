@@ -77,14 +77,11 @@ export async function getTeacherClasses(req: Request, res: Response) {
 
   const classesWithStats = await Promise.all(
     Array.from(groups.values()).map(async (g) => {
-      const codes = g.grades.map((gr: { idGrado: number }) => gr.idGrado);
       const enrolledCountRow = (await sql`
         SELECT COUNT(*)::int AS cnt
         FROM "StudentSchedule" ss
-        LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
         WHERE ss."codigoDisciplina" = ${g.discipline.codigoDisciplina}
           AND ss."diaSemana" = ${g.schedule.diaSemana}
-          AND st."idGrado" = ANY(${codes})
       `) as unknown as Array<{ cnt: number }>;
 
       const sessionRow = await first<{
@@ -308,7 +305,6 @@ export async function getAttendanceList(req: Request, res: Response) {
     LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
     WHERE ss."codigoDisciplina" = ${sessionRow.codigoDisciplina}
       AND ss."diaSemana" = ${sessionRow.diaSemana}
-      AND st."idGrado" = ANY(${gradeIds})
   `) as unknown as Array<{
     codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null; idGrado: number;
   }>;

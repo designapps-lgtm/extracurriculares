@@ -489,10 +489,11 @@ export async function getSupervisorClasses(req: Request, res: Response) {
     idAsignacion: string; idHorario: string; id: string; estado: string; attendanceCount: number;
   }>;
 
-  const enrolledKey = (d: string, dia: string, g: number) => `${d}|${dia}|${g}`;
+  const enrolledKey = (d: string, dia: string) => `${d}|${dia}`;
   const enrolledMap = new Map<string, number>();
   for (const r of enrolledRows) {
-    enrolledMap.set(enrolledKey(r.codigoDisciplina, r.diaSemana, r.idGrado), r.cnt);
+    const key = enrolledKey(r.codigoDisciplina, r.diaSemana);
+    enrolledMap.set(key, (enrolledMap.get(key) ?? 0) + r.cnt);
   }
 
   const sessionKey = (a: string, h: string) => `${a}|${h}`;
@@ -524,7 +525,7 @@ export async function getSupervisorClasses(req: Request, res: Response) {
         teacher: { idProfesor: a.idProfesor, nombre: a.profesorNombre, apellido: a.profesorApellido },
         schedule: { idHorario: a.idHorario, diaSemana: a.diaSemana, horaInicio: a.horaInicio, horaFin: a.horaFin, aula: a.aula },
         isToday: a.diaSemana === todayDay,
-        enrolledCount: 0,
+        enrolledCount: enrolledMap.get(enrolledKey(a.codigoDisciplina, a.diaSemana!)) ?? 0,
         sessionId: null,
         sessionEstado: null,
         attendanceCount: 0,
@@ -534,7 +535,6 @@ export async function getSupervisorClasses(req: Request, res: Response) {
     if (!g.grades.some((x: { idGrado: number }) => x.idGrado === a.idGrado)) {
       g.grades.push({ idGrado: a.gradoIdGrado, nombre: a.gradoNombre });
     }
-    g.enrolledCount += enrolledMap.get(enrolledKey(a.codigoDisciplina, a.diaSemana!, a.idGrado)) ?? 0;
     const sessionRow = sessionMap.get(sessionKey(a.idAsignacion, a.idHorario!));
     if (sessionRow) {
       g.sessionId = sessionRow.id;
@@ -1050,7 +1050,6 @@ export async function getSupervisorAttendanceList(req: Request, res: Response) {
     LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
     WHERE ss."codigoDisciplina" = ${sessionRow.codigoDisciplina}
       AND ss."diaSemana" = ${sessionRow.diaSemana}
-      AND st."idGrado" = ANY(${gradeIds})
   `) as unknown as Array<{
     codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null; idGrado: number;
   }>;
