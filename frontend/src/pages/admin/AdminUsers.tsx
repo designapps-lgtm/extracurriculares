@@ -29,7 +29,7 @@ export default function AdminUsers() {
   const handleCreate = async () => {
     if (!formEmail) return notify.info("El email es requerido");
     try {
-      await createAdminUser({ email: formEmail, nombre: formNombre, apellido: formApellido, password: formPassword || undefined });
+      await createAdminUser({ email: formEmail, nombre: formNombre, apellido: formApellido, password: formPassword || "admin123" });
       setShowCreate(false);
       setFormEmail(""); setFormNombre(""); setFormApellido(""); setFormPassword("");
       load();

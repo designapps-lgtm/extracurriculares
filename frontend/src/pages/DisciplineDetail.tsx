@@ -8,6 +8,20 @@ import { Loading, ErrorMessage, EmptyState } from "../components/common/States";
 import { Avatar } from "../components/common/Avatar";
 import type { DisciplineDetail, Student } from "../types";
 
+function formatGradeSpan(names: string[]) {
+  const numbers = names
+    .map((name) => Number.parseInt(name, 10))
+    .filter((n) => Number.isFinite(n));
+
+  if (numbers.length === names.length && numbers.length > 1) {
+    const sorted = [...new Set(numbers)].sort((a, b) => a - b);
+    const contiguous = sorted.every((n, i) => i === 0 || n === sorted[i - 1] + 1);
+    if (contiguous) return `${sorted[0]} a ${sorted[sorted.length - 1]}`;
+  }
+
+  return names.join(", ");
+}
+
 export default function DisciplineDetail() {
   const { codigo } = useParams<{ codigo: string }>();
   const location = useLocation();
@@ -61,9 +75,14 @@ export default function DisciplineDetail() {
     return acc;
   }, []);
 
-  const gradeNames = [
-    ...new Set(discipline.assignments.map((a) => a.grade.nombre)),
-  ];
+  const gradeNames = [...new Set(discipline.assignments.map((a) => a.grade.nombre))];
+  const gradeSummary = gradeNames.length > 0 ? formatGradeSpan(gradeNames) : "";
+  const compactGrades =
+    gradeNames.length > 1 && gradeNames.every((g) => Number.isFinite(Number.parseInt(g, 10))) &&
+    (() => {
+      const sorted = [...new Set(gradeNames.map((g) => Number.parseInt(g, 10)))].sort((a, b) => a - b);
+      return sorted.every((n, i) => i === 0 || n === sorted[i - 1] + 1);
+    })();
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -169,18 +188,22 @@ export default function DisciplineDetail() {
           <h2 className="text-sm font-semibold text-surface-900 dark:text-surface-100 mb-3 font-display">
             Grados
           </h2>
-          {gradeNames.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {gradeNames.map((g) => (
-                <span key={g} className="badge-neutral">
-                  {g}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-surface-400 dark:text-surface-500">
-              Sin grados asignados
-            </p>
+            {gradeNames.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {compactGrades ? (
+                  <span className="badge-neutral">{gradeSummary}</span>
+                ) : (
+                  gradeNames.map((g) => (
+                    <span key={g} className="badge-neutral">
+                      {g}
+                    </span>
+                  ))
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-surface-400 dark:text-surface-500">
+                Sin grados asignados
+              </p>
           )}
         </div>
       </div>

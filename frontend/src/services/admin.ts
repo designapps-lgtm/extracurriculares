@@ -97,7 +97,8 @@ export interface AssignmentScheduleInput {
 
 export async function createAdminAssignment(data: {
   codigoDisciplina: string;
-  idGrado: number;
+  idGrado?: number;
+  idGrados?: number[];
   idProfesor: string;
   esPrincipal?: boolean;
   schedules?: AssignmentScheduleInput[];

@@ -111,15 +111,23 @@ async function resolveScheduleLinks(schedules: any): Promise<{ idHorario: string
 
 export async function createAssignment(data: {
   codigoDisciplina: string;
-  idGrado: number;
+  idGrado?: number;
+  idGrados?: number[];
   idProfesor: string;
   esPrincipal?: boolean;
   schedules?: any[];
 }) {
-  const { codigoDisciplina, idGrado, idProfesor, esPrincipal, schedules } = data;
+  const { codigoDisciplina, idGrado, idGrados, idProfesor, esPrincipal, schedules } = data;
+  const gradeIds = Array.from(
+    new Set(
+      (idGrados && idGrados.length > 0 ? idGrados : idGrado ? [idGrado] : [])
+        .map((g) => Number(g))
+        .filter((g) => Number.isInteger(g) && g > 0),
+    ),
+  ).sort((a, b) => a - b);
 
-  if (!codigoDisciplina || !idGrado || !idProfesor) {
-    throw new AppError(400, "VALIDATION_ERROR", "codigoDisciplina, idGrado e idProfesor son requeridos");
+  if (!codigoDisciplina || gradeIds.length === 0 || !idProfesor) {
+    throw new AppError(400, "VALIDATION_ERROR", "codigoDisciplina, idGrado(s) e idProfesor son requeridos");
   }
 
   const discipline = await first<any>(
@@ -127,10 +135,12 @@ export async function createAssignment(data: {
   );
   if (!discipline) throw new AppError(400, "INVALID_DISCIPLINE", "Disciplina no válida");
 
-  const grade = await first<any>(
-    await sql`SELECT "idGrado" FROM "Grade" WHERE "idGrado" = ${idGrado} LIMIT 1` as any[]
-  );
-  if (!grade) throw new AppError(400, "INVALID_GRADE", "Grado no válido");
+  const gradeRows = (await sql`
+    SELECT "idGrado"
+    FROM "Grade"
+    WHERE "idGrado" = ANY(${gradeIds})
+  `) as unknown as Array<{ idGrado: number }>;
+  if (gradeRows.length !== gradeIds.length) throw new AppError(400, "INVALID_GRADE", "Uno o más grados no son válidos");
 
   const teacher = await first<any>(
     await sql`SELECT "idProfesor", "estado" FROM "Teacher" WHERE "idProfesor" = ${idProfesor} LIMIT 1` as any[]
@@ -138,19 +148,51 @@ export async function createAssignment(data: {
   if (!teacher) throw new AppError(400, "INVALID_TEACHER", "Profesor no válido");
   if (teacher.estado !== "activo") throw new AppError(400, "TEACHER_INACTIVE", "El profesor está inactivo");
 
-  const scheduleLinks = await resolveScheduleLinks(schedules);
+  const scheduleLinks = Array.from(
+    new Map((await resolveScheduleLinks(schedules)).map((link) => [link.idHorario, link])).values(),
+  );
 
-  const idRows = await sql`SELECT gen_random_uuid() AS id` as any[];
-  const newId = idRows[0].id;
+  const existingRows = (await sql`
+    SELECT "idAsignacion", "idGrado", "estado"
+    FROM "ExtracurricularAssignment"
+    WHERE "idProfesor" = ${idProfesor}
+      AND "codigoDisciplina" = ${codigoDisciplina}
+      AND "idGrado" = ANY(${gradeIds})
+  `) as unknown as Array<{ idAsignacion: string; idGrado: number; estado: string }>;
 
-  await sql.transaction((tx) => [
-    tx`INSERT INTO "ExtracurricularAssignment" ("idAsignacion", "idProfesor", "codigoDisciplina", "idGrado", "esPrincipal", "updatedAt") VALUES (${newId}, ${idProfesor}, ${codigoDisciplina}, ${idGrado}, ${esPrincipal || false}, now())`,
-    ...scheduleLinks.map((link) =>
-      tx`INSERT INTO "AssignmentSchedule" ("id", "idAsignacion", "idHorario") VALUES (gen_random_uuid(), ${newId}, ${link.idHorario})`
-    ),
-  ]);
+  const existingByGrade = new Map(existingRows.map((row) => [row.idGrado, row]));
+  const createdIds: string[] = [];
 
-  return getAssignmentById(newId);
+  await sql.transaction((tx) => {
+    const ops: any[] = [];
+
+    for (const gradeId of gradeIds) {
+      const existing = existingByGrade.get(gradeId);
+      const assignmentId = existing?.idAsignacion ?? globalThis.crypto.randomUUID();
+      createdIds.push(assignmentId);
+
+      if (existing) {
+        ops.push(
+          tx`UPDATE "ExtracurricularAssignment" SET "esPrincipal" = ${esPrincipal || false}, "estado" = 'activo', "updatedAt" = now() WHERE "idAsignacion" = ${assignmentId}`,
+        );
+      } else {
+        ops.push(
+          tx`INSERT INTO "ExtracurricularAssignment" ("idAsignacion", "idProfesor", "codigoDisciplina", "idGrado", "esPrincipal", "updatedAt") VALUES (${assignmentId}, ${idProfesor}, ${codigoDisciplina}, ${gradeId}, ${esPrincipal || false}, now())`,
+        );
+      }
+
+      ops.push(tx`DELETE FROM "AssignmentSchedule" WHERE "idAsignacion" = ${assignmentId}`);
+      for (const link of scheduleLinks) {
+        ops.push(
+          tx`INSERT INTO "AssignmentSchedule" ("id", "idAsignacion", "idHorario") VALUES (gen_random_uuid(), ${assignmentId}, ${link.idHorario})`,
+        );
+      }
+    }
+
+    return ops;
+  });
+
+  return getAssignmentById(createdIds[0]);
 }
 
 export async function updateAssignment(id: string, data: { esPrincipal?: boolean; estado?: string; schedules?: any[] }) {

@@ -57,7 +57,7 @@ export default function AdminTeachers() {
   );
   const [assignForm, setAssignForm] = useState({
     codigoDisciplina: "",
-    idGrado: 0,
+    idGrados: [] as number[],
     esPrincipal: false,
     schedules: [] as string[],
   });
@@ -126,7 +126,7 @@ export default function AdminTeachers() {
     setEditingAssignment(null);
     setAssignForm({
       codigoDisciplina: "",
-      idGrado: 0,
+      idGrados: [],
       esPrincipal: false,
       schedules: [],
     });
@@ -137,7 +137,7 @@ export default function AdminTeachers() {
     setEditingAssignment(a);
     setAssignForm({
       codigoDisciplina: a.codigoDisciplina,
-      idGrado: a.idGrado,
+      idGrados: [a.idGrado],
       esPrincipal: a.esPrincipal,
       schedules: a.schedules.map((s) => s.schedule.idHorario),
     });
@@ -146,14 +146,14 @@ export default function AdminTeachers() {
 
   const handleSaveAssignment = async () => {
     if (!showAssignments) return;
-    if (!assignForm.codigoDisciplina || !assignForm.idGrado)
-      return notify.info("Disciplina y grado son requeridos");
+    if (!assignForm.codigoDisciplina || assignForm.idGrados.length === 0)
+      return notify.info("Disciplina y grados son requeridos");
 
     setAssignLoading(true);
     try {
       const payload = {
         codigoDisciplina: assignForm.codigoDisciplina,
-        idGrado: assignForm.idGrado,
+        idGrados: assignForm.idGrados,
         idProfesor: showAssignments.idProfesor,
         esPrincipal: assignForm.esPrincipal,
         schedules: assignForm.schedules.map((idHorario) => ({ idHorario })),
@@ -600,26 +600,44 @@ export default function AdminTeachers() {
 
                     <div>
                       <label className="block text-sm font-medium text-surface-500 mb-2">
-                        Grado *
+                        Grados *
                       </label>
-                      <select
-                        value={assignForm.idGrado || ""}
-                        onChange={(e) =>
-                          setAssignForm({
-                            ...assignForm,
-                            idGrado: Number(e.target.value),
-                          })
-                        }
-                        className="w-full px-4 py-3 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-base"
-                      >
-                        <option value="">Seleccionar grado</option>
-                        {grades.map((g) => (
-                          <option key={g.idGrado} value={g.idGrado}>
-                            {g.nombre}
-                            {g.nivel ? ` · ${g.nivel}` : ""}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-44 overflow-y-auto rounded-xl border border-surface-200 dark:border-surface-700 p-3 bg-white dark:bg-surface-800">
+                        {grades.map((g) => {
+                          const selected = assignForm.idGrados.includes(g.idGrado);
+                          return (
+                            <button
+                              key={g.idGrado}
+                              type="button"
+                              onClick={() =>
+                                setAssignForm((prev) => ({
+                                  ...prev,
+                                  idGrados: prev.idGrados.includes(g.idGrado)
+                                    ? prev.idGrados.filter((id) => id !== g.idGrado)
+                                    : [...prev.idGrados, g.idGrado],
+                                }))
+                              }
+                              disabled={!!editingAssignment}
+                              className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                                selected
+                                  ? "border-brand-500 bg-brand-50 text-brand-700"
+                                  : "border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-700"
+                              } ${editingAssignment ? "opacity-60 cursor-not-allowed" : ""}`}
+                            >
+                              <span className="truncate">
+                                {g.nombre}
+                                {g.nivel ? ` · ${g.nivel}` : ""}
+                              </span>
+                              {selected && <span className="text-xs font-semibold">✓</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-xs text-surface-500">
+                        {editingAssignment
+                          ? "El grado no se modifica desde aquí."
+                          : "Marcá uno o varios grados para crear todas las asignaciones del profesor de una vez."}
+                      </p>
                     </div>
                   </div>
 

@@ -46,7 +46,7 @@ export default function AdminAssignments() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
 
   const [formDiscipline, setFormDiscipline] = useState("");
-  const [formGrade, setFormGrade] = useState(0);
+  const [formGrades, setFormGrades] = useState<number[]>([]);
   const [formTeacher, setFormTeacher] = useState("");
   const [formSchedules, setFormSchedules] = useState<string[]>([]);
   const [esPrincipal, setEsPrincipal] = useState(false);
@@ -95,7 +95,7 @@ export default function AdminAssignments() {
   const openCreate = () => {
     setEditing(null);
     setFormDiscipline("");
-    setFormGrade(0);
+    setFormGrades([]);
     setFormTeacher("");
     setFormSchedules([]);
     setEsPrincipal(false);
@@ -106,7 +106,7 @@ export default function AdminAssignments() {
   const openEdit = (a: Assignment) => {
     setEditing(a);
     setFormDiscipline(a.discipline.codigoDisciplina);
-    setFormGrade(a.grade.idGrado);
+    setFormGrades([a.grade.idGrado]);
     setFormTeacher(a.teacher.idProfesor);
     setFormSchedules(a.schedules.map((s) => s.schedule.idHorario));
     setEsPrincipal(a.esPrincipal);
@@ -146,8 +146,8 @@ export default function AdminAssignments() {
   };
 
   const handleSubmit = async () => {
-    if (!formDiscipline || !formGrade || !formTeacher)
-      return notify.info("Disciplina, grado y profesor son requeridos");
+    if (!formDiscipline || formGrades.length === 0 || !formTeacher)
+      return notify.info("Disciplina, grados y profesor son requeridos");
     try {
       if (editing) {
         await updateAdminAssignment(editing.idAsignacion, {
@@ -158,7 +158,7 @@ export default function AdminAssignments() {
       } else {
         await createAdminAssignment({
           codigoDisciplina: formDiscipline,
-          idGrado: formGrade,
+          idGrados: formGrades,
           idProfesor: formTeacher,
           esPrincipal,
           schedules: formSchedules.map((id) => ({ idHorario: id })),
@@ -374,24 +374,44 @@ export default function AdminAssignments() {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-surface-500 mb-1">
-                    Grado *
-                  </label>
-                  <select
-                    value={formGrade || ""}
-                    onChange={(e) => setFormGrade(Number(e.target.value))}
-                    disabled={!!editing}
-                    className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm disabled:opacity-60"
-                  >
-                    <option value="">Seleccionar grado</option>
-                    {grades.map((g: any) => (
-                      <option key={g.idGrado} value={g.idGrado}>
-                        {g.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div>
+                    <label className="block text-xs font-medium text-surface-500 mb-1">
+                      Grados *
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-44 overflow-y-auto rounded-xl border border-surface-200 dark:border-surface-700 p-3 bg-white dark:bg-surface-800">
+                      {grades.map((g: any) => {
+                        const selected = formGrades.includes(g.idGrado);
+                        return (
+                          <button
+                            key={g.idGrado}
+                            type="button"
+                            disabled={!!editing}
+                            onClick={() => {
+                              if (editing) return;
+                              setFormGrades((prev) =>
+                                prev.includes(g.idGrado)
+                                  ? prev.filter((id) => id !== g.idGrado)
+                                  : [...prev, g.idGrado],
+                              );
+                            }}
+                            className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                              selected
+                                ? "border-brand-500 bg-brand-50 text-brand-700"
+                                : "border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-700"
+                            } ${editing ? "opacity-60 cursor-not-allowed" : ""}`}
+                          >
+                            <span className="truncate">{g.nombre}</span>
+                            {selected && <span className="text-xs font-semibold">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-xs text-surface-500">
+                      {editing
+                        ? "El grado no se modifica desde esta pantalla."
+                        : "Podés marcar uno o varios grados para crear la misma disciplina en paralelo."}
+                    </p>
+                  </div>
                 <div>
                   <label className="block text-xs font-medium text-surface-500 mb-1">
                     Profesor *

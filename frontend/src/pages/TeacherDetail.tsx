@@ -17,6 +17,20 @@ function getAvatarColor(id: string) {
   return AVATAR_COLORS[index];
 }
 
+function formatGradeSpan(names: string[]) {
+  const numbers = names
+    .map((name) => Number.parseInt(name, 10))
+    .filter((n) => Number.isFinite(n));
+
+  if (numbers.length === names.length && numbers.length > 1) {
+    const sorted = [...new Set(numbers)].sort((a, b) => a - b);
+    const contiguous = sorted.every((n, i) => i === 0 || n === sorted[i - 1] + 1);
+    if (contiguous) return `${sorted[0]} a ${sorted[sorted.length - 1]}`;
+  }
+
+  return names.join(", ");
+}
+
 export default function TeacherDetail() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
@@ -55,6 +69,14 @@ export default function TeacherDetail() {
     ...new Set(assignments.map((a) => a.discipline.nombre)),
   ];
   const grades = [...new Set(assignments.map((a) => a.grade.nombre))];
+  const compactGrades =
+    grades.length > 1 &&
+    grades.every((g) => Number.isFinite(Number.parseInt(g, 10))) &&
+    (() => {
+      const sorted = [...new Set(grades.map((g) => Number.parseInt(g, 10)))].sort((a, b) => a - b);
+      return sorted.every((n, i) => i === 0 || n === sorted[i - 1] + 1);
+    })();
+  const gradeSummary = grades.length > 0 ? formatGradeSpan(grades) : "";
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -161,11 +183,15 @@ export default function TeacherDetail() {
           </h2>
           {grades.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {grades.map((g) => (
-                <span key={g} className="badge-neutral">
-                  {g}
-                </span>
-              ))}
+              {compactGrades ? (
+                <span className="badge-neutral">{gradeSummary}</span>
+              ) : (
+                grades.map((g) => (
+                  <span key={g} className="badge-neutral">
+                    {g}
+                  </span>
+                ))
+              )}
             </div>
           ) : (
             <p className="text-sm text-surface-400 dark:text-surface-500">
