@@ -8,6 +8,7 @@ interface ServiceAccountCredentials {
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 const DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files";
+const DRIVE_CHANGES_URL = "https://www.googleapis.com/drive/v3/changes";
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
@@ -74,6 +75,13 @@ export interface DriveFile {
   modifiedTime?: string;
 }
 
+export interface DriveChange {
+  fileId?: string;
+  file?: DriveFile;
+  removed?: boolean;
+  time?: string;
+}
+
 async function request<T>(url: string, token: string): Promise<T> {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
@@ -110,6 +118,82 @@ export async function downloadFile(fileId: string, creds: ServiceAccountCredenti
     throw new Error(`No se pudo descargar el archivo ${fileId}: ${res.status} ${text}`);
   }
   return Buffer.from(await res.arrayBuffer());
+}
+
+export async function getStartPageToken(creds: ServiceAccountCredentials): Promise<string> {
+  const token = await getAccessToken(creds);
+  const res = await fetch(`${DRIVE_CHANGES_URL}/startPageToken?supportsAllDrives=true`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`No se pudo obtener startPageToken: ${res.status} ${text}`);
+  }
+  const data = (await res.json()) as { startPageToken?: string };
+  if (!data.startPageToken) throw new Error("Respuesta de Google sin startPageToken");
+  return data.startPageToken;
+}
+
+export async function listDriveChanges(pageToken: string, creds: ServiceAccountCredentials): Promise<{ changes: DriveChange[]; nextPageToken?: string; newStartPageToken?: string }> {
+  const token = await getAccessToken(creds);
+  const url = new URL(DRIVE_CHANGES_URL);
+  url.searchParams.set("pageToken", pageToken);
+  url.searchParams.set("pageSize", "1000");
+  url.searchParams.set("supportsAllDrives", "true");
+  url.searchParams.set("includeItemsFromAllDrives", "true");
+  url.searchParams.set("fields", "nextPageToken,newStartPageToken,changes(fileId,file(id,name,mimeType,modifiedTime),removed,time)");
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`No se pudieron listar cambios: ${res.status} ${text}`);
+  }
+  return await res.json() as { changes: DriveChange[]; nextPageToken?: string; newStartPageToken?: string };
+}
+
+export async function watchDriveChanges(params: {
+  pageToken: string;
+  callbackUrl: string;
+  channelId: string;
+  token: string;
+  creds: ServiceAccountCredentials;
+}): Promise<{ resourceId: string; expiration?: string }> {
+  const accessToken = await getAccessToken(params.creds);
+  const res = await fetch(`${DRIVE_CHANGES_URL}/watch?supportsAllDrives=true&pageToken=${encodeURIComponent(params.pageToken)}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id: params.channelId,
+      type: "web_hook",
+      address: params.callbackUrl,
+      token: params.token,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`No se pudo crear watch: ${res.status} ${text}`);
+  }
+  return await res.json() as { resourceId: string; expiration?: string };
+}
+
+export async function stopDriveChannel(params: { channelId: string; resourceId: string; creds: ServiceAccountCredentials }): Promise<void> {
+  const token = await getAccessToken(params.creds);
+  const res = await fetch("https://www.googleapis.com/drive/v3/channels/stop", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ id: params.channelId, resourceId: params.resourceId }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`No se pudo detener el canal: ${res.status} ${text}`);
+  }
 }
 
 export async function getDriveFileMetadata(fileId: string, creds: ServiceAccountCredentials): Promise<DriveFile | null> {

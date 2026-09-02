@@ -166,10 +166,22 @@ npx wrangler secret put JWT_SECRET
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
 npx wrangler secret put GOOGLE_DRIVE_FOLDER_ID
+npx wrangler secret put GOOGLE_DRIVE_WEBHOOK_TOKEN
 ```
 
 > `GOOGLE_DRIVE_FOLDER_ID` está en `[vars]` como placeholder vacío; si preferís
 > como secreto, quitalo de `[vars]` y dale `wrangler secret put`.
+>
+> `GOOGLE_DRIVE_WEBHOOK_URL` debe apuntar al endpoint público del worker,
+> por ejemplo `https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive`.
+
+Después del deploy y de setear los secretos, pegale una vez al bootstrap:
+
+```bash
+curl -X POST \
+  -H "X-Goog-Channel-Token: $GOOGLE_DRIVE_WEBHOOK_TOKEN" \
+  https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive/bootstrap
+```
 
 ### Probar en local
 ```bash

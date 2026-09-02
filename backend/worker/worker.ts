@@ -3,6 +3,7 @@ import { httpServerHandler } from "cloudflare:node";
 import app from "../src/app";
 import { config } from "../src/config";
 import { syncNovedadesFromDrive } from "../src/modules/novedades/novedades.service";
+import { ensureDriveWatch, syncDriveSources } from "../src/modules/driveSync/driveSync.service";
 
 app.listen(config.port);
 
@@ -19,6 +20,19 @@ export default {
     }
 
     try {
+      if (config.googleDriveWebhookUrl && config.googleDriveWebhookToken) {
+        await ensureDriveWatch();
+      } else {
+        console.log("[Drive] Webhook no configurado; se ejecuta solo sync de respaldo");
+      }
+
+      const driveResult = await syncDriveSources();
+      if (driveResult.errors.length > 0) {
+        console.error(`[Drive] Sync con errores: ${driveResult.errors.join(" | ")}`);
+      } else {
+        console.log(`[Drive] Sync OK: ${driveResult.files} archivos procesados`);
+      }
+
       const result = await syncNovedadesFromDrive();
       if (result.errors.length > 0) {
         console.error(`[Novedades] Sync con errores: ${result.errors.join(" | ")}`);

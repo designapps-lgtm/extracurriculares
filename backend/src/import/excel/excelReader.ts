@@ -27,6 +27,15 @@ const DAY_COLUMNS: Record<string, keyof RawStudentRow> = {
 
 export function readExcel(filePath: string): RawStudentRow[] {
   const workbook = XLSX.readFile(filePath);
+  return readWorkbook(workbook);
+}
+
+export function readExcelBuffer(buffer: Buffer): RawStudentRow[] {
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  return readWorkbook(workbook);
+}
+
+function readWorkbook(workbook: XLSX.WorkBook): RawStudentRow[] {
   const sheetName = "Base";
   const sheet = workbook.Sheets[sheetName];
 

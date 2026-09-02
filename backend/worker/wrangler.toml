@@ -12,8 +12,8 @@ workers_dev = true
 crons = ["*/10 * * * *"]
 
 # Variables de entorno no secretas.
-# Las secretas (DATABASE_URL, JWT_SECRET, GOOGLE_*) NO van acá: se setean con
-# `wrangler secret put <NOMBRE>` para que no queden en el repo.
+# Las secretas (DATABASE_URL, JWT_SECRET, GOOGLE_*, WEBHOOK token) NO van acá:
+# se setean con `wrangler secret put <NOMBRE>` para que no queden en el repo.
 [vars]
 NODE_ENV = "production"
 PORT = "3000"
@@ -22,6 +22,7 @@ ACCESS_TOKEN_EXPIRES_IN = "15m"
 SESSION_DURATION_HOURS = "168"
 GOOGLE_INSTITUTION_DOMAIN = "gi.edu.co"
 NOVEDADES_SYNC_MINUTES = "10"
+GOOGLE_DRIVE_WEBHOOK_URL = "https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive"
 # Rate limiting a nivel de app (además del de Cloudflare). El limiter in-memory
 # de Express se activa cuando estas vars existen. AUTH_RATE_LIMIT: intentos de
 # login/google/logout por ventana de 15 min. API_RATE_LIMIT: requests generales.

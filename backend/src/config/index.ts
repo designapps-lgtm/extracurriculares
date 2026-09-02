@@ -31,6 +31,8 @@ export const config = {
   sessionDurationHours: parseInt(process.env.SESSION_DURATION_HOURS || "168", 10),
   googleServiceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON || null,
   googleDriveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID || null,
+  googleDriveWebhookUrl: process.env.GOOGLE_DRIVE_WEBHOOK_URL || null,
+  googleDriveWebhookToken: process.env.GOOGLE_DRIVE_WEBHOOK_TOKEN || null,
   novedadesSyncMinutes: parseInt(process.env.NOVEDADES_SYNC_MINUTES || "10", 10),
   googleClientId: process.env.GOOGLE_CLIENT_ID || null,
   googleInstitutionDomain: process.env.GOOGLE_INSTITUTION_DOMAIN || "gi.edu.co",
