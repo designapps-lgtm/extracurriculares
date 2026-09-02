@@ -9,3 +9,9 @@ export async function listDisciplines(req: Request, res: Response) {
   }, pagination);
   res.json({ success: true, ...data });
 }
+
+export async function getDisciplineGrades(req: Request, res: Response) {
+  const codigo = String(req.params.codigo ?? "");
+  const data = await service.getDisciplineGrades(codigo);
+  res.json({ success: true, ...data });
+}

@@ -131,6 +131,18 @@ export async function getAdminDisciplines(params?: Record<string, string>) {
   return api.get<PaginatedResponse<Discipline>>("/api/admin/disciplines", params);
 }
 
+export interface DisciplineGrade {
+  idGrado: number;
+  nombre: string;
+  students: number;
+}
+
+export async function getAdminDisciplineGrades(codigoDisciplina: string) {
+  return api.get<{ success: boolean; codigoDisciplina: string; grades: DisciplineGrade[] }>(
+    `/api/admin/disciplines/${encodeURIComponent(codigoDisciplina)}/grades`,
+  );
+}
+
 export async function getAdminGrades() {
   return api.get<{ success: boolean; data: Grade[] }>("/api/admin/grades");
 }

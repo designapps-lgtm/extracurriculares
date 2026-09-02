@@ -1,4 +1,5 @@
 import { sql, first } from "../../config/db";
+import { AppError } from "../../middlewares/errorHandler";
 import { PaginationParams, paginatedResult } from "../../utils/pagination";
 
 export async function getDisciplines(query: { search?: string }, pagination: PaginationParams) {
@@ -64,4 +65,23 @@ export async function getDisciplines(query: { search?: string }, pagination: Pag
   }));
 
   return paginatedResult(data, total, pagination);
+}
+
+export async function getDisciplineGrades(codigoDisciplina: string) {
+  const discipline = await first<any>(
+    await sql`SELECT "codigoDisciplina" FROM "Discipline" WHERE "codigoDisciplina" = ${codigoDisciplina} LIMIT 1` as any[]
+  );
+  if (!discipline) throw new AppError(404, "DISCIPLINE_NOT_FOUND", "Disciplina no encontrada");
+
+  const rows = (await sql`
+    SELECT g."idGrado", g."nombre", COUNT(*)::int AS "students"
+    FROM "StudentSchedule" ss
+    JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+    JOIN "Grade" g ON g."idGrado" = st."idGrado"
+    WHERE ss."codigoDisciplina" = ${codigoDisciplina}
+    GROUP BY g."idGrado", g."nombre"
+    ORDER BY g."idGrado" ASC
+  `) as unknown as Array<{ idGrado: number; nombre: string; students: number }>;
+
+  return { codigoDisciplina, grades: rows };
 }

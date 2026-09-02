@@ -6,6 +6,7 @@ import {
   deleteAdminAssignment,
   createAdminSchedule,
   getAdminDisciplines,
+  getAdminDisciplineGrades,
   getAdminTeachers,
   getAdminGrades,
   getAdminSchedules,
@@ -359,7 +360,19 @@ export default function AdminAssignments() {
                   </label>
                   <select
                     value={formDiscipline}
-                    onChange={(e) => setFormDiscipline(e.target.value)}
+                    onChange={async (e) => {
+                      const code = e.target.value;
+                      setFormDiscipline(code);
+                      setFormGrades([]);
+                      if (code) {
+                        try {
+                          const res = await getAdminDisciplineGrades(code);
+                          setFormGrades(res.grades.map((g) => g.idGrado));
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }
+                    }}
                     disabled={!!editing}
                     className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm disabled:opacity-60"
                   >
