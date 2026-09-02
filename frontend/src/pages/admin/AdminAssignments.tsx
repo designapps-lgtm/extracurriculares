@@ -44,6 +44,8 @@ export default function AdminAssignments() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
+  const [autoSchedules, setAutoSchedules] = useState<string[]>([]);
+  const [forceShowSchedules, setForceShowSchedules] = useState(false);
 
   const [formDiscipline, setFormDiscipline] = useState("");
   const [formTeacher, setFormTeacher] = useState("");
@@ -94,6 +96,8 @@ export default function AdminAssignments() {
     setFormDiscipline("");
     setFormTeacher("");
     setFormSchedules([]);
+    setAutoSchedules([]);
+    setForceShowSchedules(false);
     setEsPrincipal(false);
     setShowNewSchedule(false);
     setShowModal(true);
@@ -104,6 +108,8 @@ export default function AdminAssignments() {
     setFormDiscipline(a.discipline.codigoDisciplina);
     setFormTeacher(a.teacher.idProfesor);
     setFormSchedules(a.schedules.map((s) => s.schedule.idHorario));
+    setAutoSchedules([]);
+    setForceShowSchedules(false);
     setEsPrincipal(a.esPrincipal);
     setShowNewSchedule(false);
     setShowModal(true);
@@ -209,6 +215,11 @@ export default function AdminAssignments() {
   const sortedSchedules = [...schedules].sort(
     (a, b) => DIAS_ORDEN.indexOf(a.diaSemana) - DIAS_ORDEN.indexOf(b.diaSemana),
   );
+
+  const autoScheduleInfo = sortedSchedules
+    .filter((s) => autoSchedules.includes(s.idHorario))
+    .map((s) => `${s.diaSemana} ${s.horaInicio || "?"}-${s.horaFin || "?"}${s.aula ? ` (${s.aula})` : ""}`)
+    .join(" · ");
 
   const groupedAssignments = (() => {
     const groups = new Map<string, {
@@ -400,6 +411,8 @@ export default function AdminAssignments() {
                       const code = e.target.value;
                       setFormDiscipline(code);
                       setFormSchedules([]);
+                      setAutoSchedules([]);
+                      setForceShowSchedules(false);
                       if (code) {
                         setLoadingSchedules(true);
                         try {
@@ -414,6 +427,7 @@ export default function AdminAssignments() {
                             }
                             return merged;
                           });
+                          setAutoSchedules(discSched);
                           setFormSchedules(discSched);
                         } catch (err) {
                           console.error(err);
@@ -463,6 +477,26 @@ export default function AdminAssignments() {
                 </div>
 
                 <div>
+                  {!editing && !forceShowSchedules && autoSchedules.length > 0 ? (
+                    <div>
+                      <label className="block text-xs font-medium text-surface-500 mb-1">
+                        Horarios (automáticos de la disciplina)
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-surface-100 dark:bg-surface-800 rounded-lg text-xs text-surface-600 dark:text-surface-400">
+                          {autoScheduleInfo}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setForceShowSchedules(true)}
+                          className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                        >
+                          + Agregar otro horario
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-medium text-surface-500 mb-1">
                       Horarios
@@ -570,6 +604,8 @@ export default function AdminAssignments() {
                       </label>
                     ))}
                   </div>
+                    </>
+                  )}
                 </div>
 
                 <label className="flex items-center gap-2 text-sm text-surface-700 dark:text-surface-300">
