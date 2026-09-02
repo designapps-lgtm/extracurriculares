@@ -137,8 +137,16 @@ export interface DisciplineGrade {
   students: number;
 }
 
+export interface DisciplineScheduleInfo {
+  idHorario: string;
+  diaSemana: string;
+  horaInicio: string | null;
+  horaFin: string | null;
+  aula: string | null;
+}
+
 export async function getAdminDisciplineGrades(codigoDisciplina: string) {
-  return api.get<{ success: boolean; codigoDisciplina: string; grades: DisciplineGrade[] }>(
+  return api.get<{ success: boolean; codigoDisciplina: string; grades: DisciplineGrade[]; schedules: DisciplineScheduleInfo[] }>(
     `/api/admin/disciplines/${encodeURIComponent(codigoDisciplina)}/grades`,
   );
 }

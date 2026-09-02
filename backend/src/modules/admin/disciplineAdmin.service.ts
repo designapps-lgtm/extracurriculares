@@ -83,5 +83,14 @@ export async function getDisciplineGrades(codigoDisciplina: string) {
     ORDER BY g."idGrado" ASC
   `) as unknown as Array<{ idGrado: number; nombre: string; students: number }>;
 
-  return { codigoDisciplina, grades: rows };
+  const schedules = (await sql`
+    SELECT DISTINCT sc."idHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula"
+    FROM "ExtracurricularAssignment" ea
+    JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
+    JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
+    WHERE ea."codigoDisciplina" = ${codigoDisciplina}
+    ORDER BY sc."diaSemana" ASC, sc."horaInicio" ASC
+  `) as unknown as Array<{ idHorario: string; diaSemana: string; horaInicio: string | null; horaFin: string | null; aula: string | null }>;
+
+  return { codigoDisciplina, grades: rows, schedules };
 }

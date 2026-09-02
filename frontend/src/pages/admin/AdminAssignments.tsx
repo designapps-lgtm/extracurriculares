@@ -6,6 +6,7 @@ import {
   deleteAdminAssignment,
   createAdminSchedule,
   getAdminDisciplines,
+  getAdminDisciplineGrades,
   getAdminTeachers,
   getAdminSchedules,
 } from "../../services/admin";
@@ -42,6 +43,7 @@ export default function AdminAssignments() {
   const [disciplines, setDisciplines] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [loadingSchedules, setLoadingSchedules] = useState(false);
 
   const [formDiscipline, setFormDiscipline] = useState("");
   const [formTeacher, setFormTeacher] = useState("");
@@ -394,7 +396,32 @@ export default function AdminAssignments() {
                   </label>
                   <select
                     value={formDiscipline}
-                    onChange={(e) => setFormDiscipline(e.target.value)}
+                    onChange={async (e) => {
+                      const code = e.target.value;
+                      setFormDiscipline(code);
+                      setFormSchedules([]);
+                      if (code) {
+                        setLoadingSchedules(true);
+                        try {
+                          const res = await getAdminDisciplineGrades(code);
+                          const discSched = res.schedules.map((s) => s.idHorario);
+                          setSchedules((prev) => {
+                            const merged = [...prev];
+                            for (const s of res.schedules) {
+                              if (!merged.some((m) => m.idHorario === s.idHorario)) {
+                                merged.push(s as unknown as Schedule);
+                              }
+                            }
+                            return merged;
+                          });
+                          setFormSchedules(discSched);
+                        } catch (err) {
+                          console.error(err);
+                        } finally {
+                          setLoadingSchedules(false);
+                        }
+                      }
+                    }}
                     disabled={!!editing}
                     className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm disabled:opacity-60"
                   >
@@ -411,9 +438,9 @@ export default function AdminAssignments() {
                 </div>
                 {formDiscipline && (
                   <div className="px-3 py-2 bg-brand-50 dark:bg-brand-950 rounded-xl text-sm text-brand-700 dark:text-brand-300">
-                    Los grados se asignan automáticamente según los estudiantes
-                    inscritos en la disciplina. Todos los grados de{" "}
-                    <strong>{formDiscipline}</strong> quedarán cubiertos.
+                    Los grados y horarios se aplican automáticamente según los
+                    estudiantes inscritos y las asignaciones existentes de{" "}
+                    <strong>{formDiscipline}</strong>.
                   </div>
                 )}
                 <div>
@@ -440,7 +467,7 @@ export default function AdminAssignments() {
                     <label className="block text-xs font-medium text-surface-500 mb-1">
                       Horarios
                     </label>
-                    {!showNewSchedule && (
+                    {!showNewSchedule && !loadingSchedules && (
                       <button
                         onClick={() => setShowNewSchedule(true)}
                         className="text-xs text-brand-600 hover:text-brand-700 font-medium"
@@ -449,6 +476,10 @@ export default function AdminAssignments() {
                       </button>
                     )}
                   </div>
+
+                  {loadingSchedules && (
+                    <p className="text-xs text-surface-400 mb-2">Cargando horarios de la disciplina...</p>
+                  )}
 
                   {showNewSchedule && (
                     <div className="mb-3 p-3 border border-dashed border-surface-300 dark:border-surface-600 rounded-xl space-y-3 bg-surface-50 dark:bg-surface-800/40">
