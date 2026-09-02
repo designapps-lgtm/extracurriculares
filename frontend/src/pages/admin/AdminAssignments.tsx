@@ -6,9 +6,7 @@ import {
   deleteAdminAssignment,
   createAdminSchedule,
   getAdminDisciplines,
-  getAdminDisciplineGrades,
   getAdminTeachers,
-  getAdminGrades,
   getAdminSchedules,
 } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
@@ -43,11 +41,9 @@ export default function AdminAssignments() {
 
   const [disciplines, setDisciplines] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
-  const [grades, setGrades] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
 
   const [formDiscipline, setFormDiscipline] = useState("");
-  const [formGrades, setFormGrades] = useState<number[]>([]);
   const [formTeacher, setFormTeacher] = useState("");
   const [formSchedules, setFormSchedules] = useState<string[]>([]);
   const [esPrincipal, setEsPrincipal] = useState(false);
@@ -77,15 +73,13 @@ export default function AdminAssignments() {
     load();
     (async () => {
       try {
-        const [d, t, g, s] = await Promise.all([
+        const [d, t, s] = await Promise.all([
           getAdminDisciplines({ limit: "100" }),
           getAdminTeachers({ limit: "100" }),
-          getAdminGrades(),
           getAdminSchedules({ limit: "100" }),
         ]);
         setDisciplines(d.data);
         setTeachers(t.data);
-        setGrades(g.data);
         setSchedules(s.data);
       } catch (err) {
         console.error(err);
@@ -96,7 +90,6 @@ export default function AdminAssignments() {
   const openCreate = () => {
     setEditing(null);
     setFormDiscipline("");
-    setFormGrades([]);
     setFormTeacher("");
     setFormSchedules([]);
     setEsPrincipal(false);
@@ -107,7 +100,6 @@ export default function AdminAssignments() {
   const openEdit = (a: Assignment) => {
     setEditing(a);
     setFormDiscipline(a.discipline.codigoDisciplina);
-    setFormGrades([a.grade.idGrado]);
     setFormTeacher(a.teacher.idProfesor);
     setFormSchedules(a.schedules.map((s) => s.schedule.idHorario));
     setEsPrincipal(a.esPrincipal);
@@ -147,8 +139,8 @@ export default function AdminAssignments() {
   };
 
   const handleSubmit = async () => {
-    if (!formDiscipline || formGrades.length === 0 || !formTeacher)
-      return notify.info("Disciplina, grados y profesor son requeridos");
+    if (!formDiscipline || !formTeacher)
+      return notify.info("Disciplina y profesor son requeridos");
     try {
       if (editing) {
         await updateAdminAssignment(editing.idAsignacion, {
@@ -159,7 +151,6 @@ export default function AdminAssignments() {
       } else {
         await createAdminAssignment({
           codigoDisciplina: formDiscipline,
-          idGrados: formGrades,
           idProfesor: formTeacher,
           esPrincipal,
           schedules: formSchedules.map((id) => ({ idHorario: id })),
@@ -217,6 +208,46 @@ export default function AdminAssignments() {
     (a, b) => DIAS_ORDEN.indexOf(a.diaSemana) - DIAS_ORDEN.indexOf(b.diaSemana),
   );
 
+  const groupedAssignments = (() => {
+    const groups = new Map<string, {
+      ids: string[];
+      discipline: Assignment["discipline"];
+      teacher: Assignment["teacher"];
+      grades: { idGrado: number; nombre: string }[];
+      schedules: Assignment["schedules"];
+      esPrincipal: boolean;
+      estado: string;
+    }>();
+    for (const a of assignments) {
+      const key = `${a.codigoDisciplina}|${a.teacher.idProfesor}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          ids: [],
+          discipline: a.discipline,
+          teacher: a.teacher,
+          grades: [],
+          schedules: [],
+          esPrincipal: a.esPrincipal,
+          estado: a.estado,
+        };
+        groups.set(key, group);
+      }
+      group.ids.push(a.idAsignacion);
+      if (!group.grades.some((g) => g.idGrado === a.grade.idGrado)) {
+        group.grades.push(a.grade);
+      }
+      for (const s of a.schedules) {
+        if (!group.schedules.some((gs) => gs.schedule.idHorario === s.schedule.idHorario)) {
+          group.schedules.push(s);
+        }
+      }
+      if (a.esPrincipal) group.esPrincipal = true;
+    }
+    for (const grp of groups.values()) grp.grades.sort((x, y) => x.idGrado - y.idGrado);
+    return Array.from(groups.values());
+  })();
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -236,11 +267,12 @@ export default function AdminAssignments() {
           <Loading />
         ) : (
           <div className="divide-y divide-surface-100 dark:divide-surface-800">
-            {assignments.map((a) => {
+            {groupedAssignments.map((a) => {
               const schedByDay = schedulesByDay(a.schedules);
+              const first = assignments.find((x) => x.codigoDisciplina === a.discipline.codigoDisciplina && x.teacher.idProfesor === a.teacher.idProfesor && a.ids.includes(x.idAsignacion));
               return (
                 <div
-                  key={a.idAsignacion}
+                  key={a.ids.join(",")}
                   className="p-5 hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -249,9 +281,11 @@ export default function AdminAssignments() {
                         <p className="font-semibold text-surface-900 dark:text-surface-100">
                           {a.discipline.nombre}
                         </p>
-                        <span className="badge-neutral text-xs">
-                          {a.grade.nombre}
-                        </span>
+                        {a.grades.map((g) => (
+                          <span key={g.idGrado} className="badge-neutral text-xs">
+                            {g.nombre}°
+                          </span>
+                        ))}
                         {a.esPrincipal && (
                           <span className="px-2 py-0.5 bg-brand-100 dark:bg-brand-900 text-brand-700 dark:text-brand-300 text-xs font-medium rounded-full">
                             Principal
@@ -293,21 +327,21 @@ export default function AdminAssignments() {
                     </div>
                     <div className="flex items-center gap-1 flex-wrap shrink-0">
                       <button
-                        onClick={() => openEdit(a)}
+                        onClick={() => first && openEdit(first)}
                         className="px-2.5 py-1.5 text-brand-600 hover:text-brand-700 hover:bg-brand-50 dark:hover:bg-brand-950 rounded-lg text-sm font-medium"
                       >
                         Editar
                       </button>
                       {a.estado === "inactivo" && (
                         <button
-                          onClick={() => handleActivate(a)}
+                          onClick={() => first && handleActivate(first)}
                           className="px-2.5 py-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950 rounded-lg text-sm font-medium"
                         >
                           Activar
                         </button>
                       )}
                       <button
-                        onClick={() => handleToggleState(a)}
+                        onClick={() => first && handleToggleState(first)}
                         className="px-2.5 py-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg text-sm font-medium"
                       >
                         {a.estado === "activo" ? "Desactivar" : "Eliminar"}
@@ -317,7 +351,7 @@ export default function AdminAssignments() {
                 </div>
               );
             })}
-            {assignments.length === 0 && (
+            {groupedAssignments.length === 0 && (
               <div className="p-8 text-center text-surface-500">
                 No hay asignaciones registradas.
               </div>
@@ -360,19 +394,7 @@ export default function AdminAssignments() {
                   </label>
                   <select
                     value={formDiscipline}
-                    onChange={async (e) => {
-                      const code = e.target.value;
-                      setFormDiscipline(code);
-                      setFormGrades([]);
-                      if (code) {
-                        try {
-                          const res = await getAdminDisciplineGrades(code);
-                          setFormGrades(res.grades.map((g) => g.idGrado));
-                        } catch (err) {
-                          console.error(err);
-                        }
-                      }
-                    }}
+                    onChange={(e) => setFormDiscipline(e.target.value)}
                     disabled={!!editing}
                     className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm disabled:opacity-60"
                   >
@@ -387,44 +409,13 @@ export default function AdminAssignments() {
                     ))}
                   </select>
                 </div>
-                  <div>
-                    <label className="block text-xs font-medium text-surface-500 mb-1">
-                      Grados *
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-44 overflow-y-auto rounded-xl border border-surface-200 dark:border-surface-700 p-3 bg-white dark:bg-surface-800">
-                      {grades.map((g: any) => {
-                        const selected = formGrades.includes(g.idGrado);
-                        return (
-                          <button
-                            key={g.idGrado}
-                            type="button"
-                            disabled={!!editing}
-                            onClick={() => {
-                              if (editing) return;
-                              setFormGrades((prev) =>
-                                prev.includes(g.idGrado)
-                                  ? prev.filter((id) => id !== g.idGrado)
-                                  : [...prev, g.idGrado],
-                              );
-                            }}
-                            className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
-                              selected
-                                ? "border-brand-500 bg-brand-50 text-brand-700"
-                                : "border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-700"
-                            } ${editing ? "opacity-60 cursor-not-allowed" : ""}`}
-                          >
-                            <span className="truncate">{g.nombre}</span>
-                            {selected && <span className="text-xs font-semibold">✓</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="mt-2 text-xs text-surface-500">
-                      {editing
-                        ? "El grado no se modifica desde esta pantalla."
-                        : "Podés marcar uno o varios grados para crear la misma disciplina en paralelo."}
-                    </p>
+                {formDiscipline && (
+                  <div className="px-3 py-2 bg-brand-50 dark:bg-brand-950 rounded-xl text-sm text-brand-700 dark:text-brand-300">
+                    Los grados se asignan automáticamente según los estudiantes
+                    inscritos en la disciplina. Todos los grados de{" "}
+                    <strong>{formDiscipline}</strong> quedarán cubiertos.
                   </div>
+                )}
                 <div>
                   <label className="block text-xs font-medium text-surface-500 mb-1">
                     Profesor *

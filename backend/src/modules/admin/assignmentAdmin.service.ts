@@ -118,7 +118,7 @@ export async function createAssignment(data: {
   schedules?: any[];
 }) {
   const { codigoDisciplina, idGrado, idGrados, idProfesor, esPrincipal, schedules } = data;
-  const gradeIds = Array.from(
+  let gradeIds = Array.from(
     new Set(
       (idGrados && idGrados.length > 0 ? idGrados : idGrado ? [idGrado] : [])
         .map((g) => Number(g))
@@ -126,14 +126,30 @@ export async function createAssignment(data: {
     ),
   ).sort((a, b) => a - b);
 
-  if (!codigoDisciplina || gradeIds.length === 0 || !idProfesor) {
-    throw new AppError(400, "VALIDATION_ERROR", "codigoDisciplina, idGrado(s) e idProfesor son requeridos");
+  if (!codigoDisciplina || !idProfesor) {
+    throw new AppError(400, "VALIDATION_ERROR", "codigoDisciplina e idProfesor son requeridos");
   }
 
   const discipline = await first<any>(
     await sql`SELECT "codigoDisciplina" FROM "Discipline" WHERE "codigoDisciplina" = ${codigoDisciplina} LIMIT 1` as any[]
   );
   if (!discipline) throw new AppError(400, "INVALID_DISCIPLINE", "Disciplina no válida");
+
+  // Si no se indican grados, se derivan automáticamente de los grados que ya tienen
+  // estudiantes inscritos en la disciplina. Así la asignación cubre todos los grados de la oferta.
+  if (gradeIds.length === 0) {
+    const derivedRows = (await sql`
+      SELECT DISTINCT st."idGrado"
+      FROM "StudentSchedule" ss
+      JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+      WHERE ss."codigoDisciplina" = ${codigoDisciplina}
+      ORDER BY st."idGrado" ASC
+    `) as unknown as Array<{ idGrado: number }>;
+    gradeIds = derivedRows.map((r) => r.idGrado);
+    if (gradeIds.length === 0) {
+      throw new AppError(400, "NO_GRADES", "La disciplina no tiene estudiantes inscritos. Agregue estudiantes o indique grados explícitamente.");
+    }
+  }
 
   const gradeRows = (await sql`
     SELECT "idGrado"
