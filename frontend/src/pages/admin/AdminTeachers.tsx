@@ -10,7 +10,7 @@ import {
   deleteAdminAssignment,
   deleteAdminTeacher,
   getAdminDisciplines,
-  getAdminGrades,
+  getAdminDisciplineGrades,
   getAdminSchedules,
 } from "../../services/admin";
 import { useNotify } from "../../components/common/Notify";
@@ -23,7 +23,6 @@ import type {
   TeacherWithCount as Teacher,
   Assignment,
   Discipline,
-  Grade,
   Schedule,
 } from "../../types";
 
@@ -62,9 +61,11 @@ export default function AdminTeachers() {
     schedules: [] as string[],
   });
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
-  const [grades, setGrades] = useState<Grade[]>([]);
   const [allSchedules, setAllSchedules] = useState<Schedule[]>([]);
   const [assignLoading, setAssignLoading] = useState(false);
+  const [autoSchedules, setAutoSchedules] = useState<string[]>([]);
+  const [loadingAutoSchedules, setLoadingAutoSchedules] = useState(false);
+  const [forceShowSchedules, setForceShowSchedules] = useState(false);
 
   const notify = useNotify();
 
@@ -103,13 +104,11 @@ export default function AdminTeachers() {
 
   const loadFormData = async () => {
     try {
-      const [dRes, gRes, sRes] = await Promise.all([
+      const [dRes, sRes] = await Promise.all([
         getAdminDisciplines({ limit: "200" }),
-        getAdminGrades(),
         getAdminSchedules({ limit: "200" }),
       ]);
       setDisciplines(dRes.data);
-      setGrades(gRes.data);
       setAllSchedules(sRes.data);
     } catch (err) {
       console.error(err);
@@ -130,6 +129,8 @@ export default function AdminTeachers() {
       esPrincipal: false,
       schedules: [],
     });
+    setAutoSchedules([]);
+    setForceShowSchedules(false);
     setShowAddAssignment(true);
   };
 
@@ -141,13 +142,15 @@ export default function AdminTeachers() {
       esPrincipal: a.esPrincipal,
       schedules: a.schedules.map((s) => s.schedule.idHorario),
     });
+    setAutoSchedules([]);
+    setForceShowSchedules(false);
     setShowAddAssignment(true);
   };
 
   const handleSaveAssignment = async () => {
     if (!showAssignments) return;
-    if (!assignForm.codigoDisciplina || assignForm.idGrados.length === 0)
-      return notify.info("Disciplina y grados son requeridos");
+    if (!assignForm.codigoDisciplina)
+      return notify.info("Disciplina es requerida");
 
     setAssignLoading(true);
     try {
@@ -272,6 +275,43 @@ export default function AdminTeachers() {
     },
     {} as Record<string, Schedule[]>,
   );
+
+  const handleDisciplineChange = async (codigoDisciplina: string) => {
+    setAssignForm((prev) => ({
+      ...prev,
+      codigoDisciplina,
+      idGrados: [],
+      schedules: [],
+    }));
+    setAutoSchedules([]);
+    setForceShowSchedules(false);
+    if (!codigoDisciplina) return;
+    setLoadingAutoSchedules(true);
+    try {
+      const res = await getAdminDisciplineGrades(codigoDisciplina);
+      const discSched = res.schedules.map((s) => s.idHorario);
+      setAllSchedules((prev) => {
+        const merged = [...prev];
+        for (const s of res.schedules) {
+          if (!merged.some((m) => m.idHorario === s.idHorario)) {
+            merged.push(s as unknown as Schedule);
+          }
+        }
+        return merged;
+      });
+      setAutoSchedules(discSched);
+      setAssignForm((prev) => ({ ...prev, schedules: discSched }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingAutoSchedules(false);
+    }
+  };
+
+  const autoScheduleText = allSchedules
+    .filter((s) => autoSchedules.includes(s.idHorario))
+    .map((s) => `${s.diaSemana} ${s.horaInicio || "?"}-${s.horaFin || "?"}`)
+    .join(" · ");
 
   return (
     <div className="space-y-6">
@@ -578,12 +618,8 @@ export default function AdminTeachers() {
                       </label>
                       <select
                         value={assignForm.codigoDisciplina}
-                        onChange={(e) =>
-                          setAssignForm({
-                            ...assignForm,
-                            codigoDisciplina: e.target.value,
-                          })
-                        }
+                        onChange={(e) => handleDisciplineChange(e.target.value)}
+                        disabled={!!editingAssignment}
                         className="w-full px-4 py-3 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-base"
                       >
                         <option value="">Seleccionar disciplina</option>
@@ -598,97 +634,86 @@ export default function AdminTeachers() {
                       </select>
                     </div>
 
+                    <div className="flex items-center gap-3 mt-2">
+                      <input
+                        type="checkbox"
+                        checked={assignForm.esPrincipal}
+                        onChange={(e) =>
+                          setAssignForm({
+                            ...assignForm,
+                            esPrincipal: e.target.checked,
+                          })
+                        }
+                        className="rounded border-surface-300 w-4 h-4"
+                      />
+                      <label className="text-base text-surface-700 dark:text-surface-300">
+                        Es principal
+                      </label>
+                    </div>
+                    {assignForm.codigoDisciplina && !editingAssignment && (
+                      <p className="text-sm text-surface-500">
+                        Los grados se asignan automáticamente según los
+                        estudiantes inscritos en la disciplina.
+                      </p>
+                    )}
+                  </div>
+
+                  {!editingAssignment && !forceShowSchedules && autoSchedules.length > 0 ? (
                     <div>
                       <label className="block text-sm font-medium text-surface-500 mb-2">
-                        Grados *
+                        Horarios (automáticos de la disciplina)
                       </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-44 overflow-y-auto rounded-xl border border-surface-200 dark:border-surface-700 p-3 bg-white dark:bg-surface-800">
-                        {grades.map((g) => {
-                          const selected = assignForm.idGrados.includes(g.idGrado);
-                          return (
-                            <button
-                              key={g.idGrado}
-                              type="button"
-                              onClick={() =>
-                                setAssignForm((prev) => ({
-                                  ...prev,
-                                  idGrados: prev.idGrados.includes(g.idGrado)
-                                    ? prev.idGrados.filter((id) => id !== g.idGrado)
-                                    : [...prev.idGrados, g.idGrado],
-                                }))
-                              }
-                              disabled={!!editingAssignment}
-                              className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
-                                selected
-                                  ? "border-brand-500 bg-brand-50 text-brand-700"
-                                  : "border-surface-200 dark:border-surface-700 hover:border-brand-300 dark:hover:border-brand-700"
-                              } ${editingAssignment ? "opacity-60 cursor-not-allowed" : ""}`}
-                            >
-                              <span className="truncate">
-                                {g.nombre}
-                                {g.nivel ? ` · ${g.nivel}` : ""}
-                              </span>
-                              {selected && <span className="text-xs font-semibold">✓</span>}
-                            </button>
-                          );
-                        })}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-surface-100 dark:bg-surface-800 rounded-lg text-sm text-surface-600 dark:text-surface-400">
+                          {autoScheduleText}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setForceShowSchedules(true)}
+                          className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+                        >
+                          + Agregar otro horario
+                        </button>
                       </div>
-                      <p className="mt-2 text-xs text-surface-500">
-                        {editingAssignment
-                          ? "El grado no se modifica desde aquí."
-                          : "Marcá uno o varios grados para crear todas las asignaciones del profesor de una vez."}
-                      </p>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 mt-5">
-                    <input
-                      type="checkbox"
-                      checked={assignForm.esPrincipal}
-                      onChange={(e) =>
-                        setAssignForm({
-                          ...assignForm,
-                          esPrincipal: e.target.checked,
-                        })
-                      }
-                      className="rounded border-surface-300 w-4 h-4"
-                    />
-                    <label className="text-base text-surface-700 dark:text-surface-300">
-                      Es principal
-                    </label>
-                  </div>
-
-                  <div className="mt-5">
-                    <label className="block text-sm font-medium text-surface-500 mb-3">
-                      Horarios
-                    </label>
-                    <div className="space-y-3 max-h-56 overflow-y-auto">
-                      {Object.entries(schedulesByDay).map(
-                        ([day, schedules]) => (
-                          <div key={day}>
-                            <p className="text-sm font-semibold text-surface-600 dark:text-surface-400 mb-2">
-                              {day}
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {schedules.map((s) => (
-                                <button
-                                  key={s.idHorario}
-                                  onClick={() => toggleSchedule(s.idHorario)}
-                                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    assignForm.schedules.includes(s.idHorario)
-                                      ? "bg-brand-600 text-white"
-                                      : "bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-200"
-                                  }`}
-                                >
-                                  {s.horaInicio}-{s.horaFin}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ),
+                  ) : (
+                    <div className="mt-5">
+                      <label className="block text-sm font-medium text-surface-500 mb-3">
+                        Horarios
+                      </label>
+                      {loadingAutoSchedules && (
+                        <p className="text-sm text-surface-400 mb-2">
+                          Cargando horarios de la disciplina...
+                        </p>
                       )}
+                      <div className="space-y-3 max-h-56 overflow-y-auto">
+                        {Object.entries(schedulesByDay).map(
+                          ([day, schedules]) => (
+                            <div key={day}>
+                              <p className="text-sm font-semibold text-surface-600 dark:text-surface-400 mb-2">
+                                {day}
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {schedules.map((s) => (
+                                  <button
+                                    key={s.idHorario}
+                                    onClick={() => toggleSchedule(s.idHorario)}
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                      assignForm.schedules.includes(s.idHorario)
+                                        ? "bg-brand-600 text-white"
+                                        : "bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-200"
+                                    }`}
+                                  >
+                                    {s.horaInicio}-{s.horaFin}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ),
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="flex gap-4 mt-6">
                     <button
