@@ -1,5 +1,6 @@
 import { sql, first } from "../../config/db";
 import { MappedStudent } from "./excelMapper";
+import { canonicalGradeName, normalizeLookupText, normalizeStudentCode } from "./normalization";
 
 export interface ImportResult {
   processed: number;
@@ -21,7 +22,7 @@ export interface ImportResult {
 }
 
 interface GradeRow { nombre: string }
-interface DisciplineRow { codigoDisciplina: string }
+interface DisciplineRow { codigoDisciplina: string; nombre: string | null }
 interface StudentCodeRow { codigoEstudiante: string }
 interface GradeIdRow { idGrado: number }
 interface ScheduleRow { id: string; diaSemana: string; codigoDisciplina: string }
@@ -46,25 +47,69 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
     absentStudents: [],
   };
 
-  for (const s of students) {
+  // Se cargan primero las claves existentes para que una variante del origen,
+  // como 12345.0 o "12 345", actualice al alumno ya existente en vez de crear
+  // un segundo registro.
+  const existingStudents = (await sql`SELECT "codigoEstudiante" FROM "Student"`) as unknown as StudentCodeRow[];
+  const existingBarcodes = new Set(existingStudents.map((s) => s.codigoEstudiante));
+  const existingCodeByNormalized = new Map<string, string>();
+  for (const student of existingStudents) {
+    const normalized = normalizeStudentCode(student.codigoEstudiante);
+    if (!existingCodeByNormalized.has(normalized)) existingCodeByNormalized.set(normalized, student.codigoEstudiante);
+  }
+
+  const existingGrades = (await sql`SELECT "nombre" FROM "Grade"`) as unknown as GradeRow[];
+  const existingGradeNames = new Set(existingGrades.map((g) => g.nombre));
+  const gradeByCanonicalName = new Map<string, string>();
+  for (const grade of existingGrades) {
+    const key = canonicalGradeName(grade.nombre);
+    // Preferimos el nombre canónico (por ejemplo 8) si la base tiene también
+    // una variante (8A), porque las ofertas se relacionan con ese grado.
+    if (!gradeByCanonicalName.has(key) || grade.nombre === key) {
+      gradeByCanonicalName.set(key, grade.nombre);
+    }
+  }
+
+  const existingDisciplines = (await sql`
+    SELECT "codigoDisciplina", "nombre" FROM "Discipline"
+  `) as unknown as DisciplineRow[];
+  const disciplineByLookup = new Map<string, string>();
+  for (const discipline of existingDisciplines) {
+    disciplineByLookup.set(normalizeLookupText(discipline.codigoDisciplina), discipline.codigoDisciplina);
+    if (discipline.nombre) disciplineByLookup.set(normalizeLookupText(discipline.nombre), discipline.codigoDisciplina);
+  }
+
+  const normalizedStudents = students.map((student) => {
+    const rawCode = normalizeStudentCode(student.codigoEstudiante);
+    const code = existingCodeByNormalized.get(rawCode) || rawCode;
+    const rawGrade = canonicalGradeName(student.gradeNombre);
+    const gradeNombre = gradeByCanonicalName.get(rawGrade) || rawGrade;
+    const schedules = student.schedules.map((schedule) => {
+      const rawDiscipline = String(schedule.codigoDisciplina ?? "").trim();
+      return {
+        ...schedule,
+        codigoDisciplina: disciplineByLookup.get(normalizeLookupText(rawDiscipline)) || rawDiscipline,
+      };
+    });
+    return { ...student, codigoEstudiante: code, gradeNombre, schedules };
+  });
+
+  for (const s of normalizedStudents) {
     result.gradeNames.add(s.gradeNombre);
     for (const sched of s.schedules) {
       result.disciplineCodes.add(sched.codigoDisciplina);
     }
   }
 
-  const existingGrades = (await sql`SELECT "nombre" FROM "Grade"`) as unknown as GradeRow[];
-  const existingGradeNames = new Set(existingGrades.map((g) => g.nombre));
   for (const nombre of result.gradeNames) {
-    if (!existingGradeNames.has(nombre)) {
+    if (nombre && !existingGradeNames.has(nombre)) {
       result.newGrades.push(nombre);
     }
   }
 
-  const existingDisciplines = (await sql`SELECT "codigoDisciplina" FROM "Discipline"`) as unknown as DisciplineRow[];
   const existingDisciplineCodes = new Set(existingDisciplines.map((d) => d.codigoDisciplina));
   for (const codigo of result.disciplineCodes) {
-    if (!existingDisciplineCodes.has(codigo)) {
+    if (codigo && !existingDisciplineCodes.has(codigo)) {
       result.newDisciplines.push(codigo);
     }
   }
@@ -79,13 +124,10 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
     }
   }
 
-  const existingStudents = (await sql`SELECT "codigoEstudiante" FROM "Student"`) as unknown as StudentCodeRow[];
-  const existingBarcodes = new Set(existingStudents.map((s) => s.codigoEstudiante));
-
-  const excelBarcodes = new Set(students.map((s) => s.codigoEstudiante));
+  const sourceBarcodes = new Set(normalizedStudents.map((s) => s.codigoEstudiante));
   const absentBarcodes: string[] = [];
   for (const barcode of existingBarcodes) {
-    if (!excelBarcodes.has(barcode)) {
+    if (!sourceBarcodes.has(barcode)) {
       result.absentStudents.push(barcode);
       result.absent++;
       absentBarcodes.push(barcode);
@@ -96,7 +138,7 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
     await sql`UPDATE "Student" SET "estado" = 'inactivo' WHERE "codigoEstudiante" = ANY(${absentBarcodes})`;
   }
 
-  for (const student of students) {
+  for (const student of normalizedStudents) {
     result.processed++;
 
     try {
@@ -114,11 +156,8 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
       const isExisting = existingBarcodes.has(student.codigoEstudiante);
 
       if (dryRun) {
-        if (isExisting) {
-          result.updated++;
-        } else {
-          result.created++;
-        }
+        if (isExisting) result.updated++;
+        else result.created++;
 
         const existingSchedules = (await sql`
           SELECT "id", "diaSemana", "codigoDisciplina" FROM "StudentSchedule"
@@ -129,23 +168,16 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
         const newMap = new Map(student.schedules.map((s) => [s.diaSemana, s.codigoDisciplina]));
 
         for (const [dia, disc] of newMap) {
-          if (!existingMap.has(dia)) {
-            result.activitiesCreated++;
-          } else if (existingMap.get(dia) !== disc) {
-            result.activitiesModified++;
-          }
+          if (!existingMap.has(dia)) result.activitiesCreated++;
+          else if (existingMap.get(dia) !== disc) result.activitiesModified++;
         }
-
         for (const [dia] of existingMap) {
-          if (!newMap.has(dia)) {
-            result.activitiesDeleted++;
-          }
+          if (!newMap.has(dia)) result.activitiesDeleted++;
         }
-
         continue;
       }
 
-      // Upsert student (ON CONFLICT para HTTP driver sin transacción)
+      // Upsert student (ON CONFLICT para HTTP driver sin transacción).
       const estadoValue = student.estado ? "estado" : null;
       const columns = ['"codigoEstudiante"', '"nombre"', '"apellido"', '"idGrado"', '"grupo"', '"correo"', '"updatedAt"'];
       const placeholders = ["$1", "$2", "$3", "$4", "$5", "$6", "now()"];
@@ -171,10 +203,9 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
          VALUES (${placeholders.join(", ")})
          ON CONFLICT ("codigoEstudiante") DO UPDATE SET
            ${updateSets.join(",\n           ")}`,
-        values
+        values,
       );
 
-      // Read existing schedules (after upsert ensures student exists)
       const existingSchedules = (await sql`
         SELECT "id", "diaSemana", "codigoDisciplina" FROM "StudentSchedule"
         WHERE "codigoEstudiante" = ${student.codigoEstudiante}
@@ -183,13 +214,11 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
       const existingMap = new Map(existingSchedules.map((s) => [s.diaSemana, s]));
       const newMap = new Map(student.schedules.map((s) => [s.diaSemana, s]));
 
-      // Insert new schedules
       for (const [dia, newEntry] of newMap) {
         const existing = existingMap.get(dia);
         if (!existing) {
-          // La tabla de producción actualmente no tiene default para `id`,
-          // aunque el schema Prisma declare @default(uuid()). Generarlo aquí
-          // mantiene el importador compatible con ambas estructuras.
+          // La tabla de producción actualmente no tiene default para id,
+          // aunque el schema Prisma declare @default(uuid()).
           await sql`INSERT INTO "StudentSchedule" ("id", "codigoEstudiante", "codigoDisciplina", "diaSemana") VALUES (gen_random_uuid(), ${student.codigoEstudiante}, ${newEntry.codigoDisciplina}, ${dia})`;
           result.activitiesCreated++;
         } else if (existing.codigoDisciplina !== newEntry.codigoDisciplina) {
@@ -198,7 +227,6 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
         }
       }
 
-      // Delete removed schedules
       for (const [dia, existing] of existingMap) {
         if (!newMap.has(dia)) {
           await sql`DELETE FROM "StudentSchedule" WHERE "id" = ${existing.id}`;
@@ -206,11 +234,8 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
         }
       }
 
-      if (isExisting) {
-        result.updated++;
-      } else {
-        result.created++;
-      }
+      if (isExisting) result.updated++;
+      else result.created++;
     } catch (err) {
       result.errors++;
       result.errorDetails.push({

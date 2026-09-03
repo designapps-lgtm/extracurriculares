@@ -38,6 +38,7 @@ export const config = {
     process.env.APPSHEET_NOVEDADES_WEBHOOK_TOKEN || process.env.APPSHEET_WEBHOOK_TOKEN || null,
   appsheetAppId: process.env.APPSHEET_APP_ID || null,
   appsheetAccessKey: process.env.APPSHEET_APPLICATION_ACCESS_KEY || null,
+  appsheetDemograficosTable: process.env.APPSHEET_DEMOGRAFICOS_TABLE || "Demograficos",
   appsheetNovedadesTable: process.env.APPSHEET_NOVEDADES_TABLE || null,
   novedadesSyncMinutes: parseInt(process.env.NOVEDADES_SYNC_MINUTES || "10", 10),
   googleClientId: process.env.GOOGLE_CLIENT_ID || null,

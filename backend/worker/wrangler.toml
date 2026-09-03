@@ -23,7 +23,9 @@ SESSION_DURATION_HOURS = "168"
 GOOGLE_INSTITUTION_DOMAIN = "gi.edu.co"
 NOVEDADES_SYNC_MINUTES = "10"
 GOOGLE_DRIVE_WEBHOOK_URL = "https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive"
-APPSHEET_APP_ID = "6f5cc364-a2a4-4a1b-9603-873f54374310"
+# App ID de Extracurriculares-745737628 (tabla Demograficos).
+APPSHEET_APP_ID = "0a43ca9a-ff5b-47bf-8127-8f14f1150ff0"
+APPSHEET_DEMOGRAFICOS_TABLE = "Demograficos"
 # Rate limiting a nivel de app (además del de Cloudflare). El limiter in-memory
 # de Express se activa cuando estas vars existen. AUTH_RATE_LIMIT: intentos de
 # login/google/logout por ventana de 15 min. API_RATE_LIMIT: requests generales.
