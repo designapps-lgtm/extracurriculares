@@ -27,17 +27,25 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
   const [starting, setStarting] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [niveles, setNiveles] = useState<Nivel[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const navigate = useNavigate();
   const notify = useNotify();
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     api.getClasses(true)
-      .then(setData)
+      .then((result) => {
+        if (!result || !Array.isArray(result.classes)) {
+          throw new Error("La respuesta de clases no tiene un formato válido");
+        }
+        setData(result);
+      })
       .catch((err: any) => {
-        if (err.message?.includes("401") || err.message?.includes("No autenticado")) {
+        if (err.status === 401 || err.message?.includes("401") || err.message?.includes("No autenticado")) {
           navigate("/");
         } else {
+          setLoadError(err.message || "No se pudieron cargar las clases");
           notify.error(err.message || "Error al cargar las clases");
         }
       })
@@ -97,17 +105,9 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
     }
   };
 
-  if (loading && !data) {
-    return (
-      <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
-        <Loading />
-      </div>
-    );
-  }
-
   const visible = showAll
-    ? data!.classes
-    : data!.classes.filter((c) => c.isToday);
+    ? (data?.classes ?? [])
+    : (data?.classes ?? []).filter((c) => c.isToday);
 
   const visibleByNivel = useMemo(() => {
     if (niveles.length === 0) return visible;
@@ -119,6 +119,27 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
       });
     });
   }, [niveles, visible]);
+
+  if (loading && !data) {
+    return (
+      <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
+        <Loading />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center px-4">
+        <div className="card p-8 text-center max-w-md">
+          <p className="text-sm text-red-600 dark:text-red-400">{loadError || "No se pudieron cargar las clases."}</p>
+          <button type="button" onClick={load} className="mt-4 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium hover:bg-brand-700">
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const toggleNivel = (nivel: Nivel) => {
     setNiveles((current) => current.includes(nivel) ? current.filter((item) => item !== nivel) : [...current, nivel]);

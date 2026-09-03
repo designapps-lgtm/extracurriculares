@@ -23,30 +23,20 @@ function toDateOnlyISO(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function parseDateFilter(value?: string): Date | undefined {
-  if (!value) return undefined;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return undefined;
-  const [, y, m, d] = match;
-  return new Date(`${y}-${m}-${d}T00:00:00.000Z`);
-}
-
-function dayEnd(date: Date): Date {
-  return new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1);
-}
-
 interface SessionWhere {
   conditions: string[];
   params: any[];
 }
 
-// Convierte los filtros de query en condiciones SQL + params.
+// Las asistencias operativas siempre corresponden al día actual en Colombia.
 function buildSessionWhereSQL(query: Record<string, string>): SessionWhere {
-  const { fecha, grado, disciplina, profesor } = query;
+  const { grado, disciplina, profesor } = query;
   const conditions: string[] = [];
   const params: any[] = [];
 
   conditions.push(`cs."estado" = 'finalizada'`);
+  params.push(todayColombiaDate());
+  conditions.push(`cs."fecha"::date = $${params.length}::date`);
 
   if (disciplina) {
     params.push(disciplina);
@@ -59,14 +49,6 @@ function buildSessionWhereSQL(query: Record<string, string>): SessionWhere {
   if (grado) {
     params.push(grado);
     conditions.push(`g."nombre" = $${params.length}`);
-  }
-  const fechaStart = parseDateFilter(fecha);
-  if (fechaStart) {
-    params.push(fechaStart);
-    const p1 = params.length;
-    params.push(dayEnd(fechaStart));
-    const p2 = params.length;
-    conditions.push(`cs."fecha" >= $${p1} AND cs."fecha" <= $${p2}`);
   }
 
   return { conditions, params };
@@ -216,9 +198,9 @@ export async function getSupervisorSessionAttendance(req: Request, res: Response
     await sql(
       `SELECT ${SESSION_SELECT}
        ${SESSION_JOIN}
-       WHERE cs."id" = $1
+       WHERE cs."id" = $1 AND cs."fecha"::date = $2::date
        GROUP BY cs."id", ea."idAsignacion", d."codigoDisciplina", g."idGrado", sc."idHorario", t."idProfesor"`,
-      [sessionId]
+      [sessionId, todayColombiaDate()]
     ) as unknown as SessionRow[]
   );
 
@@ -395,9 +377,9 @@ export async function exportSupervisorSessionAttendance(req: Request, res: Respo
     await sql(
       `SELECT ${SESSION_SELECT}
        ${SESSION_JOIN}
-       WHERE cs."id" = $1
+       WHERE cs."id" = $1 AND cs."fecha"::date = $2::date
        GROUP BY cs."id", ea."idAsignacion", d."codigoDisciplina", g."idGrado", sc."idHorario", t."idProfesor"`,
-      [sessionId]
+      [sessionId, todayColombiaDate()]
     ) as unknown as SessionRow[]
   );
 
@@ -438,6 +420,10 @@ function supervisorNowColombia() {
   return new Date(`${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`);
 }
 
+function todayColombiaDate(): string {
+  return toDateOnlyISO(supervisorNowColombia());
+}
+
 const SUP_DIA_MAP_COL: Record<string, string> = {
   0: "DOMINGO", 1: "LUNES", 2: "MARTES", 3: "MIERCOLES",
   4: "JUEVES", 5: "VIERNES", 6: "SABADO",
@@ -446,7 +432,6 @@ const SUP_DIA_MAP_COL: Record<string, string> = {
 // Clases de todos los profesores. Con `today=1` devuelve solo las del día de
 // hoy; si no, todas (el supervisor puede llamar a lista en cualquiera).
 export async function getSupervisorClasses(req: Request, res: Response) {
-  const todayOnly = String(req.query.today || "") === "1";
   const today = supervisorNowColombia();
   const todayStr = today.toISOString().split("T")[0];
   const todayDay = SUP_DIA_MAP_COL[today.getDay()];
@@ -555,7 +540,7 @@ export async function getSupervisorClasses(req: Request, res: Response) {
 
   const classes = Array.from(groups.values());
 
-  const visibleClasses = todayOnly ? classes.filter((c) => c.isToday) : classes;
+  const visibleClasses = classes.filter((c) => c.isToday);
 
   res.json({
     success: true,
@@ -645,9 +630,10 @@ export async function getSupervisorAssignmentHistory(req: Request, res: Response
      FROM "ClassSession" cs
      LEFT JOIN "AttendanceRecord" a ON a."sessionId" = cs."id"
      WHERE cs."idAsignacion" = $1
+       AND cs."fecha"::date = $2::date
      GROUP BY cs."id"
      ORDER BY cs."fecha" DESC`,
-    [asignacionId]
+    [asignacionId, todayColombiaDate()]
   ) as unknown as any[];
 
   const schedules = assignmentsSchedules.map((sch) => ({
@@ -745,9 +731,10 @@ export async function getSupervisorScheduleHistory(req: Request, res: Response) 
      FROM "ClassSession" cs
      LEFT JOIN "AttendanceRecord" a ON a."sessionId" = cs."id"
      WHERE cs."idAsignacion" = $1 AND cs."idHorario" = $2
+       AND cs."fecha"::date = $3::date
      GROUP BY cs."id"
      ORDER BY cs."fecha" DESC`,
-    [asignacionId, horarioId]
+    [asignacionId, horarioId, todayColombiaDate()]
   ) as unknown as any[];
 
   res.json({
@@ -1016,6 +1003,7 @@ export async function getSupervisorAttendanceList(req: Request, res: Response) {
       LEFT JOIN "Schedule" sc ON sc."idHorario" = cs."idHorario"
       LEFT JOIN "Teacher" t ON t."idProfesor" = cs."idProfesor"
       WHERE cs."id" = ${sessionId}
+        AND cs."fecha"::date = ${todayColombiaDate()}::date
       LIMIT 1
     `) as unknown as Array<any>
   );
@@ -1207,6 +1195,7 @@ export async function supervisorSaveAttendance(req: Request, res: Response) {
       SELECT "id"
       FROM "ClassSession"
       WHERE "id" = ${sessionId}
+        AND "fecha"::date = ${todayColombiaDate()}::date
       LIMIT 1
     `) as unknown as Array<{ id: string }>
   );

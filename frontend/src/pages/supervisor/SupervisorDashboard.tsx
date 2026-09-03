@@ -8,6 +8,10 @@ import Logo from "../../components/common/Logo";
 import type { SupervisorSessionItem } from "../../types";
 import { NIVELES, nivelDeGrado, nivelLabel, type Nivel } from "../../utils/niveles";
 
+function todayBogota(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
+}
+
 function formatFecha(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric", timeZone: "America/Bogota" });
@@ -26,11 +30,10 @@ type AttendanceFilters = {
   profesor: string;
 };
 
-const EMPTY_FILTERS: AttendanceFilters = { fecha: "", grado: "", disciplina: "", profesor: "" };
+const EMPTY_FILTERS: AttendanceFilters = { fecha: todayBogota(), grado: "", disciplina: "", profesor: "" };
 
 function toQueryParams(filters: AttendanceFilters, role: RoleKind): Record<string, string> {
-  const params: Record<string, string> = {};
-  if (filters.fecha) params.fecha = filters.fecha;
+  const params: Record<string, string> = { fecha: todayBogota() };
   if ((role === "secretary" || role === "admin") && filters.grado) params.grado = filters.grado;
   if (filters.disciplina) params.disciplina = filters.disciplina;
   if (filters.profesor) params.profesor = filters.profesor;
@@ -201,13 +204,14 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
           )}
           <div className={`grid gap-3 ${role === "secretary" ? "grid-cols-1 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"}`}>
             <div>
-              <label htmlFor="attendance-fecha" className="block text-xs font-medium text-surface-500 mb-1">Fecha</label>
+              <label htmlFor="attendance-fecha" className="block text-xs font-medium text-surface-500 mb-1">Fecha de hoy</label>
               <input
                 id="attendance-fecha"
                 type="date"
-                value={draftFilters.fecha}
-                onChange={(e) => updateDraft("fecha", e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                value={todayBogota()}
+                readOnly
+                disabled
+                className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 text-sm opacity-80"
               />
             </div>
             {role === "secretary" && (
