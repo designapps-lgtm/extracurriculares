@@ -104,10 +104,23 @@ function parseFlexibleDate(value: unknown): Date | null {
     return isNaN(iso.getTime()) ? null : iso;
   }
 
-  // ISO sin zona → tratar como reloj de pared de Bogotá.
-  const naive = new Date(str);
-  if (isNaN(naive.getTime())) return null;
-  return toBogotaUtc(naive);
+  // ISO sin zona: p.ej. "2026-09-01" o "2026-09-01T14:30:00" → reloj de pared de Bogotá.
+  const naiveISO = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (naiveISO) {
+    const [, yyyy, mm, dd, hh, min, ss] = naiveISO;
+    const d = new Date(Date.UTC(
+      parseInt(yyyy, 10),
+      parseInt(mm, 10) - 1,
+      parseInt(dd, 10),
+      parseInt(hh || "0", 10),
+      parseInt(min || "0", 10),
+      parseInt(ss || "0", 10),
+    ));
+    return toBogotaUtc(d);
+  }
+
+  const fallback = new Date(str);
+  return isNaN(fallback.getTime()) ? null : fallback;
 }
 
 function parseBoolean(value: unknown): boolean {
