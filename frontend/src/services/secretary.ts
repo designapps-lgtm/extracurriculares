@@ -12,6 +12,8 @@ import type {
   SupervisorClassesResponse,
   AttendanceStudent,
   Schedule,
+  Student,
+  StudentProfile,
   StudentNovedades,
 } from "../types";
 
@@ -158,4 +160,13 @@ export async function getSecretaryClassStudents(
     `/api/secretary/classes/${asignacionId}/${horarioId}/students`,
   );
   return res.data;
+}
+
+
+export async function getSecretaryStudents(params?: Record<string, string>) {
+  return api.get<PaginatedResponse<Student>>("/api/secretary/students", params);
+}
+
+export async function getSecretaryStudentProfile(codigo: string) {
+  return api.get<ApiResponse<StudentProfile>>(`/api/secretary/students/${encodeURIComponent(codigo)}/profile`);
 }

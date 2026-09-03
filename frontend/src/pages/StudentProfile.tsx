@@ -1,6 +1,7 @@
 import { useParams, Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getStudentProfile } from "../services/students";
+import { getSecretaryStudentProfile } from "../services/secretary";
 import { updateAdminStudent } from "../services/admin";
 import { useNotify } from "../components/common/Notify";
 import { Loading, ErrorMessage } from "../components/common/States";
@@ -28,11 +29,12 @@ export default function StudentProfile() {
   const { codigo } = useParams<{ codigo: string }>();
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
+  const isSecretary = location.pathname.startsWith("/secretary");
   const from = location.state as { from?: string; disciplina?: string } | null;
 
   const backTo = from?.from === "discipline" && from.disciplina
-    ? `${isAdmin ? "/admin" : ""}/disciplines/${from.disciplina}`
-    : isAdmin ? "/admin/students" : "/students";
+    ? `${isAdmin ? "/admin" : isSecretary ? "/secretary" : ""}/disciplines/${from.disciplina}`
+    : isAdmin ? "/admin/students" : isSecretary ? "/secretary/students" : "/students";
 
   const [profile, setProfile] = useState<StudentProfileType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,7 +93,10 @@ export default function StudentProfile() {
     if (!codigo) return;
     setLoading(true);
     setError(null);
-    getStudentProfile(codigo)
+    const request = isSecretary
+      ? getSecretaryStudentProfile(codigo)
+      : getStudentProfile(codigo);
+    request
       .then((res) => {
         setProfile(res.data);
         setLoading(false);

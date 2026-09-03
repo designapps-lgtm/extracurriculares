@@ -15,6 +15,7 @@ import {
   getSupervisorClasses,
 } from "../supervisor/supervisor.service";
 import { getSecretaryClassStudents } from "./secretary.service";
+import { getStudents, getStudentProfile } from "./studentSecretary.controller";
 import { getNovedadesBatch, getNovedadesDiarias } from "../novedades/novedades.controller";
 
 const router = Router();
@@ -23,6 +24,10 @@ router.use(authenticateSecretary, requireActiveSecretary);
 
 // La secretaria solo visualiza: no inicia sesiones, no toma asistencia,
 // ni crea ni elimina stays.
+
+// Estudiantes: consulta de solo lectura. No existe PATCH/POST/DELETE para este rol.
+router.get("/students", asyncHandler(getStudents));
+router.get("/students/:codigo/profile", asyncHandler(getStudentProfile));
 
 // Vista "Llamar lista" de solo lectura: las clases del día con sus grados.
 router.get("/classes", asyncHandler(getSupervisorClasses));

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
 import { param } from "../../utils/reqParams";
+import { saveAttendance as saveAttendanceRecords } from "../attendance/attendance.service";
 
 function nowColombia() {
   const now = new Date();
@@ -372,38 +373,23 @@ export async function getAttendanceList(req: Request, res: Response) {
 export async function saveAttendance(req: Request, res: Response) {
   const teacherId = req.teacher!.teacherId;
   const sessionId = param(req, "sessionId");
-  const { records } = req.body;
-
-  if (!records || !Array.isArray(records)) {
-    throw new AppError(400, "VALIDATION_ERROR", "records debe ser un array");
-  }
-
-  const session = await first<{ idProfesor: string }>(
+  const session = await first<{ id: string; idProfesor: string }>(
     (await sql`
-      SELECT "idProfesor"
+      SELECT "id", "idProfesor"
       FROM "ClassSession"
       WHERE "id" = ${sessionId}
       LIMIT 1
-    `) as unknown as Array<{ idProfesor: string }>
+    `) as unknown as Array<{ id: string; idProfesor: string }>
   );
   if (!session || session.idProfesor !== teacherId) {
-    throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
+    throw new AppError(404, "SESSION_NOT_FOUND", "Sesión de Asistencia Extracurriculares no encontrada");
   }
 
-  await sql`DELETE FROM "AttendanceRecord" WHERE "sessionId" = ${sessionId}`;
-
-  const validRecords = records.filter((r: any) =>
-    r.estado === "presente" || r.estado === "ausente" || r.estado === "justificado"
-  );
-
-  if (validRecords.length > 0) {
-    await sql.transaction((tx) =>
-      validRecords.map((r: any) =>
-        tx`INSERT INTO "AttendanceRecord" ("id", "sessionId", "codigoEstudiante", "estado", "createdAt")
-           VALUES (gen_random_uuid(), ${sessionId}, ${r.codigoEstudiante}, ${r.estado}, now())`
-      )
-    );
+  const { records } = req.body as { records?: Array<{ codigoEstudiante?: unknown; estado?: unknown }> };
+  if (!Array.isArray(records)) {
+    throw new AppError(400, "VALIDATION_ERROR", "records debe ser un array");
   }
 
-  res.json({ success: true, data: { message: "Asistencia guardada", total: validRecords.length } });
+  const result = await saveAttendanceRecords(sessionId, records, { allowFinalizedEdit: true });
+  res.json({ success: true, data: result });
 }

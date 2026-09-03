@@ -38,6 +38,7 @@ import SecretaryClassStudents from "./pages/secretary/SecretaryClassStudents";
 import SecretarySchedules from "./pages/secretary/SecretarySchedules";
 import SecretarySession from "./pages/secretary/SecretarySession";
 import SecretaryNovedad from "./pages/secretary/SecretaryNovedad";
+import SecretaryStudents from "./pages/secretary/SecretaryStudents";
 
 // Admin
 import AdminSupervisors from "./pages/admin/AdminSupervisors";
@@ -84,6 +85,8 @@ function App() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<SecretaryDashboard />} />
         <Route path="classes" element={<SecretaryClasses />} />
+        <Route path="students" element={<SecretaryStudents />} />
+        <Route path="students/:codigo" element={<StudentProfile />} />
         <Route path="classes/:asignacionId/:horarioId/students" element={<SecretaryClassStudents />} />
         <Route path="schedules" element={<SecretarySchedules />} />
         <Route path="session/:sessionId" element={<SecretarySession />} />

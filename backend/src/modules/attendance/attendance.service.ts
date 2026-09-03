@@ -298,9 +298,14 @@ export async function getAttendanceData(sessionId: string) {
   };
 }
 
-export async function saveAttendance(sessionId: string, records: AttendanceRecordInput[]) {
+export async function saveAttendance(
+  sessionId: string,
+  records: AttendanceRecordInput[],
+  options: { allowFinalizedEdit?: boolean } = {},
+) {
   const session = await getAttendanceSession(sessionId);
-  if (session.estado !== "en_curso") {
+  const isFinalizedEdit = session.estado === "finalizada" && options.allowFinalizedEdit === true;
+  if (session.estado !== "en_curso" && !isFinalizedEdit) {
     throw new AppError(409, "SESSION_NOT_EDITABLE", "La Asistencia Extracurriculares solo se puede guardar mientras la sesión está en curso");
   }
 
@@ -343,7 +348,7 @@ export async function saveAttendance(sessionId: string, records: AttendanceRecor
     sessionId,
     idAsignacion: session.idAsignacion,
     total: normalizedRecords.length,
-    resultado: "finalizada",
+    resultado: isFinalizedEdit ? "actualizada" : "finalizada",
   };
 }
 
@@ -375,5 +380,15 @@ export async function attendanceSave(req: Request, res: Response) {
   res.json({ success: true, data: await saveAttendance(param(req, "sessionId"), records) });
 }
 
+export async function supervisorSaveAttendance(req: Request, res: Response) {
+  const { records } = req.body as { records?: AttendanceRecordInput[] };
+  if (!Array.isArray(records)) {
+    throw new AppError(400, "VALIDATION_ERROR", "records debe ser un array");
+  }
+  res.json({
+    success: true,
+    data: await saveAttendance(param(req, "sessionId"), records, { allowFinalizedEdit: true }),
+  });
+}
+
 export const getSupervisorAttendanceList = attendanceList;
-export const supervisorSaveAttendance = attendanceSave;
