@@ -238,3 +238,58 @@ de `/api/*` → la URL de tu Worker (en vez de Render).
   `SameSite=Lax`/`Strict` (más robusto frente al bloqueo de cookies de terceros).
 - No hay migraciones de Prisma comiteadas. Al primer cambio de schema en prod,
   generar migraciones y correr `prisma migrate deploy` en vez de `db push`.
+
+
+## 7. Novedades en tiempo casi real desde AppSheet
+
+La fuente de novedades ahora puede enviar cada alta o modificación directamente desde un Bot de AppSheet al Worker:
+
+```text
+POST https://extracurriculares-api.gi-school.workers.dev/api/webhooks/appsheet/novedades
+Header: x-appsheet-webhook-token: <secreto privado>
+Content-Type: application/json
+```
+
+En AppSheet configurar un Bot sobre la tabla real de novedades, con evento de alta y actualización, tarea **Call a webhook**, preset **Custom**, método `POST`, contenido `JSON` y un body template como este (usar los nombres exactos de las columnas de la aplicación):
+
+```json
+{
+  "NovedadID": "<<[NovedadID]>>",
+  "StudentID": "<<[StudentID]>>",
+  "Grado": "<<[Grado]>>",
+  "Tipo de Novedad": "<<[Tipo de Novedad]>>",
+  "Motivo": "<<[Motivo]>>",
+  "Descripción de la Novedad": "<<[Descripción de la Novedad]>>",
+  "Fecha y Hora de La Novedad": "<<[Fecha y Hora de La Novedad]>>",
+  "Autorizado Por": "<<[Autorizado Por]>>",
+  "Foto Estudiante": "<<[Foto Estudiante]>>"
+}
+```
+
+El backend acepta `StudentID` como código o como nombre completo, incluyendo el orden apellido-nombre que usa la aplicación actual. El registro se guarda con upsert por `(NovedadID, codigoEstudiante)`, por lo que los reintentos de AppSheet no duplican novedades. También se acepta el payload predeterminado de AppSheet con una fila directa o dentro de `Rows`/`row`.
+
+Configurar el secreto únicamente en Cloudflare y en el header del Bot; nunca en `wrangler.toml`, el body, GitHub ni capturas:
+
+```text
+npx wrangler secret put APPSHEET_NOVEDADES_WEBHOOK_TOKEN
+```
+
+La API de lectura de AppSheet queda como respaldo opcional. Para activarla, definir el nombre exacto de la tabla en `APPSHEET_NOVEDADES_TABLE` y guardar la nueva Application Access Key en `APPSHEET_APPLICATION_ACCESS_KEY`. La clave que haya quedado visible en capturas debe deshabilitarse y reemplazarse antes de usarla.
+
+Las pantallas de novedades y de asistencia consultan cambios automáticamente cada 15 segundos mientras están abiertas. El webhook escribe inmediatamente en la base de datos; esos 15 segundos corresponden solo al refresco de la interfaz del navegador.
+
+## 8. Catálogo y flujo por tipo de novedad
+
+Las novedades conservan los valores originales de AppSheet (`tipoNovedad`, `flujoNovedad` y `procesado`) y además incluyen `novedadMeta` en las respuestas de consulta. Esta metadata normaliza la familia, etiqueta, flujo, pasos y campos relevantes sin romper registros antiguos ni bloquear tipos nuevos.
+
+Las familias soportadas inicialmente son: salida o ausencia, salud y bienestar, disciplina y convivencia, apoyo escolar, actividad o evento, traslado o cambio, información general y otro tipo de novedad. Si AppSheet envía un valor que no coincide con los alias conocidos, se conserva visible y se presenta como otro tipo; no se descarta.
+
+El catálogo consultable está disponible para cada rol autenticado en:
+
+```text
+GET /api/teacher/novedades/catalogo
+GET /api/supervisor/novedades/catalogo
+GET /api/secretary/novedades/catalogo
+```
+
+El flujo es una guía de seguimiento para la interfaz. No cambia automáticamente `AttendanceRecord`; una salida, ausencia, salud o cualquier otro tipo debe ser revisado por el responsable antes de modificar la asistencia.

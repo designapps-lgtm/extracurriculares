@@ -1,54 +1,24 @@
 import { Request, Response } from "express";
 import { sql } from "../../config/db";
 import { getNovedadesForStudent, syncNovedadesFromDrive } from "./novedades.service";
-import { dayBounds, isOnDay, isActive, novedadDayName } from "./novedades.dates";
+import { syncAppSheetNovedades } from "../appsheet/appsheet.novedades";
+import { dayBounds, isOnDay, isActive } from "./novedades.dates";
+import { presentNovedad, listNovedadCatalog } from "./novedades.catalog";
 
 async function refreshNovedades(): Promise<void> {
   try {
-    await syncNovedadesFromDrive();
+    await Promise.all([
+      syncNovedadesFromDrive(),
+      syncAppSheetNovedades(),
+    ]);
   } catch (e: any) {
     console.error("[Novedades] Error en refresh on-demand:", e?.message || e);
   }
 }
 
-// Días de extracurricular por estudiante (StudentSchedule.diaSemana).
-async function getStudentDays(codigos: string[]): Promise<Map<string, Set<string>>> {
-  const rows = (await sql`
-    SELECT "codigoEstudiante", "diaSemana"
-    FROM "StudentSchedule"
-    WHERE "codigoEstudiante" = ANY(${codigos})
-  `) as unknown as Array<{ codigoEstudiante: string; diaSemana: string }>;
-
-  const map = new Map<string, Set<string>>();
-  for (const r of rows) {
-    if (!map.has(r.codigoEstudiante)) map.set(r.codigoEstudiante, new Set());
-    map.get(r.codigoEstudiante)!.add(r.diaSemana);
-  }
-  return map;
-}
-
-// Una novedad solo se muestra si se hizo el mismo día que el estudiante tiene extracurricular.
-function matchesExtracurricularDay(n: any, daysByStudent: Map<string, Set<string>>): boolean {
-  const days = daysByStudent.get(n.codigoEstudiante);
-  if (!days || days.size === 0) return false;
-  return days.has(novedadDayName(n));
-}
-
 function isRelevantNovedad(n: any): boolean {
-  const text = [
-    n.descripcion,
-    n.seAusentaCon,
-    n.seAusentaConOtro,
-    n.seAusentaConTipo,
-    n.tipoNovedad,
-    n.flujoNovedad,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toUpperCase();
-
-  return Boolean(n.seAusentaCon || n.seAusentaConOtro || n.seAusentaConTipo) ||
-    /SALIDA|AUSEN|CAMBIO|DEPORTE/.test(text);
+  // Una novedad puede ser informativa y no contener palabras de salida/ausencia.
+  return Boolean(n.novedadId);
 }
 
 function serialize(n: any) {
@@ -63,6 +33,7 @@ function serialize(n: any) {
     seAusentaConTipo: n.seAusentaConTipo,
     tipoNovedad: n.tipoNovedad,
     flujoNovedad: n.flujoNovedad,
+    novedadMeta: presentNovedad(n),
     grados: n.grados,
     nombresEstudiantes: n.nombresEstudiantes,
     fotoUrls: n.fotoUrls,
@@ -77,13 +48,15 @@ function serialize(n: any) {
   };
 }
 
+export async function getNovedadesCatalogo(_req: Request, res: Response): Promise<void> {
+  res.json({ success: true, data: listNovedadCatalog() });
+}
+
 export async function getNovedadesByCodigo(req: Request, res: Response): Promise<void> {
   const codigoEstudiante = String(req.params.codigoEstudiante || "");
   await refreshNovedades();
   const todos = await getNovedadesForStudent(codigoEstudiante);
-  const daysByStudent = await getStudentDays([codigoEstudiante]);
-  const filtered = todos.filter((n) => matchesExtracurricularDay(n, daysByStudent));
-  res.json({ success: true, data: filtered.filter(isRelevantNovedad).map(serialize) });
+  res.json({ success: true, data: todos.filter(isRelevantNovedad).map(serialize) });
 }
 
 export async function getNovedadesBatch(req: Request, res: Response): Promise<void> {
@@ -100,14 +73,12 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
   const rows = (await sql`
     SELECT * FROM "Novedad"
     WHERE "codigoEstudiante" = ANY(${codigos})
-    ORDER BY "fechaNovedad" DESC NULLS LAST, "fechaCreacion" DESC NULLS LAST
+    ORDER BY COALESCE("fechaNovedad", "fechaHora", "fechaCreacion") DESC NULLS LAST
   `) as unknown as any[];
 
   const bounds = fechaParam ? dayBounds(fechaParam) : null;
-  const daysByStudent = await getStudentDays(codigos);
   const activas: Record<string, any[]> = {};
   for (const r of rows) {
-    if (!matchesExtracurricularDay(r, daysByStudent)) continue;
     if (!isRelevantNovedad(r)) continue;
     const match = bounds ? isOnDay(r, bounds) : isActive(r);
     if (!match) continue;
@@ -135,12 +106,10 @@ export async function getNovedadesDiarias(req: Request, res: Response): Promise<
     FROM "Novedad" n
     LEFT JOIN "Student" s ON s."codigoEstudiante" = n."codigoEstudiante"
     LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
-    WHERE (
-      (n."fechaNovedad" >= ${bounds.start} AND n."fechaNovedad" < ${bounds.end})
-      OR (n."fechaNovedad" IS NULL AND n."fechaCreacion" >= ${bounds.start} AND n."fechaCreacion" < ${bounds.end})
-    )
+    WHERE COALESCE(n."fechaNovedad", n."fechaHora", n."fechaCreacion") >= ${bounds.start}
+      AND COALESCE(n."fechaNovedad", n."fechaHora", n."fechaCreacion") < ${bounds.end}
     AND (${grado} = '' OR g."nombre" = ${grado})
-    ORDER BY n."fechaNovedad" DESC NULLS LAST, n."fechaCreacion" DESC NULLS LAST
+    ORDER BY COALESCE(n."fechaNovedad", n."fechaHora", n."fechaCreacion") DESC
   `) as unknown as any[];
 
   res.json({

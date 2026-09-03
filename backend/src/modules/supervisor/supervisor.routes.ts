@@ -22,7 +22,7 @@ import {
   listSupervisorTransfers,
   deleteSupervisorTransfer,
 } from "./supervisor.service";
-import { getNovedadesBatch, getNovedadesDiarias } from "../novedades/novedades.controller";
+import { getNovedadesBatch, getNovedadesCatalogo, getNovedadesDiarias } from "../novedades/novedades.controller";
 
 const router = Router();
 
@@ -36,6 +36,7 @@ router.get("/sessions/:sessionId/attendance", asyncHandler(getSupervisorAttendan
 router.post("/sessions/:sessionId/attendance", asyncHandler(supervisorSaveAttendance));
 
 // Novedades para el supervisor (mismo batch de los profesores)
+router.get("/novedades/catalogo", asyncHandler(getNovedadesCatalogo));
 router.get("/novedades/batch", asyncHandler(getNovedadesBatch));
 router.get("/novedades/diarias", asyncHandler(getNovedadesDiarias));
 

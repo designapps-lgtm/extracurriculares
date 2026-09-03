@@ -2,6 +2,7 @@ import app from "./app";
 import { config } from "./config";
 import { syncNovedadesFromDrive } from "./modules/novedades/novedades.service";
 import { syncAppSheetStudents } from "./modules/appsheet/appsheet.students";
+import { syncAppSheetNovedades } from "./modules/appsheet/appsheet.novedades";
 
 const PORT = config.port;
 
@@ -19,6 +20,16 @@ async function start() {
       console.error(`[AppSheet] Sync con errores: ${result.errors.join(" | ")}`);
     } else {
       console.log(`[AppSheet] Estudiantes OK: ${result.processed} procesados (${result.created} nuevos, ${result.updated} actualizados)`);
+    }
+  };
+
+  const runAppSheetNovedadesSync = async () => {
+    if (!config.appsheetAppId || !config.appsheetAccessKey || !config.appsheetNovedadesTable) return;
+    const result = await syncAppSheetNovedades();
+    if (result.errors.length > 0) {
+      console.error(`[AppSheet/Novedades] Sync con errores: ${result.errors.join(" | ")}`);
+    } else if (result.accepted > 0) {
+      console.log(`[AppSheet/Novedades] ${result.accepted} novedades recibidas`);
     }
   };
 
@@ -40,6 +51,12 @@ async function start() {
     console.log(`[AppSheet] Sync programado cada ${config.novedadesSyncMinutes} minutos`);
   } else {
     console.log("[AppSheet] Sync desactivado: faltan APPSHEET_APP_ID o APPSHEET_APPLICATION_ACCESS_KEY");
+  }
+
+  if (config.appsheetAppId && config.appsheetAccessKey && config.appsheetNovedadesTable) {
+    setTimeout(() => { runAppSheetNovedadesSync().catch((e) => console.error("[AppSheet/Novedades] Error en sync inicial:", e.message)); }, 7000);
+    setInterval(() => { runAppSheetNovedadesSync().catch((e) => console.error("[AppSheet/Novedades] Error en sync periódico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
+    console.log(`[AppSheet/Novedades] Sync de respaldo programado cada ${config.novedadesSyncMinutes} minutos`);
   }
 
   if (config.googleServiceAccountJson && config.googleDriveFolderId) {

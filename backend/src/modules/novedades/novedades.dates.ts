@@ -78,10 +78,10 @@ export function dayBounds(fechaISO: string): { start: Date; end: Date } | null {
 // True si la novedad pertenece al día calendario de Colombia consultado.
 // Compara por clave de fecha (robusto ante el huso de guardado de cada fecha).
 export function isOnDay(
-  n: { fechaNovedad?: Date | null; fechaCreacion?: Date | null },
+  n: { fechaNovedad?: Date | null; fechaHora?: Date | null; fechaCreacion?: Date | null },
   bounds: { start: Date; end: Date }
 ): boolean {
-  const d = n.fechaNovedad || n.fechaCreacion;
+  const d = n.fechaNovedad || n.fechaHora || n.fechaCreacion;
   if (!d) return false;
   const startKey = colombiaDateKey(bounds.start);
   const novedadKey = colombiaDateKey(d);
@@ -89,9 +89,8 @@ export function isOnDay(
 }
 
 // True si la novedad es de "hoy o después" (visión por defecto, sin fecha).
-export function isActive(n: { fechaNovedad?: Date | null; fechaCreacion?: Date | null }): boolean {
+export function isActive(n: { fechaNovedad?: Date | null; fechaHora?: Date | null; fechaCreacion?: Date | null }): boolean {
   const todayStart = todayColombiaStart();
-  if (n.fechaNovedad) return n.fechaNovedad >= todayStart;
-  if (n.fechaCreacion) return n.fechaCreacion >= todayStart;
-  return false;
+  const d = n.fechaNovedad || n.fechaHora || n.fechaCreacion;
+  return Boolean(d && d >= todayStart);
 }

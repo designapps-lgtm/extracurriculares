@@ -43,15 +43,6 @@ export default function SupervisorAttendance() {
         setTeacher(data.teacher ?? null);
         setStudents(data.students);
         setTransfers(data.transfers ?? []);
-        const codigos = data.students.map((s) => s.codigoEstudiante);
-        if (codigos.length === 0) return;
-        const novedades = await getSupervisorNovedadesBatch(codigos, todayBogotaStr());
-        setNovedadesMap(
-          novedades.reduce((acc, item) => {
-            if (item.novedades.length > 0) acc[item.codigoEstudiante] = item.novedades;
-            return acc;
-          }, {} as Record<string, Novedad[]>)
-        );
       })
       .catch((err) => {
         notify.error(err.message || "Error al cargar asistencia");
@@ -59,6 +50,29 @@ export default function SupervisorAttendance() {
       })
       .finally(() => setLoading(false));
   }, [sessionId, navigate]);
+
+  const studentCodes = students.map((student) => student.codigoEstudiante).join(",");
+
+  useEffect(() => {
+    const codigos = studentCodes.split(",").filter(Boolean);
+    if (codigos.length === 0) return;
+
+    const loadNovedades = () => {
+      getSupervisorNovedadesBatch(codigos, todayBogotaStr()).then((novedades) => {
+        setNovedadesMap(
+          novedades.reduce((acc, item) => {
+            if (item.novedades.length > 0) acc[item.codigoEstudiante] = item.novedades;
+            else delete acc[item.codigoEstudiante];
+            return acc;
+          }, {} as Record<string, Novedad[]>)
+        );
+      }).catch(() => undefined);
+    };
+
+    loadNovedades();
+    const interval = window.setInterval(loadNovedades, 15000);
+    return () => window.clearInterval(interval);
+  }, [studentCodes]);
 
   const toggleAttendance = (codigoEstudiante: string, newEstado: string) => {
     setStudents((prev) =>
@@ -177,11 +191,15 @@ export default function SupervisorAttendance() {
                           {st.nombre} {st.apellido} {st.grupo ? `· ${st.grupo}` : ""}
                         </p>
                       )}
+                      {novedad.tipoNovedad && <p className="text-amber-800 dark:text-amber-300 font-semibold">{novedad.tipoNovedad}</p>}
+                      {novedad.novedadMeta && <p className="text-amber-700 dark:text-amber-400">{novedad.novedadMeta.familyLabel} · Flujo: {novedad.novedadMeta.flowLabel}</p>}
                       {novedad.descripcion && (
                         <p className="text-amber-800 dark:text-amber-300 font-medium">{novedad.descripcion}</p>
                       )}
                       <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
+                        {novedad.seAusentaConTipo && <span>Motivo: {novedad.seAusentaConTipo}</span>}
                         {novedad.seAusentaCon && <span>Se ausenta con: {novedad.seAusentaCon}</span>}
+                        {novedad.registradoPor && <span>Autorizado por: {novedad.registradoPor}</span>}
                         <span>
                           {novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}
                           {novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}
@@ -264,11 +282,14 @@ export default function SupervisorAttendance() {
                         <div className="mt-2 space-y-1.5">
                           {novedades.map((n) => (
                             <div key={n.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
+                              {n.tipoNovedad && <p className="text-amber-800 dark:text-amber-300 font-semibold">{n.tipoNovedad}</p>}
                               {n.descripcion && (
                                 <p className="text-amber-800 dark:text-amber-300 font-medium">{n.descripcion}</p>
                               )}
                               <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
+                                {n.seAusentaConTipo && <span>Motivo: {n.seAusentaConTipo}</span>}
                                 {n.seAusentaCon && <span>Se ausenta con: {n.seAusentaCon}</span>}
+                                {n.registradoPor && <span>Autorizado por: {n.registradoPor}</span>}
                                 <span>
                                   {n.regresaAlColegio ? "Sí regresa" : "No regresa"}
                                   {n.horaEstimadaRegreso ? ` · ${n.horaEstimadaRegreso}` : ""}

@@ -345,6 +345,23 @@ export interface SupervisorTransfer {
   };
 }
 
+export interface NovedadFlowStep {
+  key: string;
+  label: string;
+}
+
+export interface NovedadMeta {
+  typeKey: string;
+  typeLabel: string;
+  familyKey: "salida_ausencia" | "salud" | "disciplina_convivencia" | "apoyo_escolar" | "actividad" | "traslado" | "informativa" | "otra";
+  familyLabel: string;
+  flowKey: string;
+  flowLabel: string;
+  flowSteps: NovedadFlowStep[];
+  visibleFields: string[];
+  attendanceEffect: "none";
+}
+
 export interface Novedad {
   id: string;
   novedadId: string;
@@ -356,6 +373,7 @@ export interface Novedad {
   seAusentaConTipo: string | null;
   tipoNovedad: string | null;
   flujoNovedad: string | null;
+  novedadMeta?: NovedadMeta;
   grados: string | null;
   nombresEstudiantes: string | null;
   fotoUrls: string | null;

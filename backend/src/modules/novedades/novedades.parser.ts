@@ -4,15 +4,29 @@ import * as XLSX from "xlsx";
 const HEADER_ALIASES: Record<string, string[]> = {
   novedadId: ["NovedadID_M", "NovedadID", "Novedad Id"],
   listaEstudiantes: ["Lista_Estudiantes", "StudentID"],
-  descripcion: ["Novedad_de_Salida_Diaria_M", "Novedad de Salida Diaria M", "Novedad_de_Salida_Diaria", "Novedad de Salida Diaria"],
+  descripcion: [
+    "Novedad_de_Salida_Diaria_M",
+    "Novedad de Salida Diaria M",
+    "Novedad_de_Salida_Diaria",
+    "Novedad de Salida Diaria",
+    "Descripcion de la Novedad",
+    "Descripción de la Novedad",
+    "Descripcion",
+    "Descripción",
+  ],
   seAusentaCon: ["Se ausenta con", "Se_Ausenta_Con"],
-  grados: ["Grados"],
-  fotos: ["Fotos", "Foto_Estudiante_Snap"],
-  nombresEstudiantes: ["Nombres_Estudiantes", "Nombre_Estudiante_Snap"],
-  fechaHora: ["FechaHora", "Fecha Hora"],
+  grados: ["Grados", "Grado"],
+  fotos: ["Fotos", "Foto_Estudiante_Snap", "Foto Estudiante", "Foto_Estudiante", "Foto"],
+  nombresEstudiantes: ["Nombres_Estudiantes", "Nombre_Estudiante_Snap", "Student Name"],
+  fechaHora: [
+    "FechaHora",
+    "Fecha Hora",
+    "Fecha y Hora de La Novedad",
+    "Fecha y Hora de la Novedad",
+  ],
   scanCodes: ["ScanCode", "Scan Code"],
-  fechaCreacion: ["Fecha_Creacion", "Fecha Creacion", "Fecha_Creacion", "Fecha de Creacion"],
-  registradoPor: ["RegistradoPor", "Registrado Por"],
+  fechaCreacion: ["Fecha_Creacion", "Fecha Creacion", "Fecha_Creacion", "Fecha de Creacion", "CreatedAt"],
+  registradoPor: ["RegistradoPor", "Registrado Por", "Autorizado Por", "AutorizadoPor"],
   procesado: ["Procesado"],
   tipoNovedad: ["Tipo de Novedad", "Tipo_Novedad"],
   seAusentaConOtro: ["Se ausenta con Otro", "Se_Ausenta_Con_Otro"],
@@ -20,7 +34,12 @@ const HEADER_ALIASES: Record<string, string[]> = {
   horaEstimadaRegreso: ["Hora_Estimada_Regreso", "Hora Estimada Regreso"],
   flujoNovedad: ["Flujo_Novedad", "Flujo Novedad"],
   fechaNovedad: ["Fecha_Novedad", "Fecha Novedad"],
-  seAusentaConTipo: ["Se_AusentaCon_Tipo_M", "Se_AusentaCon_Tipo", "Se Ausenta Con Tipo"],
+  seAusentaConTipo: [
+    "Se_AusentaCon_Tipo_M",
+    "Se_AusentaCon_Tipo",
+    "Se Ausenta Con Tipo",
+    "Motivo",
+  ],
 };
 
 function normalizeHeader(value: string): string {
@@ -61,7 +80,7 @@ export interface ParsedNovedadRow {
   excelRow: number;
 }
 
-function parseFlexibleDate(value: unknown): Date | null {
+export function parseFlexibleDate(value: unknown): Date | null {
   if (value === null || value === undefined) return null;
   if (value instanceof Date && !isNaN(value.getTime())) return value;
 
@@ -123,7 +142,7 @@ function parseFlexibleDate(value: unknown): Date | null {
   return isNaN(fallback.getTime()) ? null : fallback;
 }
 
-function parseBoolean(value: unknown): boolean {
+export function parseBoolean(value: unknown): boolean {
   const str = String(value ?? "").trim().toUpperCase();
   return str === "TRUE" || str === "VERDADERO" || str === "1" || str === "SI";
 }

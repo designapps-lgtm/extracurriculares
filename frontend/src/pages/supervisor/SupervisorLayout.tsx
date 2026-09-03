@@ -12,6 +12,7 @@ export default function SupervisorLayout({ role = "supervisor" }: PageProps) {
   const api = roleApis[role];
   const basePath = role === "secretary" ? "/secretary" : "/supervisor";
 
+  const transferItem = { path: `${basePath}/transfers`, label: "Traslados", icon: "M9 13h6m2 0-2-2m2 2-2 2M7 13h.01M4 6h16M4 18h16" };
   const NAV_ITEMS = [
     { path: `${basePath}/dashboard`, label: "Asistencias", icon: "M3 13l4-4m0 0l4 4m-4-4v10m8-6l4 4m0 0l4-4m-4 4V3" },
     {
@@ -20,10 +21,11 @@ export default function SupervisorLayout({ role = "supervisor" }: PageProps) {
       icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
     },
     { path: `${basePath}/schedules`, label: "Horarios", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
-    { path: `${basePath}/transfers`, label: "Traslados", icon: "M9 13h6m2 0-2-2m2 2-2 2M7 13h.01M4 6h16M4 18h16" },
+    ...(api.canManageTransfers ? [transferItem] : []),
     { path: `${basePath}/novedades`, label: "Novedades diarias", icon: "M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" },
   ];
 
+  const homePath = role === "secretary" ? `${basePath}/novedades` : `${basePath}/dashboard`;
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState<RoleUser | null>(null);
@@ -63,7 +65,7 @@ export default function SupervisorLayout({ role = "supervisor" }: PageProps) {
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 bg-surface-900 dark:bg-surface-950 text-surface-100 z-40">
         <div className="px-6 py-5 border-b border-surface-800">
-          <Link to={`${basePath}/dashboard`} className="inline-flex items-center gap-2">
+          <Link to={homePath} className="inline-flex items-center gap-2">
             <Logo chip alt="Extracurriculares" className="h-8 w-auto" />
             <span className="font-display font-bold text-lg text-white">{api.label}</span>
           </Link>
@@ -130,7 +132,7 @@ export default function SupervisorLayout({ role = "supervisor" }: PageProps) {
       {sidebarOpen && (
         <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-surface-900 text-surface-100 flex flex-col shadow-2xl shadow-black/30">
           <div className="px-6 py-5 border-b border-surface-800 pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] flex items-center justify-between gap-3">
-            <Link to={`${basePath}/dashboard`} className="inline-flex items-center gap-2" onClick={() => setSidebarOpen(false)}>
+            <Link to={homePath} className="inline-flex items-center gap-2" onClick={() => setSidebarOpen(false)}>
               <Logo chip alt="Extracurriculares" className="h-8 w-auto" />
               <span className="font-display font-bold text-lg text-white">{api.label}</span>
             </Link>

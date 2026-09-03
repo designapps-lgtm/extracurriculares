@@ -13,6 +13,7 @@ export default function TeacherAttendance() {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [novedadesMap, setNovedadesMap] = useState<Record<string, Novedad[]>>({});
+  const [novedadFecha, setNovedadFecha] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -25,15 +26,7 @@ export default function TeacherAttendance() {
         setAssignment(data.assignment);
         setSchedule(data.schedule);
         setStudents(data.students);
-        const codigos = data.students.map((s) => s.codigoEstudiante);
-        if (codigos.length === 0) return;
-        const novedades = await getNovedadesBatch(codigos, data.session?.fecha);
-        setNovedadesMap(
-          novedades.reduce((acc, item) => {
-            if (item.novedades.length > 0) acc[item.codigoEstudiante] = item.novedades;
-            return acc;
-          }, {} as Record<string, Novedad[]>)
-        );
+        setNovedadFecha(data.session?.fecha);
       })
       .catch((err) => {
         notify.error(err.message || "Error al cargar asistencia");
@@ -41,6 +34,29 @@ export default function TeacherAttendance() {
       })
       .finally(() => setLoading(false));
   }, [sessionId, navigate]);
+
+  const studentCodes = students.map((student) => student.codigoEstudiante).join(",");
+
+  useEffect(() => {
+    const codigos = studentCodes.split(",").filter(Boolean);
+    if (codigos.length === 0) return;
+
+    const loadNovedades = () => {
+      getNovedadesBatch(codigos, novedadFecha).then((novedades) => {
+        setNovedadesMap(
+          novedades.reduce((acc, item) => {
+            if (item.novedades.length > 0) acc[item.codigoEstudiante] = item.novedades;
+            else delete acc[item.codigoEstudiante];
+            return acc;
+          }, {} as Record<string, Novedad[]>)
+        );
+      }).catch(() => undefined);
+    };
+
+    loadNovedades();
+    const interval = window.setInterval(loadNovedades, 15000);
+    return () => window.clearInterval(interval);
+  }, [studentCodes, novedadFecha]);
 
   const toggleAttendance = (codigoEstudiante: string, newEstado: string) => {
     setStudents((prev) =>
@@ -169,11 +185,15 @@ export default function TeacherAttendance() {
                     <div className="mt-2 space-y-1.5">
                       {novedades.map((n) => (
                         <div key={n.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
+                          {n.tipoNovedad && <p className="text-amber-800 dark:text-amber-300 font-semibold">{n.tipoNovedad}</p>}
+                          {n.novedadMeta && <p className="text-amber-700 dark:text-amber-400">{n.novedadMeta.familyLabel} · Flujo: {n.novedadMeta.flowLabel}</p>}
                           {n.descripcion && (
                             <p className="text-amber-800 dark:text-amber-300 font-medium">{n.descripcion}</p>
                           )}
                           <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
+                            {n.seAusentaConTipo && <span>Motivo: {n.seAusentaConTipo}</span>}
                             {n.seAusentaCon && <span>Se ausenta con: {n.seAusentaCon}</span>}
+                            {n.registradoPor && <span>Autorizado por: {n.registradoPor}</span>}
                             <span>
                               {n.regresaAlColegio ? "Sí regresa" : "No regresa"}
                               {n.horaEstimadaRegreso ? ` · ${n.horaEstimadaRegreso}` : ""}

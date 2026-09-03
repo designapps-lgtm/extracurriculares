@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { roleApis, type RoleKind, type DailyNovedad } from "../../services/roles";
 import { Loading } from "../../components/common/States";
 import { useNotify } from "../../components/common/Notify";
+import NovedadFlow, { shouldShowNovedadField } from "../../components/novedades/NovedadFlow";
 
 function today(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
@@ -32,6 +33,7 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
   const api = roleApis[role];
   const [fecha, setFecha] = useState(today);
   const [grado, setGrado] = useState("");
+  const [familia, setFamilia] = useState("");
   const [grados, setGrados] = useState<string[]>([]);
   const [items, setItems] = useState<DailyNovedad[]>([]);
   const [niveles, setNiveles] = useState<Nivel[]>([]);
@@ -51,7 +53,11 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
     api.getFilters().then((data) => setGrados(data.grados)).catch(() => notify.error("No se pudieron cargar los grados"));
   }, [api, notify]);
 
-  useEffect(() => { load(); }, [api]);
+  useEffect(() => {
+    load();
+    const interval = window.setInterval(() => load(), 15000);
+    return () => window.clearInterval(interval);
+  }, [api, fecha, grado]);
 
   const itemsPorNivel = useMemo(() => {
     if (niveles.length === 0) return items;
@@ -61,6 +67,14 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
     });
   }, [items, niveles]);
 
+  const familias = useMemo(() => {
+    const labels = new Map<string, string>();
+    items.forEach(({ novedad }) => {
+      if (novedad.novedadMeta) labels.set(novedad.novedadMeta.familyKey, novedad.novedadMeta.familyLabel);
+    });
+    return [...labels.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [items]);
+
   const estudiantes = useMemo(() => {
     const unique = new Map<string, DailyNovedad["estudiante"]>();
     itemsPorNivel.forEach(({ estudiante: student }) => unique.set(student.codigoEstudiante, student));
@@ -69,11 +83,12 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
 
   const filteredItems = useMemo(() => {
     const search = estudiante.trim().toLowerCase();
-    if (!search) return itemsPorNivel;
-    return itemsPorNivel.filter(({ estudiante: student }) =>
-      `${student.nombre} ${student.apellido} ${student.codigoEstudiante}`.toLowerCase().includes(search),
-    );
-  }, [itemsPorNivel, estudiante]);
+    return itemsPorNivel.filter(({ estudiante: student, novedad }) => {
+      const matchesFamily = !familia || novedad.novedadMeta?.familyKey === familia;
+      const matchesStudent = !search || `${student.nombre} ${student.apellido} ${student.codigoEstudiante}`.toLowerCase().includes(search);
+      return matchesFamily && matchesStudent;
+    });
+  }, [itemsPorNivel, estudiante, familia]);
 
   const toggleNivel = (nivel: Nivel) => {
     setNiveles((current) => current.includes(nivel) ? current.filter((item) => item !== nivel) : [...current, nivel]);
@@ -86,6 +101,8 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
         <p className="text-sm text-surface-500">Seguimiento de estudiantes</p>
         <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">Novedades diarias</h1>
       </div>
+
+      <p className="text-xs text-surface-400">Actualización automática cada 15 segundos mientras esta pantalla está abierta.</p>
 
       <div className="card p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
         <div className="flex-1">
@@ -100,6 +117,13 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
           <select value={grado} onChange={(e) => setGrado(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm">
             <option value="">Todos los grados</option>
             {grados.map((g) => <option key={g} value={g}>Grado {g}</option>)}
+          </select>
+        </div>
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-surface-500 mb-1">Familia de novedad</label>
+          <select value={familia} onChange={(e) => setFamilia(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm">
+            <option value="">Todas las familias</option>
+            {familias.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
         </div>
         <button onClick={() => load()} className="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium hover:bg-brand-700">Filtrar</button>
@@ -141,13 +165,17 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
                 </div>
                 <span className="text-xs text-surface-400">{formatDate(novedad.fechaHora || novedad.fechaNovedad || novedad.fechaCreacion)}</span>
               </div>
+              <NovedadFlow novedad={novedad} compact />
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 {novedad.tipoNovedad && <div><span className="text-xs text-surface-400 block">Tipo de novedad</span><span className="text-surface-800 dark:text-surface-200">{novedad.tipoNovedad}</span></div>}
-                {novedad.descripcion && <div><span className="text-xs text-surface-400 block">Descripción</span><span className="text-surface-800 dark:text-surface-200">{novedad.descripcion}</span></div>}
-                {(novedad.seAusentaConTipo || novedad.seAusentaCon || novedad.seAusentaConOtro) && <div><span className="text-xs text-surface-400 block">Motivo</span><span className="text-surface-800 dark:text-surface-200">{novedad.seAusentaConTipo || novedad.seAusentaCon || novedad.seAusentaConOtro}</span></div>}
-                {novedad.registradoPor && <div><span className="text-xs text-surface-400 block">Autorizado por</span><span className="text-surface-800 dark:text-surface-200">{novedad.registradoPor}</span></div>}
+                {novedad.flujoNovedad && <div><span className="text-xs text-surface-400 block">Flujo</span><span className="text-surface-800 dark:text-surface-200">{novedad.flujoNovedad}</span></div>}
+                {novedad.descripcion && shouldShowNovedadField(novedad, "descripcion") && <div><span className="text-xs text-surface-400 block">Descripción</span><span className="text-surface-800 dark:text-surface-200">{novedad.descripcion}</span></div>}
+                {(novedad.seAusentaConTipo || novedad.seAusentaCon || novedad.seAusentaConOtro) && shouldShowNovedadField(novedad, novedad.seAusentaConTipo ? "motivo" : "acompanante") && <div><span className="text-xs text-surface-400 block">Motivo / acompañante</span><span className="text-surface-800 dark:text-surface-200">{novedad.seAusentaConTipo || novedad.seAusentaCon || novedad.seAusentaConOtro}</span></div>}
+                {novedad.grados && shouldShowNovedadField(novedad, "grado") && <div><span className="text-xs text-surface-400 block">Grado reportado</span><span className="text-surface-800 dark:text-surface-200">{novedad.grados}</span></div>}
+                {novedad.registradoPor && shouldShowNovedadField(novedad, "autorizado") && <div><span className="text-xs text-surface-400 block">Autorizado por</span><span className="text-surface-800 dark:text-surface-200">{novedad.registradoPor}</span></div>}
+                {novedad.procesado && shouldShowNovedadField(novedad, "procesado") && <div><span className="text-xs text-surface-400 block">Procesado</span><span className="text-surface-800 dark:text-surface-200">{novedad.procesado}</span></div>}
                 <div><span className="text-xs text-surface-400 block">Fecha y hora de la novedad</span><span className="text-surface-800 dark:text-surface-200">{formatDate(novedad.fechaHora || novedad.fechaNovedad || novedad.fechaCreacion)}</span></div>
-                <div><span className="text-xs text-surface-400 block">Regreso</span><span className="text-surface-800 dark:text-surface-200">{novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}{novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}</span></div>
+                {shouldShowNovedadField(novedad, "regreso") && <div><span className="text-xs text-surface-400 block">Regreso</span><span className="text-surface-800 dark:text-surface-200">{novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}{novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}</span></div>}
               </div>
               {estudiante.fotoUrl && (
                 <div className="mt-4">

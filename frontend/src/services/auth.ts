@@ -40,7 +40,7 @@ export function homePathForRole(role: AuthRole): string {
     case "teacher":
       return "/teacher/dashboard";
     case "secretary":
-      return "/secretary/dashboard";
+      return "/secretary/novedades";
     default:
       return "/supervisor/dashboard";
   }

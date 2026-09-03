@@ -14,6 +14,8 @@ interface __BaseEnv_Env {
 	GOOGLE_CLIENT_ID: string;
 	GOOGLE_SERVICE_ACCOUNT_JSON: string;
 	GOOGLE_DRIVE_FOLDER_ID: string;
+	APPSHEET_APP_ID: string;
+	APPSHEET_NOVEDADES_TABLE: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -26,7 +28,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NODE_ENV" | "PORT" | "FRONTEND_URL" | "ACCESS_TOKEN_EXPIRES_IN" | "SESSION_DURATION_HOURS" | "GOOGLE_INSTITUTION_DOMAIN" | "NOVEDADES_SYNC_MINUTES" | "DATABASE_URL" | "JWT_SECRET" | "GOOGLE_CLIENT_ID" | "GOOGLE_SERVICE_ACCOUNT_JSON" | "GOOGLE_DRIVE_FOLDER_ID">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NODE_ENV" | "PORT" | "FRONTEND_URL" | "ACCESS_TOKEN_EXPIRES_IN" | "SESSION_DURATION_HOURS" | "GOOGLE_INSTITUTION_DOMAIN" | "NOVEDADES_SYNC_MINUTES" | "DATABASE_URL" | "JWT_SECRET" | "GOOGLE_CLIENT_ID" | "GOOGLE_SERVICE_ACCOUNT_JSON" | "GOOGLE_DRIVE_FOLDER_ID" | "APPSHEET_APP_ID" | "APPSHEET_NOVEDADES_TABLE">> {}
 }
 
 // Begin runtime types

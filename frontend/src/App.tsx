@@ -39,7 +39,6 @@ import SecretaryClassStudents from "./pages/secretary/SecretaryClassStudents";
 import SecretarySchedules from "./pages/secretary/SecretarySchedules";
 import SecretarySession from "./pages/secretary/SecretarySession";
 import SecretaryNovedad from "./pages/secretary/SecretaryNovedad";
-import SecretaryTransfers from "./pages/secretary/SecretaryTransfers";
 
 // Admin
 import AdminSupervisors from "./pages/admin/AdminSupervisors";
@@ -84,7 +83,7 @@ function App() {
 
       {/* Secretary routes — mismo flujo que supervisor sin llamar lista ni gestión */}
       <Route path="/secretary" element={<SecretaryLayout />}>
-        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route index element={<Navigate to="novedades" replace />} />
         <Route path="dashboard" element={<SecretaryDashboard />} />
         <Route path="classes" element={<SecretaryClasses />} />
         <Route path="classes/:asignacionId/:horarioId/students" element={<SecretaryClassStudents />} />
@@ -92,7 +91,6 @@ function App() {
         <Route path="session/:sessionId" element={<SecretarySession />} />
         <Route path="novedad/:codigoEstudiante" element={<SecretaryNovedad />} />
         <Route path="novedades" element={<SupervisorDailyNovedades role="secretary" />} />
-        <Route path="transfers" element={<SecretaryTransfers />} />
       </Route>
 
       {/* Admin routes — AdminLayout handles auth + sidebar */}

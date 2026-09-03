@@ -2,6 +2,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getNovedadesBatch } from "../../services/teacher";
 import Logo from "../../components/common/Logo";
+import NovedadFlow, { shouldShowNovedadField } from "../../components/novedades/NovedadFlow";
 import type { Novedad } from "../../types";
 
 interface State {
@@ -31,19 +32,23 @@ export default function TeacherNovedad() {
 
   useEffect(() => {
     if (!codigoEstudiante) return;
-    if (state?.novedades && state.novedades.length > 0) return;
-    setLoading(true);
-    setError(null);
-    getNovedadesBatch([codigoEstudiante])
-      .then((res) => {
-        const item = res.find((i) => i.codigoEstudiante === codigoEstudiante);
-        setNovedades(item?.novedades || []);
-      })
-      .catch(() => {
-        setError("No se pudieron cargar las novedades.");
-      })
-      .finally(() => setLoading(false));
-  }, [codigoEstudiante, state]);
+
+    const load = (showLoading: boolean) => {
+      if (showLoading) setLoading(true);
+      setError(null);
+      getNovedadesBatch([codigoEstudiante])
+        .then((res) => {
+          const item = res.find((i) => i.codigoEstudiante === codigoEstudiante);
+          setNovedades(item?.novedades || []);
+        })
+        .catch(() => setError("No se pudieron cargar las novedades."))
+        .finally(() => { if (showLoading) setLoading(false); });
+    };
+
+    load(true);
+    const interval = window.setInterval(() => load(false), 15000);
+    return () => window.clearInterval(interval);
+  }, [codigoEstudiante]);
 
   const backTo = state?.sessionId ? `/teacher/session/${state.sessionId}` : "/teacher/dashboard";
   const nombre = state?.nombre;
@@ -120,12 +125,14 @@ export default function TeacherNovedad() {
                   <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                 </svg>
                 <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base">
-                  Novedad de salida
+                  {n.tipoNovedad || "Novedad"}
                 </h2>
               </div>
 
               <div className="px-6 py-5 space-y-4">
-                {n.descripcion && (
+                <NovedadFlow novedad={n} />
+
+                {n.descripcion && shouldShowNovedadField(n, "descripcion") && (
                   <div>
                     <p className="text-xs font-medium text-surface-400 uppercase tracking-wide mb-1">Detalle</p>
                     <p className="text-surface-800 dark:text-surface-200 font-medium">{n.descripcion}</p>
@@ -133,7 +140,19 @@ export default function TeacherNovedad() {
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {(n.seAusentaCon || n.seAusentaConOtro) && (
+                  {n.seAusentaConTipo && shouldShowNovedadField(n, "motivo") && (
+                    <div className="rounded-xl bg-surface-50 dark:bg-surface-800 px-4 py-3 border border-surface-100 dark:border-surface-700">
+                      <p className="text-xs font-medium text-surface-400 mb-0.5">Motivo</p>
+                      <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{n.seAusentaConTipo}</p>
+                    </div>
+                  )}
+                  {n.grados && shouldShowNovedadField(n, "grado") && (
+                    <div className="rounded-xl bg-surface-50 dark:bg-surface-800 px-4 py-3 border border-surface-100 dark:border-surface-700">
+                      <p className="text-xs font-medium text-surface-400 mb-0.5">Grado reportado</p>
+                      <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{n.grados}</p>
+                    </div>
+                  )}
+                  {(n.seAusentaCon || n.seAusentaConOtro) && shouldShowNovedadField(n, "acompanante") && (
                     <div className="rounded-xl bg-surface-50 dark:bg-surface-800 px-4 py-3 border border-surface-100 dark:border-surface-700">
                       <p className="text-xs font-medium text-surface-400 mb-0.5">Se ausenta con</p>
                       <p className="text-sm font-medium text-surface-800 dark:text-surface-200">
@@ -142,13 +161,15 @@ export default function TeacherNovedad() {
                     </div>
                   )}
 
-                  <div className="rounded-xl bg-surface-50 dark:bg-surface-800 px-4 py-3 border border-surface-100 dark:border-surface-700">
-                    <p className="text-xs font-medium text-surface-400 mb-0.5">Regreso</p>
-                    <p className="text-sm font-medium text-surface-800 dark:text-surface-200">
-                      {n.regresaAlColegio ? "Sí regresa" : "No regresa"}
-                      {n.horaEstimadaRegreso ? ` · ${n.horaEstimadaRegreso}` : ""}
-                    </p>
-                  </div>
+                  {shouldShowNovedadField(n, "regreso") && (
+                    <div className="rounded-xl bg-surface-50 dark:bg-surface-800 px-4 py-3 border border-surface-100 dark:border-surface-700">
+                      <p className="text-xs font-medium text-surface-400 mb-0.5">Regreso</p>
+                      <p className="text-sm font-medium text-surface-800 dark:text-surface-200">
+                        {n.regresaAlColegio ? "Sí regresa" : "No regresa"}
+                        {n.horaEstimadaRegreso ? ` · ${n.horaEstimadaRegreso}` : ""}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-surface-500">

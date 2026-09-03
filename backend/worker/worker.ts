@@ -5,6 +5,7 @@ import { config } from "../src/config";
 import { syncNovedadesFromDrive } from "../src/modules/novedades/novedades.service";
 import { ensureDriveWatch, syncDriveSources } from "../src/modules/driveSync/driveSync.service";
 import { syncAppSheetStudents } from "../src/modules/appsheet/appsheet.students";
+import { syncAppSheetNovedades } from "../src/modules/appsheet/appsheet.novedades";
 
 app.listen(config.port);
 
@@ -28,6 +29,15 @@ export default {
         }
       } else {
         console.log("[AppSheet] Sync desactivado: faltan APPSHEET_APP_ID o APPSHEET_APPLICATION_ACCESS_KEY");
+      }
+
+      if (config.appsheetNovedadesTable && config.appsheetAppId && config.appsheetAccessKey) {
+        const novedades = await syncAppSheetNovedades();
+        if (novedades.errors.length > 0) {
+          console.error(`[AppSheet/Novedades] Sync con errores: ${novedades.errors.join(" | ")}`);
+        } else if (novedades.accepted > 0) {
+          console.log(`[AppSheet/Novedades] ${novedades.accepted} novedades sincronizadas`);
+        }
       }
 
       // AppSheet y Drive son integraciones independientes. La falta de
