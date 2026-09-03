@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { roleApis, type RoleKind, type DailyNovedad } from "../../services/roles";
+import { roleApis, type RoleApi, type RoleKind, type DailyNovedad } from "../../services/roles";
 import { Loading } from "../../components/common/States";
 import { useNotify } from "../../components/common/Notify";
 
@@ -28,8 +28,16 @@ function nivelDeGrado(grado: string | null): Nivel | null {
   return null;
 }
 
-export default function SupervisorDailyNovedades({ role = "supervisor" }: { role?: RoleKind }) {
-  const api = roleApis[role];
+type DailyNovedadesApi = Pick<RoleApi, "getFilters" | "getNovedadesDiarias">;
+
+export default function SupervisorDailyNovedades({
+  role = "supervisor",
+  novedadesApi,
+}: {
+  role?: RoleKind;
+  novedadesApi?: DailyNovedadesApi;
+}) {
+  const api = novedadesApi ?? roleApis[role];
   const [fecha, setFecha] = useState(today);
   const [grado, setGrado] = useState("");
   const [grados, setGrados] = useState<string[]>([]);

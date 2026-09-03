@@ -42,7 +42,7 @@ interface SessionWhere {
 
 // Convierte los filtros de query en condiciones SQL + params.
 function buildSessionWhereSQL(query: Record<string, string>): SessionWhere {
-  const { fecha, disciplina, profesor } = query;
+  const { fecha, grado, disciplina, profesor } = query;
   const conditions: string[] = [];
   const params: any[] = [];
 
@@ -55,6 +55,10 @@ function buildSessionWhereSQL(query: Record<string, string>): SessionWhere {
   if (profesor) {
     params.push(profesor);
     conditions.push(`cs."idProfesor" = $${params.length}`);
+  }
+  if (grado) {
+    params.push(grado);
+    conditions.push(`g."nombre" = $${params.length}`);
   }
   const fechaStart = parseDateFilter(fecha);
   if (fechaStart) {
@@ -161,6 +165,7 @@ export async function getSupervisorSessions(req: Request, res: Response) {
   const countRows = await sql(
     `SELECT COUNT(DISTINCT cs."id")::int AS total FROM "ClassSession" cs
      LEFT JOIN "ExtracurricularAssignment" ea ON ea."idAsignacion" = cs."idAsignacion"
+     LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
      ${where}`,
     params
   ) as unknown as Array<{ total: number }>;

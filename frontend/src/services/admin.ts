@@ -222,3 +222,18 @@ export async function updateAdminSecretary(id: string, data: Record<string, unkn
 export async function deleteAdminSecretary(id: string) {
   return api.delete<ApiResponse<{ id: string }>>(`/api/admin/secretaries/${id}`);
 }
+
+
+export const adminNovedadesApi = {
+  getFilters: async () => {
+    const response = await getAdminGrades();
+    return { disciplinas: [], profesores: [], grados: response.data.map((grade) => grade.nombre) };
+  },
+  getNovedadesDiarias: async (params?: { fecha?: string; grado?: string }) => {
+    const response = await api.get<ApiResponse<import("../services/roles").DailyNovedad[]>>(
+      "/api/admin/novedades/diarias",
+      params,
+    );
+    return response.data;
+  },
+};

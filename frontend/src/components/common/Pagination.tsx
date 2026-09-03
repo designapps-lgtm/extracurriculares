@@ -4,14 +4,24 @@ export function Pagination({
   total,
   onPageChange,
   variant = "bordered",
+  alwaysRender = false,
 }: {
   page: number;
   totalPages: number;
   total?: number;
   onPageChange: (page: number) => void;
   variant?: "bordered" | "centered";
+  alwaysRender?: boolean;
 }) {
-  if (totalPages <= 1) return null;
+  if (totalPages <= 1 && !(alwaysRender && totalPages === 0)) return null;
+
+  if (totalPages === 0) {
+    return (
+      <div className="px-4 py-3 border-t border-surface-100 dark:border-surface-800 text-sm text-surface-500 dark:text-surface-400" aria-live="polite">
+        0 resultados
+      </div>
+    );
+  }
 
   if (variant === "centered") {
     return (

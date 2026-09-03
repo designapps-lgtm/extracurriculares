@@ -29,6 +29,7 @@ import { adminUserRouter } from "./modules/admin/adminUser.routes";
 import { adminDashboardRouter } from "./modules/admin/dashboardAdmin.routes";
 import { adminSupervisorRouter } from "./modules/admin/supervisorAdmin.routes";
 import { adminSecretaryRouter } from "./modules/admin/secretaryAdmin.routes";
+import { adminNovedadesRouter } from "./modules/admin/novedadesAdmin.routes";
 import { driveSyncRouter } from "./modules/driveSync/driveSync.routes";
 import { appSheetSyncRouter } from "./modules/appsheet/appsheet.routes";
 
@@ -101,6 +102,7 @@ app.use("/api/admin/grades", authenticate, requireAdmin, adminGradeRouter);
 app.use("/api/admin/admins", authenticate, requireAdmin, adminUserRouter);
 app.use("/api/admin/supervisors", authenticate, requireAdmin, adminSupervisorRouter);
 app.use("/api/admin/secretaries", authenticate, requireAdmin, adminSecretaryRouter);
+app.use("/api/admin/novedades", authenticate, requireAdmin, adminNovedadesRouter);
 
 // Teacher auth (login/logout don't need auth)
 app.use("/api/teacher/auth", teacherAuthRouter);
