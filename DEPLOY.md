@@ -167,6 +167,7 @@ npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
 npx wrangler secret put GOOGLE_DRIVE_FOLDER_ID
 npx wrangler secret put GOOGLE_DRIVE_WEBHOOK_TOKEN
+npx wrangler secret put APPSHEET_APPLICATION_ACCESS_KEY
 ```
 
 > `GOOGLE_DRIVE_FOLDER_ID` está en `[vars]` como placeholder vacío; si preferís
@@ -174,6 +175,9 @@ npx wrangler secret put GOOGLE_DRIVE_WEBHOOK_TOKEN
 >
 > `GOOGLE_DRIVE_WEBHOOK_URL` debe apuntar al endpoint público del worker,
 > por ejemplo `https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive`.
+
+El App ID de AppSheet se configura en `wrangler.toml` como `APPSHEET_APP_ID`.
+La Application Access Key debe configurarse como secreto y nunca guardarse en el repositorio.
 
 Después del deploy y de setear los secretos, pegale una vez al bootstrap:
 

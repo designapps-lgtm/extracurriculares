@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
 import { PaginationParams, paginatedResult } from "../../utils/pagination";
@@ -184,7 +185,7 @@ export async function createAssignment(data: {
 
     for (const gradeId of gradeIds) {
       const existing = existingByGrade.get(gradeId);
-      const assignmentId = existing?.idAsignacion ?? globalThis.crypto.randomUUID();
+      const assignmentId = existing?.idAsignacion ?? crypto.randomUUID();
       createdIds.push(assignmentId);
 
       if (existing) {

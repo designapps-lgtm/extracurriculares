@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { sql, first } from "../../config/db";
 import { config } from "../../config";
 import { validateRows } from "../../import/excel/excelValidator";
@@ -115,6 +116,11 @@ export async function syncDriveSources(): Promise<{ students: number; offerEntri
       const buffer = await downloadSpreadsheet(file, creds);
 
       if (normalized === normalize("Extracurriculares_base.xlsx")) {
+        // Si AppSheet está configurado, los estudiantes se sincronizan desde la
+        // tabla "Demograficos" y este archivo se ignora (evita pisar el sync).
+        if (config.appsheetAppId && config.appsheetAccessKey) {
+          continue;
+        }
         const rows = readExcelBuffer(buffer);
         const { valid, errors: validationErrors } = validateRows(rows);
         if (validationErrors.length > 0) {
@@ -149,7 +155,7 @@ export async function ensureDriveWatch(): Promise<{ ok: boolean; renewed: boolea
   }
 
   const startPageToken = await getStartPageToken(creds);
-  const channelId = `drive-watch-${globalThis.crypto.randomUUID()}`;
+  const channelId = `drive-watch-${crypto.randomUUID()}`;
   const watch = await watchDriveChanges({
     pageToken: startPageToken,
     callbackUrl: callbackUrl(),

@@ -9,6 +9,8 @@ export interface MappedStudent {
   correo: string | null;
   schedules: MappedSchedule[];
   _excelRow: number;
+  /** Estado explícito (activo/inactivo) si el origen lo trae. */
+  estado?: string;
 }
 
 export interface MappedSchedule {

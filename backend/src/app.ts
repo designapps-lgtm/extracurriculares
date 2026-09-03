@@ -30,6 +30,7 @@ import { adminDashboardRouter } from "./modules/admin/dashboardAdmin.routes";
 import { adminSupervisorRouter } from "./modules/admin/supervisorAdmin.routes";
 import { adminSecretaryRouter } from "./modules/admin/secretaryAdmin.routes";
 import { driveSyncRouter } from "./modules/driveSync/driveSync.routes";
+import { appSheetSyncRouter } from "./modules/appsheet/appsheet.routes";
 
 // Teacher routes
 import { teacherAuthRouter } from "./modules/teacher/auth.routes";
@@ -121,6 +122,9 @@ app.use("/api/secretary", authenticateSecretary, requireActiveSecretary, secreta
 
 // Drive webhooks / manual sync bootstrap
 app.use("/api/webhooks", driveSyncRouter);
+
+// AppSheet: sync de estudiantes desde la tabla "Demograficos"
+app.use("/api/webhooks/appsheet", appSheetSyncRouter);
 
 // 404 + error handler
 app.use(notFound);

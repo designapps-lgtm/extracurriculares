@@ -40,7 +40,7 @@ function readWorkbook(workbook: XLSX.WorkBook): RawStudentRow[] {
   const sheet = workbook.Sheets[sheetName];
 
   if (!sheet) {
-    throw new Error(`Hoja "${sheetName}" no encontrada en ${filePath}`);
+    throw new Error(`Hoja "${sheetName}" no encontrada en el archivo`);
   }
 
   const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });

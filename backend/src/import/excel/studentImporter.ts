@@ -100,7 +100,7 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
     result.processed++;
 
     try {
-      const grade = await first<GradeIdRow>(await sql`SELECT "idGrado" FROM "Grade" WHERE "nombre" = ${student.gradeNombre} LIMIT 1`);
+      const grade = await first<GradeIdRow>(await sql`SELECT "idGrado" FROM "Grade" WHERE "nombre" = ${student.gradeNombre} LIMIT 1` as unknown as GradeIdRow[]);
       if (!grade) {
         if (dryRun && result.newGrades.includes(student.gradeNombre)) {
           const isExisting = existingBarcodes.has(student.codigoEstudiante);
@@ -146,17 +146,32 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
       }
 
       // Upsert student (ON CONFLICT para HTTP driver sin transacción)
+      const estadoValue = student.estado ? "estado" : null;
+      const columns = ['"codigoEstudiante"', '"nombre"', '"apellido"', '"idGrado"', '"grupo"', '"correo"', '"updatedAt"'];
+      const placeholders = ["$1", "$2", "$3", "$4", "$5", "$6", "now()"];
+      const updateSets = [
+        '"nombre" = EXCLUDED."nombre"',
+        '"apellido" = EXCLUDED."apellido"',
+        '"idGrado" = EXCLUDED."idGrado"',
+        '"grupo" = EXCLUDED."grupo"',
+        '"correo" = EXCLUDED."correo"',
+        '"updatedAt" = now()',
+      ];
+      const values: unknown[] = [student.codigoEstudiante, student.nombre, student.apellido, grade.idGrado, student.grupo, student.correo];
+
+      if (estadoValue) {
+        columns.push('"estado"');
+        placeholders.push("$7");
+        updateSets.push('"estado" = EXCLUDED."estado"');
+        values.push(student.estado);
+      }
+
       await sql(
-        `INSERT INTO "Student" ("codigoEstudiante", "nombre", "apellido", "idGrado", "grupo", "correo", "updatedAt")
-         VALUES ($1, $2, $3, $4, $5, $6, now())
+        `INSERT INTO "Student" (${columns.join(", ")})
+         VALUES (${placeholders.join(", ")})
          ON CONFLICT ("codigoEstudiante") DO UPDATE SET
-           "nombre" = EXCLUDED."nombre",
-           "apellido" = EXCLUDED."apellido",
-           "idGrado" = EXCLUDED."idGrado",
-           "grupo" = EXCLUDED."grupo",
-           "correo" = EXCLUDED."correo",
-           "updatedAt" = now()`,
-        [student.codigoEstudiante, student.nombre, student.apellido, grade.idGrado, student.grupo, student.correo]
+           ${updateSets.join(",\n           ")}`,
+        values
       );
 
       // Read existing schedules (after upsert ensures student exists)
