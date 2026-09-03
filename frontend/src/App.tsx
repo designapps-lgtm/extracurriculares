@@ -100,6 +100,7 @@ function App() {
         <Route path="classes/:asignacionId/:horarioId/students" element={<SecretaryClassStudents role="admin" />} />
         <Route path="schedules" element={<SupervisorSchedules role="admin" />} />
         <Route path="session/:sessionId" element={<SupervisorSession role="admin" />} />
+        <Route path="session-attendance/:sessionId" element={<SupervisorAttendance role="admin" />} />
         <Route path="novedad/:codigoEstudiante" element={<SupervisorNovedad role="admin" />} />
         <Route path="novedades" element={<SupervisorDailyNovedades role="admin" />} />
         <Route path="students" element={<AdminStudents />} />

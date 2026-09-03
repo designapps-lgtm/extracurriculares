@@ -15,8 +15,19 @@ import {
 } from "../supervisor/supervisor.service";
 import { getSecretaryClassStudents } from "../secretary/secretary.service";
 import { getNovedadesBatch, getNovedadesDiarias } from "../novedades/novedades.controller";
+import {
+  adminStartSession,
+  attendanceList,
+  attendanceSave,
+} from "../attendance/attendance.service";
 
 const router = Router();
+
+// Operaciones de Asistencia Extracurriculares para Admin: mismas reglas de roster,
+// pero bajo autenticación Admin y limitado a clases del día.
+router.post("/sessions/start", asyncHandler(adminStartSession));
+router.get("/sessions/:sessionId/attendance", asyncHandler(attendanceList));
+router.post("/sessions/:sessionId/attendance", asyncHandler(attendanceSave));
 
 // Operación en modo consulta para el panel administrador.
 router.get("/classes", asyncHandler(getSupervisorClasses));

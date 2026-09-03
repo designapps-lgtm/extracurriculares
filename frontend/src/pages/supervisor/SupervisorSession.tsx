@@ -110,23 +110,23 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
   return (
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Logo chip alt="Extracurriculares" className="h-8 w-auto shrink-0" />
             <Link to={`${basePath}/dashboard`} className="text-sm text-brand-600 dark:text-brand-400 font-medium hover:underline">
               ← Volver
             </Link>
           </div>
-          <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">Asistencia Extracurriculares</h1>
-          <button onClick={() => navigate(`${basePath}/dashboard`)} className="text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300">
+          <h1 className="order-3 sm:order-none basis-full sm:basis-auto sm:flex-1 min-w-0 text-center text-base sm:text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">Asistencia Extracurriculares</h1>
+          <button onClick={() => navigate(`${basePath}/dashboard`)} className="shrink-0 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300">
             Salir
           </button>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
-        <div className="card p-5">
-          <h2 className="text-xl font-display font-bold text-surface-900 dark:text-surface-100">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
+        <div className="card p-4 sm:p-5">
+          <h2 className="text-xl font-display font-bold text-surface-900 dark:text-surface-100 break-words">
             {data.assignment.discipline.nombre}
           </h2>
           <p className="text-sm text-surface-500 mt-1">
@@ -139,7 +139,7 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="mt-3 px-4 py-2 border border-brand-600 text-brand-600 dark:text-brand-400 text-sm font-medium rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20 disabled:opacity-50"
+            className="mt-3 w-full sm:w-auto px-4 py-2 border border-brand-600 text-brand-600 dark:text-brand-400 text-sm font-medium rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20 disabled:opacity-50"
           >
             {exporting ? "Generando..." : "Exportar a Excel"}
           </button>
@@ -225,9 +225,9 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-surface-100 dark:bg-surface-800">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-surface-100 dark:bg-surface-800">
               {visibleRecords.map((r) => (
-                <div key={r.codigoEstudiante} className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-surface-900">
+                <div key={r.codigoEstudiante} className="flex items-start gap-3 px-3 sm:px-4 py-3 bg-white dark:bg-surface-900">
                   {r.fotoUrl ? (
                     <img src={r.fotoUrl} alt="" className="h-10 w-10 rounded-xl object-cover shrink-0" />
                   ) : (
@@ -240,7 +240,7 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
                     <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">
                       {r.apellido}, {r.nombre}
                     </p>
-                    <p className="text-xs text-surface-500">{r.codigoEstudiante}{r.grupo ? ` · ${r.grupo}` : ""}</p>
+                    <p className="text-xs text-surface-500 break-words">{r.codigoEstudiante}{r.grupo ? ` · ${r.grupo}` : ""}</p>
                     <button
                       onClick={() => openNovedad(r)}
                       className="mt-1 inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/60"
@@ -248,7 +248,7 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
                       Novedades
                     </button>
                   </div>
-                  <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_LABEL[r.estado]?.className || ""}`}>
+                  <span className={`self-start shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_LABEL[r.estado]?.className || ""}`}>
                     {ESTADO_LABEL[r.estado]?.label || r.estado}
                   </span>
                 </div>

@@ -448,7 +448,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
                       </div>
                     </button>
                       <div className="sm:flex sm:flex-col sm:items-end gap-2 shrink-0">
-                      {api.canCallList && (
+                      {api.canCallList && role !== "admin" && (
                         <div className="flex flex-wrap gap-2">
                           {a.schedules.map((sch) => (
                             <button

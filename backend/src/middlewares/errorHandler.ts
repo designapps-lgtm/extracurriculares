@@ -35,6 +35,7 @@ export function asyncHandler(fn: (req: Request, res: Response, next: NextFunctio
           path: req.originalUrl,
           statusCode: res.statusCode,
           body: sanitizeBody(req.body),
+          result: sanitizeBody(body?.data),
         })}::jsonb, now())
       `.catch((err) => {
         console.error("[AuditLog] Failed to write:", err.message);
@@ -128,6 +129,7 @@ function dbMessage(err: Error): string {
 }
 
 function extractResourceType(url: string): string {
+  if (url.includes("/admin/operations/sessions")) return "attendance_session";
   if (url.includes("/admin/students")) return "student";
   if (url.includes("/admin/teachers")) return "teacher";
   if (url.includes("/admin/assignments")) return "assignment";
@@ -139,6 +141,9 @@ function extractResourceType(url: string): string {
 }
 
 function extractResourceId(url: string): string | null {
+  const attendanceSession = /\/admin\/operations\/sessions\/([^/?]+)/.exec(url)?.[1];
+  if (attendanceSession) return attendanceSession === "start" ? null : attendanceSession;
+
   const parts = url.split("/").filter(Boolean);
   const last = parts[parts.length - 1];
   if (last && !last.includes("?") && !["reset-password"].includes(last)) {

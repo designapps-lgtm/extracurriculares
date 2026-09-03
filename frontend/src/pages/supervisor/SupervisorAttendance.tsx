@@ -1,10 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  getSupervisorAttendanceList,
-  supervisorSaveAttendance,
-  getSupervisorNovedadesBatch,
-} from "../../services/supervisor";
+import { roleApis, type RoleKind } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import Logo from "../../components/common/Logo";
 import { Avatar } from "../../components/common/Avatar";
@@ -19,7 +15,9 @@ function todayBogotaStr(): string {
   }).format(new Date());
 }
 
-export default function SupervisorAttendance() {
+export default function SupervisorAttendance({ role = "supervisor" }: { role?: RoleKind }) {
+  const api = roleApis[role];
+  const basePath = role === "admin" ? "/admin" : "/supervisor";
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
@@ -34,7 +32,7 @@ export default function SupervisorAttendance() {
 
   useEffect(() => {
     if (!sessionId) return;
-    getSupervisorAttendanceList(sessionId)
+    api.getAttendanceList!(sessionId)
       .then(async (data) => {
         setAssignment(data.assignment);
         setSchedule(data.schedule);
@@ -42,7 +40,7 @@ export default function SupervisorAttendance() {
         setStudents(data.students);
         const codigos = data.students.map((s) => s.codigoEstudiante);
         if (codigos.length === 0) return;
-        const novedades = await getSupervisorNovedadesBatch(codigos, todayBogotaStr());
+        const novedades = await api.getNovedadesBatch(codigos, todayBogotaStr());
         setNovedadesMap(
           novedades.reduce((acc, item) => {
             if (item.novedades.length > 0) acc[item.codigoEstudiante] = item.novedades;
@@ -52,7 +50,7 @@ export default function SupervisorAttendance() {
       })
       .catch((err) => {
         notify.error(err.message || "Error al cargar la Asistencia Extracurriculares");
-        navigate("/supervisor/classes");
+        navigate(`${basePath}/classes`);
       })
       .finally(() => setLoading(false));
   }, [sessionId, navigate]);
@@ -72,9 +70,9 @@ export default function SupervisorAttendance() {
       const records = students
         .filter((s) => s.estado !== "pendiente")
         .map((s) => ({ codigoEstudiante: s.codigoEstudiante, estado: s.estado }));
-      await supervisorSaveAttendance(sessionId, records);
+      await api.saveAttendance!(sessionId, records);
       notify.success("Asistencia Extracurriculares guardada");
-      navigate("/supervisor/classes");
+      navigate(`${basePath}/classes`);
     } catch (err: any) {
       notify.error(err.message || "Error al guardar");
     } finally {
@@ -87,7 +85,7 @@ export default function SupervisorAttendance() {
   };
 
   const openNovedad = (student: Student) => {
-    navigate(`/supervisor/novedad/${student.codigoEstudiante}`, {
+    navigate(`${basePath}/novedad/${student.codigoEstudiante}`, {
       state: {
         sessionId,
         codigoEstudiante: student.codigoEstudiante,
@@ -118,7 +116,7 @@ export default function SupervisorAttendance() {
           <div className="flex items-center gap-3 min-w-0">
             <Logo chip alt="Extracurriculares" className="h-9 w-auto shrink-0" />
             <div className="min-w-0">
-              <button onClick={() => navigate("/supervisor/classes")} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
+              <button onClick={() => navigate(`${basePath}/classes`)} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
                 ← Volver
               </button>
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 break-words">

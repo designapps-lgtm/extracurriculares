@@ -15,10 +15,12 @@ import {
   createSupervisorStay,
   deleteSupervisorStay,
   getSupervisorClasses,
+} from "./supervisor.service";
+import {
   supervisorStartSession,
   getSupervisorAttendanceList,
   supervisorSaveAttendance,
-} from "./supervisor.service";
+} from "../attendance/attendance.service";
 import { getNovedadesBatch, getNovedadesDiarias } from "../novedades/novedades.controller";
 
 const router = Router();

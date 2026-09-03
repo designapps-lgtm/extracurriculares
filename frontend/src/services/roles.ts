@@ -8,6 +8,7 @@ import type {
   SupervisorStay,
   SupervisorStayStudent,
   SupervisorClassesResponse,
+  AttendanceResponse,
   StudentNovedades,
   Novedad,
 } from "../types";
@@ -62,8 +63,10 @@ export interface RoleApi {
   // Vista "Llamar lista": el supervisor la usa para llamar; la secretaria para visualizar.
   getClasses: (todayOnly?: boolean) => Promise<SupervisorClassesResponse>;
   getClassStudents?: (asignacionId: string, horarioId: string) => Promise<SecretaryClassStudentsData>;
-  // Operaciones de escritura (solo supervisor; undefined en secretaria).
+  // Operaciones de escritura de asistencia (Supervisor y Admin; Secretaría no las expone).
   startSession?: (data: { idAsignacion: string; idHorario: string }) => Promise<{ id: string }>;
+  getAttendanceList?: (sessionId: string) => Promise<AttendanceResponse>;
+  saveAttendance?: (sessionId: string, records: { codigoEstudiante: string; estado: string }[]) => Promise<unknown>;
   searchStudents?: (q: string) => Promise<SupervisorStayStudent[]>;
   getStays?: (idAsignacion: string, idHorario: string, fecha: string) => Promise<SupervisorStay[]>;
 }
@@ -88,6 +91,8 @@ const supervisorRole: RoleApi = {
   canManageStays: true,
   getClasses: supervisorApi.getSupervisorClasses,
   startSession: supervisorApi.supervisorStartSession,
+  getAttendanceList: supervisorApi.getSupervisorAttendanceList,
+  saveAttendance: supervisorApi.supervisorSaveAttendance,
   searchStudents: supervisorApi.searchSupervisorStudents,
   getStays: supervisorApi.getSupervisorStays,
 };
@@ -127,10 +132,13 @@ const adminRole: RoleApi = {
   getAssignmentHistory: adminApi.getAdminAssignmentHistory,
   getNovedadesBatch: adminApi.getAdminNovedadesBatch,
   getNovedadesDiarias: adminApi.getAdminDailyNovedades,
-  canCallList: false,
+  canCallList: true,
   canManageStays: false,
   getClasses: adminApi.getAdminClasses,
   getClassStudents: adminApi.getAdminClassStudents,
+  startSession: adminApi.adminStartSession,
+  getAttendanceList: adminApi.getAdminAttendanceList,
+  saveAttendance: adminApi.adminSaveAttendance,
   searchStudents: adminApi.searchAdminStudents,
   getStays: adminApi.getAdminStays,
 };

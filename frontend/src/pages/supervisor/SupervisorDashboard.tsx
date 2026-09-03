@@ -188,7 +188,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
       <header className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Logo chip alt="Extracurriculares" className="h-9 w-auto" />
             <div className="min-w-0">
@@ -201,7 +201,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
         <div className="card p-4">
           {catalogLoading && (
             <p className="mb-3 text-sm text-surface-500" role="status" aria-live="polite">
@@ -213,7 +213,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
               {catalogError}
             </p>
           )}
-          <div className={`grid gap-3 ${role === "secretary" ? "grid-cols-1 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"}`}>
+          <div className={`grid gap-3 ${role === "secretary" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
             <div>
               <label htmlFor="attendance-fecha" className="block text-xs font-medium text-surface-500 mb-1">Fecha</label>
               <div className="flex gap-2">
@@ -283,18 +283,18 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
               </select>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3 mt-3">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 mt-3">
             <button
               type="button"
               onClick={handleApplyFilters}
-              className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+              className="w-full sm:w-auto px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
             >
               Aplicar filtros
             </button>
             <button
               type="button"
               onClick={handleClearFilters}
-              className="px-4 py-2 border border-surface-300 dark:border-surface-600 text-surface-700 dark:text-surface-200 text-sm font-medium rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800"
+              className="w-full sm:w-auto px-4 py-2 border border-surface-300 dark:border-surface-600 text-surface-700 dark:text-surface-200 text-sm font-medium rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800"
             >
               Limpiar filtros
             </button>
@@ -302,7 +302,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
               type="button"
               onClick={handleExport}
               disabled={exporting}
-              className="px-4 py-2 border border-brand-600 text-brand-600 dark:text-brand-400 text-sm font-medium rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20 disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 border border-brand-600 text-brand-600 dark:text-brand-400 text-sm font-medium rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20 disabled:opacity-50"
             >
               {exporting ? "Generando..." : "Exportar a Excel"}
             </button>
@@ -350,11 +350,11 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
                     key={s.id}
                     type="button"
                     onClick={() => navigate(`${basePath}/session/${s.id}`)}
-                    className="w-full text-left block bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 hover:border-brand-300 dark:hover:border-brand-700 transition-colors p-4"
+                    className="w-full text-left block bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 hover:border-brand-300 dark:hover:border-brand-700 transition-colors p-3 sm:p-4"
                   >
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-surface-900 dark:text-surface-100 truncate">
+                        <p className="font-medium text-surface-900 dark:text-surface-100 break-words">
                           {s.assignment.discipline.nombre}
                           <span className="ml-2 text-xs text-surface-500">Grado {s.assignment.grade.nombre}</span>
                         </p>
@@ -370,7 +370,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
                           ))}
                         </div>
                       </div>
-                      <span className="text-sm text-brand-600 dark:text-brand-400 font-medium shrink-0">
+                      <span className="self-start sm:self-center text-sm text-brand-600 dark:text-brand-400 font-medium whitespace-normal sm:whitespace-nowrap">
                         Ver Asistencia Extracurriculares →
                       </span>
                     </div>

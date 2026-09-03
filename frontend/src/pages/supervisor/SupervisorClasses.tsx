@@ -173,7 +173,7 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
               </h1>
               <p className="text-xs text-surface-500">
                 {showAll ? "Todas las Clases Extracurriculares de todos los profesores" : `Clases Extracurriculares de hoy (${data?.dayName ?? ""})`}
-                {role !== "supervisor" && " · solo lectura"}
+                {role === "secretary" && " · solo lectura"}
               </p>
             </div>
           </div>
@@ -270,12 +270,20 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
                             >
                               Ver estudiantes Extracurriculares
                             </button>
+                          ) : cls.sessionId && cls.sessionEstado === "finalizada" ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="w-full sm:w-auto px-4 py-2 bg-surface-200 dark:bg-surface-700 text-surface-500 text-sm font-medium rounded-xl cursor-not-allowed"
+                            >
+                              Asistencia Extracurriculares registrada
+                            </button>
                           ) : cls.sessionId ? (
                             <button
                               onClick={() => navigate(`${basePath}/session-attendance/${cls.sessionId}`)}
                               className="w-full sm:w-auto px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600"
                             >
-                              Llamar lista
+                              Continuar Asistencia Extracurriculares
                             </button>
                           ) : (
                             <button
@@ -283,7 +291,7 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
                               disabled={starting !== null}
                               className="w-full sm:w-auto px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl disabled:opacity-50"
                             >
-                              {startingKey ? "Iniciando..." : "Llamar lista"}
+                              {startingKey ? "Iniciando Asistencia Extracurriculares..." : "Tomar Asistencia Extracurriculares"}
                             </button>
                           )}
                         </div>

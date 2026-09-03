@@ -10,6 +10,7 @@ import type {
   SupervisorStay,
   SupervisorStayStudent,
   SupervisorClassesResponse,
+  AttendanceResponse,
   StudentNovedades,
 } from "../types";
 import type { DailyNovedad, RoleFilters } from "./roles";
@@ -92,5 +93,29 @@ export async function getAdminDailyNovedades(params?: { fecha?: string; grado?: 
     fecha: params?.fecha || "",
     grado: params?.grado || "",
   });
+  return res.data;
+}
+
+export async function adminStartSession(data: {
+  idAsignacion: string;
+  idHorario: string;
+}): Promise<{ id: string }> {
+  const res = await api.post<ApiResponse<{ id: string }>>(`${base}/sessions/start`, data);
+  return res.data;
+}
+
+export async function getAdminAttendanceList(sessionId: string): Promise<AttendanceResponse> {
+  const res = await api.get<ApiResponse<AttendanceResponse>>(`${base}/sessions/${sessionId}/attendance`);
+  return res.data;
+}
+
+export async function adminSaveAttendance(
+  sessionId: string,
+  records: { codigoEstudiante: string; estado: string }[],
+): Promise<{ sessionId: string; total: number; resultado: string }> {
+  const res = await api.post<ApiResponse<{ sessionId: string; total: number; resultado: string }>>(
+    `${base}/sessions/${sessionId}/attendance`,
+    { records },
+  );
   return res.data;
 }
