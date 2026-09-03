@@ -25,6 +25,7 @@ NOVEDADES_SYNC_MINUTES = "10"
 GOOGLE_DRIVE_WEBHOOK_URL = "https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive"
 APPSHEET_APP_ID = "0a43ca9a-ff5b-47bf-8127-8f14f1150ff0"
 APPSHEET_DEMOGRAFICOS_TABLE = "Demograficos"
+GOOGLE_DRIVE_STUDENTS_FILE_NAME = "DEMOGRAFICOS 2026-2027"
 STUDENTS_SYNC_SOURCE = "drive"
 # Rate limiting a nivel de app (además del de Cloudflare). El limiter in-memory
 # de Express se activa cuando estas vars existen. AUTH_RATE_LIMIT: intentos de

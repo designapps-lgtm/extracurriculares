@@ -13,6 +13,7 @@ import {
   isDriveConfigured,
   listDriveChanges,
   listFolderFiles,
+  findDriveFilesByName,
   parseServiceAccount,
   watchDriveChanges,
   type DriveFile,
@@ -21,6 +22,9 @@ import {
 const STATE_KEY = "drive-watch";
 const TARGET_FILES = [
   "Extracurriculares_base.xlsx",
+  // Google Sheet real conectado a AppSheet en producción.
+  "BAESE_QR_PLACAS",
+  "DEMOGRAFICOS 2026-2027",
   "Horario por sección extracurricular.xlsx",
   "Horario por seccion extracurricular.xlsx",
 ];
@@ -38,6 +42,32 @@ function normalize(value: string): string {
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
     .trim();
+}
+
+function isStudentSourceFile(fileName: string): boolean {
+  return [
+    "Extracurriculares_base.xlsx",
+    "BAESE_QR_PLACAS",
+    "DEMOGRAFICOS 2026-2027",
+    config.googleDriveStudentsFileName,
+  ].some((name) => normalize(name) === normalize(fileName));
+}
+
+function studentSourceSheet(fileName: string): string {
+  return ["BAESE_QR_PLACAS", "DEMOGRAFICOS 2026-2027", config.googleDriveStudentsFileName]
+    .some((name) => normalize(name) === normalize(fileName))
+    ? "Base_Demo"
+    : "Base";
+}
+
+function readStudentSource(buffer: Buffer, fileName: string) {
+  const preferredSheet = studentSourceSheet(fileName);
+  try {
+    return readExcelBuffer(buffer, preferredSheet);
+  } catch (error) {
+    if (preferredSheet !== "Base") return readExcelBuffer(buffer, "Base");
+    throw error;
+  }
 }
 
 async function ensureStateTable(): Promise<void> {
@@ -109,25 +139,38 @@ export async function syncDriveSources(options: { syncStudents?: boolean } = {})
   const shouldSyncStudents = options.syncStudents ?? (config.studentsSyncSource === "drive" || !(config.appsheetAppId && config.appsheetAccessKey));
 
   const folderFiles = await listFolderFiles(folderId, creds);
-  const targets = await findTargetFiles(folderFiles);
+  let targets = await findTargetFiles(folderFiles);
+  const configuredStudentName = normalize(config.googleDriveStudentsFileName);
+  let hasConfiguredStudentFile = targets.some((file) => normalize(file.name) === configuredStudentName);
+  if (!hasConfiguredStudentFile) {
+    const remoteStudentFiles = await findDriveFilesByName(config.googleDriveStudentsFileName, creds);
+    for (const file of remoteStudentFiles) {
+      if (!targets.some((target) => target.id === file.id)) targets.push(file);
+    }
+    hasConfiguredStudentFile = remoteStudentFiles.length > 0;
+  }
+  // Si el archivo configurado existe, tiene prioridad sobre nombres antiguos
+  // o alternativos que puedan seguir en la misma carpeta.
+  if (hasConfiguredStudentFile) {
+    targets = targets.filter((file) => !isStudentSourceFile(file.name) || normalize(file.name) === configuredStudentName);
+  }
 
   for (const file of targets) {
     const normalized = normalize(file.name);
+    const isStudentFile = isStudentSourceFile(file.name);
     try {
-      // No descargar el Excel base cuando AppSheet terminó correctamente.
-      // Esto evita que un archivo de Drive viejo o inaccesible genere errores
-      // innecesarios o pueda pisar la fuente primaria.
-      if (normalized === normalize("Extracurriculares_base.xlsx") && !shouldSyncStudents) {
+      // No descargar el archivo de estudiantes cuando AppSheet terminó
+      // correctamente y está configurado como fuente primaria alternativa.
+      if (isStudentFile && !shouldSyncStudents) {
         continue;
       }
 
       const buffer = await downloadSpreadsheet(file, creds);
 
-      if (normalized === normalize("Extracurriculares_base.xlsx")) {
-        // AppSheet es la fuente primaria cuando su sincronización terminó bien.
-        // El Worker puede habilitar este archivo como fallback si AppSheet falla.
-
-        const rows = readExcelBuffer(buffer);
+      if (isStudentFile) {
+        // BAESE_QR_PLACAS es un Google Sheet y la información demográfica
+        // actualizada está en Base_Demo; el archivo histórico usa Base.
+        const rows = readStudentSource(buffer, file.name);
         if (rows.length === 0) {
           errors.push("Base: no se encontraron filas con BARCODE; no se aplicó ningún cambio");
           continue;

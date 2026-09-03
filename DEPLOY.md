@@ -177,13 +177,12 @@ npx wrangler secret put APPSHEET_WEBHOOK_TOKEN
 > `GOOGLE_DRIVE_WEBHOOK_URL` debe apuntar al endpoint público del worker,
 > por ejemplo `https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive`.
 
-El App ID de AppSheet y el nombre de la tabla se configuran en `wrangler.toml` como
-`APPSHEET_APP_ID` y `APPSHEET_DEMOGRAFICOS_TABLE` (por defecto `Demograficos`).
-`STUDENTS_SYNC_SOURCE` queda en `drive` para que `Extracurriculares_base.xlsx` sea
-la fuente primaria de estudiantes; usa `appsheet` sólo si se quiere invertir esa
-precedencia. La Application Access Key debe configurarse como secreto y nunca
-guardarse en el repositorio. Si Drive falla antes de procesar estudiantes, AppSheet
-queda como respaldo automático.
+`APPSHEET_APP_ID`, `APPSHEET_DEMOGRAFICOS_TABLE` y `GOOGLE_DRIVE_STUDENTS_FILE_NAME`
+configuran la fuente de estudiantes. La configuración actual usa
+`GOOGLE_DRIVE_STUDENTS_FILE_NAME=DEMOGRAFICOS 2026-2027` y
+`STUDENTS_SYNC_SOURCE=drive`. El Worker busca primero ese archivo por nombre en
+Drive, incluso fuera de la carpeta configurada, y usa `Base_Demo` si existe; si
+no lo encuentra, conserva los nombres alternativos compatibles como respaldo.
 
 Después del deploy y de setear los secretos, pegale una vez al bootstrap:
 

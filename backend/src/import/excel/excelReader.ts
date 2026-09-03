@@ -27,18 +27,17 @@ const DAY_COLUMNS: Record<string, keyof RawStudentRow> = {
   CC_SABADO: "ccSabado",
 };
 
-export function readExcel(filePath: string): RawStudentRow[] {
+export function readExcel(filePath: string, sheetName = "Base"): RawStudentRow[] {
   const workbook = XLSX.readFile(filePath);
-  return readWorkbook(workbook);
+  return readWorkbook(workbook, sheetName);
 }
 
-export function readExcelBuffer(buffer: Buffer): RawStudentRow[] {
+export function readExcelBuffer(buffer: Buffer, sheetName = "Base"): RawStudentRow[] {
   const workbook = XLSX.read(buffer, { type: "buffer" });
-  return readWorkbook(workbook);
+  return readWorkbook(workbook, sheetName);
 }
 
-function readWorkbook(workbook: XLSX.WorkBook): RawStudentRow[] {
-  const sheetName = "Base";
+function readWorkbook(workbook: XLSX.WorkBook, sheetName: string): RawStudentRow[] {
   const sheet = workbook.Sheets[sheetName];
 
   if (!sheet) {

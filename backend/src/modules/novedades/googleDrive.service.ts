@@ -108,6 +108,23 @@ export async function listFolderFiles(folderId: string, creds: ServiceAccountCre
   return files;
 }
 
+export async function findDriveFilesByName(name: string, creds: ServiceAccountCredentials): Promise<DriveFile[]> {
+  const token = await getAccessToken(creds);
+  const q = encodeURIComponent(`name = '${name.replace(/'/g, "\\'")}' and trashed=false`);
+  const files: DriveFile[] = [];
+  let pageToken = "";
+
+  do {
+    const page = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
+    const url = `${DRIVE_FILES_URL}?q=${q}&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${page}`;
+    const data = await request<{ files: DriveFile[]; nextPageToken?: string }>(url, token);
+    files.push(...(data.files || []));
+    pageToken = data.nextPageToken || "";
+  } while (pageToken);
+
+  return files;
+}
+
 export async function downloadFile(fileId: string, creds: ServiceAccountCredentials): Promise<Buffer> {
   const token = await getAccessToken(creds);
   const res = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media&supportsAllDrives=true`, {
