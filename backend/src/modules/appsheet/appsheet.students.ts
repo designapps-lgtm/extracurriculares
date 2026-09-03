@@ -38,6 +38,26 @@ function getCell(row: AppSheetRow, candidates: string[]): string {
   return "";
 }
 
+function deriveMiddleName(firstName: string, lastName: string, fullName: string): string {
+  if (!firstName || !fullName) return "";
+
+  const source = fullName.trim();
+  const lastFirstPrefix = [lastName, firstName].filter(Boolean).join(" ");
+  if (lastFirstPrefix && source.startsWith(`${lastFirstPrefix} `)) {
+    return source.slice(lastFirstPrefix.length).trim();
+  }
+
+  if (source.startsWith(`${firstName} `)) {
+    let remainder = source.slice(firstName.length).trim();
+    if (lastName && remainder.endsWith(` ${lastName}`)) {
+      remainder = remainder.slice(0, -(lastName.length + 1)).trim();
+    }
+    return remainder;
+  }
+
+  return "";
+}
+
 function mapEstado(value: string): "activo" | "inactivo" | undefined {
   const normalized = value.trim().toUpperCase();
   if (["ACTIVE", "ACTIVO", "ACTIVA"].includes(normalized)) return "activo";
@@ -56,13 +76,17 @@ export function mapAppSheetStudents(rows: AppSheetRow[]): MappedStudent[] {
       const firstName = normalizeStudentName(getCell(row, [
         "FIRST NAME", "FIRST_NAME", "FIRSTNAME", "NOMBRE", "PRIMER NOMBRE", "PRIMER_NOMBRE",
       ]));
-      const middleName = normalizeStudentName(getCell(row, [
+      const middleNameFromColumn = normalizeStudentName(getCell(row, [
         "MIDDLE NAME", "MIDDLE_NAME", "MIDDLENAME", "SECOND NAME", "SECOND_NAME",
         "SEGUNDO NOMBRE", "SEGUNDO_NOMBRE", "NOMBRE 2", "NOMBRE2",
       ]));
       const lastName = normalizeStudentName(getCell(row, [
         "LAST NAME", "LAST_NAME", "LASTNAME", "APELLIDO", "APELLIDOS",
       ]));
+      const fullName = normalizeStudentName(getCell(row, [
+        "FULL_NAME", "FULL NAME", "FULLNAME", "NOMBRE COMPLETO", "NOMBRE_COMPLETO",
+      ]));
+      const middleName = middleNameFromColumn || deriveMiddleName(firstName, lastName, fullName);
       const gradeNombre = getCell(row, ["GRADE", "GRADO"]);
       const homeroom = getCell(row, ["HOMEROOM"]);
       const email = getCell(row, ["STUDENT_EMAIL", "STUDENTEMAIL"]);

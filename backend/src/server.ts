@@ -12,8 +12,11 @@ async function start() {
   });
 
   const runStudentSync = async () => {
-    let shouldSyncDriveStudents = true;
-    if (config.appsheetAppId && config.appsheetAccessKey) {
+    const driveConfigured = Boolean(config.googleServiceAccountJson && config.googleDriveFolderId);
+    const driveIsPrimary = config.studentsSyncSource === "drive" && driveConfigured;
+    let shouldSyncDriveStudents = driveIsPrimary;
+
+    if (!driveIsPrimary && config.appsheetAppId && config.appsheetAccessKey) {
       const result = await syncAppSheetStudents();
       // No usar un Excel posiblemente viejo después de una importación AppSheet
       // parcial: sólo se habilita el fallback si no se procesó ninguna fila.
@@ -25,13 +28,24 @@ async function start() {
       }
     }
 
-    if (shouldSyncDriveStudents && config.googleServiceAccountJson && config.googleDriveFolderId) {
-      const fallback = await syncDriveSources({ syncStudents: true });
-      if (fallback.errors.length > 0) {
-        console.error(`[Drive] Fallback de estudiantes con errores: ${fallback.errors.join(" | ")}`);
+    if (driveConfigured && shouldSyncDriveStudents) {
+      const driveResult = await syncDriveSources({ syncStudents: true });
+      if (driveResult.errors.length > 0) {
+        console.error(`[Drive] Sync de estudiantes con errores: ${driveResult.errors.join(" | ")}`);
       } else {
-        console.log(`[Drive] Fallback de estudiantes OK: ${fallback.students} procesados`);
+        console.log(`[Drive] Estudiantes OK: ${driveResult.students} procesados`);
       }
+
+      if (driveIsPrimary && driveResult.students === 0 && config.appsheetAppId && config.appsheetAccessKey) {
+        const fallback = await syncAppSheetStudents();
+        if (fallback.errors.length > 0) {
+          console.error(`[AppSheet] Fallback con errores: ${fallback.errors.join(" | ")}`);
+        } else {
+          console.log(`[AppSheet] Fallback OK: ${fallback.processed} estudiantes (${fallback.middleNames} con segundo nombre)`);
+        }
+      }
+    } else if (!driveIsPrimary && !config.appsheetAppId) {
+      console.log("[Students] Sync desactivado: faltan credenciales de AppSheet y Drive");
     }
   };
 
@@ -47,12 +61,15 @@ async function start() {
     }
   };
 
-  if (config.appsheetAppId || (config.googleServiceAccountJson && config.googleDriveFolderId)) {
+  if (
+    (config.studentsSyncSource === "drive" && config.googleServiceAccountJson && config.googleDriveFolderId) ||
+    (config.appsheetAppId && config.appsheetAccessKey)
+  ) {
     setTimeout(() => { runStudentSync().catch((e) => console.error("[Students] Error en sync inicial:", e.message)); }, 5000);
     setInterval(() => { runStudentSync().catch((e) => console.error("[Students] Error en sync periódico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
-    console.log(`[Students] Sync programado cada ${config.novedadesSyncMinutes} minutos`);
+    console.log(`[Students] Sync programado cada ${config.novedadesSyncMinutes} minutos usando ${config.studentsSyncSource}`);
   } else {
-    console.log("[Students] Sync desactivado: faltan credenciales de AppSheet y Drive");
+    console.log("[Students] Sync desactivado: faltan credenciales de la fuente configurada");
   }
 
   if (config.googleServiceAccountJson && config.googleDriveFolderId) {

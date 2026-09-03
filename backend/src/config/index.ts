@@ -37,6 +37,9 @@ export const config = {
   appsheetAppId: process.env.APPSHEET_APP_ID || null,
   appsheetAccessKey: process.env.APPSHEET_APPLICATION_ACCESS_KEY || null,
   appsheetDemograficosTable: process.env.APPSHEET_DEMOGRAFICOS_TABLE || "Demograficos",
+  // La fuente primaria de estudiantes es el Excel de Drive. AppSheet queda
+  // como respaldo si Drive no está configurado o el archivo no llega.
+  studentsSyncSource: process.env.STUDENTS_SYNC_SOURCE?.toLowerCase() === "appsheet" ? "appsheet" : "drive",
   novedadesSyncMinutes: parseInt(process.env.NOVEDADES_SYNC_MINUTES || "10", 10),
   googleClientId: process.env.GOOGLE_CLIENT_ID || null,
   googleInstitutionDomain: process.env.GOOGLE_INSTITUTION_DOMAIN || "gi.edu.co",

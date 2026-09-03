@@ -106,7 +106,7 @@ export async function syncDriveSources(options: { syncStudents?: boolean } = {})
   let students = 0;
   let offerEntries = 0;
   let files = 0;
-  const shouldSyncStudents = options.syncStudents ?? !(config.appsheetAppId && config.appsheetAccessKey);
+  const shouldSyncStudents = options.syncStudents ?? (config.studentsSyncSource === "drive" || !(config.appsheetAppId && config.appsheetAccessKey));
 
   const folderFiles = await listFolderFiles(folderId, creds);
   const targets = await findTargetFiles(folderFiles);

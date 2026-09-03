@@ -16,8 +16,14 @@ export default {
   // Cron trigger definido en wrangler.toml. Reemplaza al setInterval de server.ts.
   async scheduled(_controller: unknown, _env: unknown, _ctx: unknown) {
     try {
-      let shouldSyncDriveStudents = true;
-      if (config.appsheetAppId && config.appsheetAccessKey) {
+      const driveConfigured = Boolean(config.googleServiceAccountJson && config.googleDriveFolderId);
+      const driveIsPrimary = config.studentsSyncSource === "drive" && driveConfigured;
+      let shouldSyncDriveStudents = driveIsPrimary;
+
+      // El Excel de Drive es la fuente primaria configurada para estudiantes.
+      // AppSheet se usa sólo si Drive no está disponible o si se selecciona
+      // explícitamente como fuente primaria.
+      if (!driveIsPrimary && config.appsheetAppId && config.appsheetAccessKey) {
         const students = await syncAppSheetStudents();
         // Sólo es seguro usar Drive cuando AppSheet no llegó a iniciar la
         // importación. Si hubo errores después de comenzar, el lote pudo ser
@@ -28,14 +34,11 @@ export default {
         } else {
           console.log(`[AppSheet] Estudiantes OK: ${students.processed} procesados (${students.created} nuevos, ${students.updated} actualizados, ${students.middleNames} con segundo nombre)`);
         }
-      } else {
-        console.log("[AppSheet] Sync desactivado: faltan APPSHEET_APP_ID o APPSHEET_APPLICATION_ACCESS_KEY");
+      } else if (!driveIsPrimary) {
+        console.log("[AppSheet] Sync desactivado: faltan credenciales o no es la fuente primaria");
       }
 
-      // AppSheet y Drive son integraciones independientes. Si AppSheet falla
-      // o recibe un lote incompleto, el Excel actualizado de Drive actúa como
-      // respaldo y evita dejar la base con datos antiguos.
-      if (!config.googleServiceAccountJson || !config.googleDriveFolderId) {
+      if (!driveConfigured) {
         console.log("[Drive] Sync desactivado: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
         return;
       }
@@ -43,14 +46,25 @@ export default {
       if (config.googleDriveWebhookUrl && config.googleDriveWebhookToken) {
         await ensureDriveWatch();
       } else {
-        console.log("[Drive] Webhook no configurado; se ejecuta solo sync de respaldo");
+        console.log("[Drive] Webhook no configurado; se ejecuta solo sync periódico");
       }
 
       const driveResult = await syncDriveSources({ syncStudents: shouldSyncDriveStudents });
       if (driveResult.errors.length > 0) {
         console.error(`[Drive] Sync con errores: ${driveResult.errors.join(" | ")}`);
       } else {
-        console.log(`[Drive] Sync OK: ${driveResult.files} archivos procesados`);
+        console.log(`[Drive] Sync OK: ${driveResult.students} estudiantes, ${driveResult.files} archivos procesados`);
+      }
+
+      // Si el Excel primario no llegó a procesar estudiantes, AppSheet evita
+      // que la base quede sin actualización por una falla temporal de Drive.
+      if (driveIsPrimary && driveResult.students === 0 && config.appsheetAppId && config.appsheetAccessKey) {
+        const fallback = await syncAppSheetStudents();
+        if (fallback.errors.length > 0) {
+          console.error(`[AppSheet] Fallback con errores (${fallback.received} recibidas, ${fallback.mapped} mapeadas): ${fallback.errors.join(" | ")}`);
+        } else {
+          console.log(`[AppSheet] Fallback OK: ${fallback.processed} estudiantes (${fallback.middleNames} con segundo nombre)`);
+        }
       }
 
       const result = await syncNovedadesFromDrive();
@@ -60,7 +74,7 @@ export default {
         console.log(`[Novedades] Sync OK: ${result.files} archivos, ${result.novedades} novedades`);
       }
     } catch (e: any) {
-      console.error("[Novedades] Error en sync periódico:", e?.message || e);
+      console.error("[Sync] Error en sync periódico:", e?.message || e);
     }
   },
 };
