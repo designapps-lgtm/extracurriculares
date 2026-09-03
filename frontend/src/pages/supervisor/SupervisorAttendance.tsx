@@ -5,15 +5,7 @@ import { useNotify } from "../../components/common/Notify";
 import Logo from "../../components/common/Logo";
 import { Avatar } from "../../components/common/Avatar";
 import type { AttendanceStudent as Student, Schedule, Assignment, Novedad } from "../../types";
-
-function todayBogotaStr(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Bogota",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
+import { colombiaDateKey, todayColombiaDateKey } from "../../utils/colombiaDate";
 
 export default function SupervisorAttendance({ role = "supervisor" }: { role?: RoleKind }) {
   const api = roleApis[role];
@@ -25,6 +17,7 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
   const [teacher, setTeacher] = useState<{ nombre: string; apellido: string } | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [novedadesMap, setNovedadesMap] = useState<Record<string, Novedad[]>>({});
+  const [fechaConsulta, setFechaConsulta] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -40,7 +33,9 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
         setStudents(data.students);
         const codigos = data.students.map((s) => s.codigoEstudiante);
         if (codigos.length === 0) return;
-        const novedades = await api.getNovedadesBatch(codigos, todayBogotaStr());
+        const fechaConsulta = colombiaDateKey(data.session?.fecha) || todayColombiaDateKey();
+        setFechaConsulta(fechaConsulta);
+        const novedades = await api.getNovedadesBatch(codigos, fechaConsulta);
         setNovedadesMap(
           novedades.reduce((acc, item) => {
             if (item.novedades.length > 0) acc[item.codigoEstudiante] = item.novedades;
@@ -92,6 +87,8 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
         nombre: student.nombre,
         apellido: student.apellido,
         grupo: student.grupo,
+        fechaConsulta: fechaConsulta || todayColombiaDateKey(),
+        returnTo: `${basePath}/session-attendance/${sessionId}`,
         novedades: novedadesMap[student.codigoEstudiante] || [],
       },
     });

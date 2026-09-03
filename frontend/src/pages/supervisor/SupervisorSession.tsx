@@ -4,7 +4,8 @@ import { roleApis, type RoleKind } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
-import type { SupervisorSessionDetail } from "../../types";
+import type { SupervisorSessionDetail, Novedad } from "../../types";
+import { colombiaDateKey } from "../../utils/colombiaDate";
 
 function formatFecha(iso: string): string {
   const d = new Date(iso);
@@ -31,13 +32,30 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<AttendanceFilter>("todos");
+  const [novedadesMap, setNovedadesMap] = useState<Record<string, Novedad[]>>({});
   const navigate = useNavigate();
   const notify = useNotify();
 
   useEffect(() => {
     if (!sessionId) return;
     api.getSession(sessionId)
-      .then(setData)
+      .then(async (detail) => {
+        setData(detail);
+        const codigos = detail.records.map((record) => record.codigoEstudiante);
+        const fechaConsulta = colombiaDateKey(detail.fecha);
+        if (codigos.length === 0 || !fechaConsulta) return;
+        try {
+          const novedades = await api.getNovedadesBatch(codigos, fechaConsulta);
+          setNovedadesMap(
+            novedades.reduce((acc, item) => {
+              if (item.novedades.length > 0) acc[item.codigoEstudiante] = item.novedades;
+              return acc;
+            }, {} as Record<string, Novedad[]>),
+          );
+        } catch {
+          setNovedadesMap({});
+        }
+      })
       .catch((err: any) => {
         if (err.message?.includes("401") || err.message?.includes("No autenticado")) {
           navigate("/");
@@ -99,10 +117,13 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
     navigate(`${basePath}/novedad/${r.codigoEstudiante}`, {
       state: {
         sessionId,
+        returnTo: `${basePath}/session/${sessionId}`,
+        fechaConsulta: data ? colombiaDateKey(data.fecha) : undefined,
         codigoEstudiante: r.codigoEstudiante,
         nombre: r.nombre,
         apellido: r.apellido,
         grupo: r.grupo,
+        novedades: novedadesMap[r.codigoEstudiante] || [],
       },
     });
   };
@@ -241,12 +262,14 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
                       {r.apellido}, {r.nombre}
                     </p>
                     <p className="text-xs text-surface-500 break-words">{r.codigoEstudiante}{r.grupo ? ` · ${r.grupo}` : ""}</p>
-                    <button
-                      onClick={() => openNovedad(r)}
-                      className="mt-1 inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/60"
-                    >
-                      Novedades
-                    </button>
+                    {novedadesMap[r.codigoEstudiante]?.length > 0 && (
+                      <button
+                        onClick={() => openNovedad(r)}
+                        className="mt-1 inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/60"
+                      >
+                        Novedades
+                      </button>
+                    )}
                   </div>
                   <span className={`self-start shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_LABEL[r.estado]?.className || ""}`}>
                     {ESTADO_LABEL[r.estado]?.label || r.estado}

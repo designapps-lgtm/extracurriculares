@@ -3,14 +3,17 @@ import { useEffect, useState } from "react";
 import { roleApis, type RoleKind } from "../../services/roles";
 import Logo from "../../components/common/Logo";
 import type { Novedad } from "../../types";
+import { todayColombiaDateKey } from "../../utils/colombiaDate";
 
 interface State {
-  sessionId: string;
+  sessionId?: string;
+  returnTo?: string;
+  fechaConsulta?: string;
   codigoEstudiante: string;
   nombre: string;
   apellido: string;
   grupo: string | null;
-  novedades: Novedad[];
+  novedades?: Novedad[];
 }
 
 function formatLocal(value: string): string {
@@ -40,7 +43,7 @@ export default function SupervisorNovedad({ role = "supervisor" }: PageProps) {
     if (state?.novedades && state.novedades.length > 0) return;
     setLoading(true);
     setError(null);
-    api.getNovedadesBatch([codigoEstudiante])
+    api.getNovedadesBatch([codigoEstudiante], state?.fechaConsulta || todayColombiaDateKey())
       .then((res) => {
         const item = res.find((i) => i.codigoEstudiante === codigoEstudiante);
         setNovedades(item?.novedades || []);
@@ -51,14 +54,12 @@ export default function SupervisorNovedad({ role = "supervisor" }: PageProps) {
       .finally(() => setLoading(false));
   }, [codigoEstudiante, state]);
 
-  // La secretaría no tiene flujo de llamar lista: vuelve a la sesión leída o al dashboard.
-  const backTo = state?.sessionId
-    ? role === "secretary"
+  const backTo = state?.returnTo
+    || (state?.sessionId
       ? `${basePath}/session/${state.sessionId}`
-      : `${basePath}/session-attendance/${state.sessionId}`
-    : role === "secretary"
-      ? `${basePath}/dashboard`
-      : `${basePath}/classes`;
+      : role === "secretary"
+        ? `${basePath}/dashboard`
+        : `${basePath}/classes`);
   const nombre = state?.nombre;
   const apellido = state?.apellido;
   const grupo = state?.grupo;

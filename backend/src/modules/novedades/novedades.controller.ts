@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { sql } from "../../config/db";
 import { getNovedadesForStudent, syncNovedadesFromDrive } from "./novedades.service";
-import { dayBounds, isOnDay, isActive, novedadDayName } from "./novedades.dates";
+import { dayBounds, isOnDay, novedadDayName } from "./novedades.dates";
 
 async function refreshNovedades(): Promise<void> {
   try {
@@ -82,7 +82,11 @@ export async function getNovedadesByCodigo(req: Request, res: Response): Promise
   await refreshNovedades();
   const todos = await getNovedadesForStudent(codigoEstudiante);
   const daysByStudent = await getStudentDays([codigoEstudiante]);
-  const filtered = todos.filter((n) => matchesExtracurricularDay(n, daysByStudent));
+  const fechaParam = String(req.query.fecha || "").trim();
+  const bounds = dayBounds(fechaParam || new Date().toISOString());
+  const filtered = bounds
+    ? todos.filter((n) => matchesExtracurricularDay(n, daysByStudent) && isOnDay(n, bounds))
+    : [];
   res.json({ success: true, data: filtered.filter(isRelevantNovedad).map(serialize) });
 }
 
@@ -103,14 +107,13 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
     ORDER BY "fechaNovedad" DESC NULLS LAST, "fechaCreacion" DESC NULLS LAST
   `) as unknown as any[];
 
-  const bounds = fechaParam ? dayBounds(fechaParam) : null;
+  const bounds = dayBounds(fechaParam || new Date().toISOString());
   const daysByStudent = await getStudentDays(codigos);
   const activas: Record<string, any[]> = {};
   for (const r of rows) {
     if (!matchesExtracurricularDay(r, daysByStudent)) continue;
     if (!isRelevantNovedad(r)) continue;
-    const match = bounds ? isOnDay(r, bounds) : isActive(r);
-    if (!match) continue;
+    if (!bounds || !isOnDay(r, bounds)) continue;
     (activas[r.codigoEstudiante] = activas[r.codigoEstudiante] || []).push(serialize(r));
   }
 

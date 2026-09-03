@@ -3,14 +3,17 @@ import { useEffect, useState } from "react";
 import { getNovedadesBatch } from "../../services/teacher";
 import Logo from "../../components/common/Logo";
 import type { Novedad } from "../../types";
+import { todayColombiaDateKey } from "../../utils/colombiaDate";
 
 interface State {
-  sessionId: string;
+  sessionId?: string;
+  returnTo?: string;
+  fechaConsulta?: string;
   codigoEstudiante: string;
   nombre: string;
   apellido: string;
   grupo: string | null;
-  novedades: Novedad[];
+  novedades?: Novedad[];
 }
 
 function formatLocal(value: string): string {
@@ -34,7 +37,7 @@ export default function TeacherNovedad() {
     if (state?.novedades && state.novedades.length > 0) return;
     setLoading(true);
     setError(null);
-    getNovedadesBatch([codigoEstudiante])
+    getNovedadesBatch([codigoEstudiante], state?.fechaConsulta || todayColombiaDateKey())
       .then((res) => {
         const item = res.find((i) => i.codigoEstudiante === codigoEstudiante);
         setNovedades(item?.novedades || []);
@@ -45,7 +48,7 @@ export default function TeacherNovedad() {
       .finally(() => setLoading(false));
   }, [codigoEstudiante, state]);
 
-  const backTo = state?.sessionId ? `/teacher/session/${state.sessionId}` : "/teacher/dashboard";
+  const backTo = state?.returnTo || (state?.sessionId ? `/teacher/session/${state.sessionId}` : "/teacher/dashboard");
   const nombre = state?.nombre;
   const apellido = state?.apellido;
   const grupo = state?.grupo;
