@@ -85,7 +85,7 @@ export interface RoleApi {
 
 const supervisorRole: RoleApi = {
   role: "supervisor",
-  label: "Supervisor",
+  label: "Supervisor Extracurriculares",
   me: async () => {
     const s = await supervisorApi.supervisorMe();
     return { nombre: s.nombre, apellido: s.apellido, correo: s.correo };
@@ -113,7 +113,7 @@ const supervisorRole: RoleApi = {
 
 const secretaryRole: RoleApi = {
   role: "secretary",
-  label: "Secretaría",
+  label: "Secretaría Extracurriculares",
   me: async () => {
     const s = await secretaryApi.secretaryMe();
     return { nombre: s.nombre, apellido: s.apellido, correo: s.correo };
@@ -137,7 +137,7 @@ const secretaryRole: RoleApi = {
 
 const adminRole: RoleApi = {
   role: "admin",
-  label: "Administrador",
+  label: "Administración Extracurriculares",
   me: adminApi.adminMe,
   getSessions: adminApi.getAdminOperationalSessions,
   getSession: adminApi.getAdminOperationalSession,

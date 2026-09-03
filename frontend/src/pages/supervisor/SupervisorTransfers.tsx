@@ -217,7 +217,7 @@ export default function SupervisorTransfers({ role = "supervisor" }: PageProps) 
             <Logo chip alt="Extracurriculares" className="h-9 w-auto" />
             <div className="min-w-0">
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
-                Traslados · Niños que se quedan
+                Traslados Extracurriculares · Niños que se quedan
               </h1>
               <p className="text-xs text-surface-500">
                 {user?.nombre ? `${user.nombre} ${user.apellido}` : ""} · mover un estudiante de una clase a otra por un tiempo
@@ -403,7 +403,7 @@ export default function SupervisorTransfers({ role = "supervisor" }: PageProps) 
         <section className="card p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base">
-              Historial de traslados
+              Historial de traslados Extracurriculares
             </h2>
             <div className="flex flex-col sm:flex-row gap-2">
               <input

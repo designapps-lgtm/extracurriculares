@@ -113,7 +113,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <span className="text-xs font-medium text-brand-700 dark:text-brand-300 uppercase tracking-wider">
-              Panel de control
+              Panel de control de Extracurriculares
             </span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-display font-bold text-surface-900 dark:text-surface-50 leading-tight">

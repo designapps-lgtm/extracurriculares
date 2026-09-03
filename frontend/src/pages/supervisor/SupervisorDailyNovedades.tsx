@@ -92,7 +92,7 @@ export default function SupervisorDailyNovedades({
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
       <div>
         <p className="text-sm text-surface-500">Seguimiento de estudiantes</p>
-        <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">Novedades diarias</h1>
+        <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">Novedades diarias Extracurriculares</h1>
       </div>
 
       <div className="card p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
@@ -137,7 +137,7 @@ export default function SupervisorDailyNovedades({
       </div>
 
       {loading ? <Loading /> : filteredItems.length === 0 ? (
-        <div className="card p-10 text-center text-sm text-surface-500">No hay novedades para los filtros seleccionados.</div>
+        <div className="card p-10 text-center text-sm text-surface-500">No hay Novedades Extracurriculares para los filtros seleccionados.</div>
       ) : (
         <div className="space-y-3">
           {filteredItems.map(({ estudiante, novedad }) => (

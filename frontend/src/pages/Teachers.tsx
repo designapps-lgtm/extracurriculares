@@ -38,8 +38,8 @@ export default function Teachers() {
   return (
     <div className="space-y-6">
       <div className="page-header">
-        <h1 className="page-title">Profesores</h1>
-        <p className="page-subtitle">{meta.total} profesores</p>
+        Profesores Extracurriculares
+        {meta.total} profesores de Extracurriculares
       </div>
 
       <div className="max-w-md relative">
@@ -76,7 +76,7 @@ export default function Teachers() {
       ) : error ? (
         <ErrorMessage message={error} onRetry={load} />
       ) : teachers.length === 0 ? (
-        <EmptyState message="No se encontraron profesores." />
+        <EmptyState message="No se encontraron profesores de Extracurriculares." />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {teachers.map((t) => (

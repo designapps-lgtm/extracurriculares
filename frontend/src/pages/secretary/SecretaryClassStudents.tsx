@@ -84,13 +84,13 @@ export default function SecretaryClassStudents({ role = "secretary" }: { role?: 
       <main className="max-w-3xl mx-auto px-4 py-6">
         <div className="card p-4 mb-4">
           <p className="text-xs text-surface-500">
-            Vista de solo lectura: podés ver los estudiantes de esta clase según el código y sus grados, sin tomar asistencia.
+            Vista de solo lectura: podés ver los estudiantes de Extracurriculares de esta clase según el código y sus grados, sin tomar asistencia.
           </p>
         </div>
 
         {data.students.length === 0 ? (
           <div className="card p-8 text-center text-sm text-surface-500">
-            No hay estudiantes inscritos en esta clase.
+            No hay estudiantes de Extracurriculares inscritos en esta clase.
           </div>
         ) : (
           <div className="space-y-1">

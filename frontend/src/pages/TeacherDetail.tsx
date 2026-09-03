@@ -97,7 +97,7 @@ export default function TeacherDetail() {
             d="M15 19l-7-7 7-7"
           />
         </svg>
-        Volver a profesores
+        Volver a Profesores Extracurriculares
       </Link>
 
       {/* Header card */}
@@ -159,8 +159,7 @@ export default function TeacherDetail() {
         {/* Disciplines */}
         <div className="card p-5">
           <h2 className="text-sm font-semibold text-surface-900 dark:text-surface-100 mb-3 font-display">
-            Disciplinas
-          </h2>
+Disciplinas Extracurriculares          </h2>
           {disciplines.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {disciplines.map((d) => (
@@ -204,8 +203,7 @@ export default function TeacherDetail() {
       {/* Assignments */}
       <div className="card p-5">
         <h2 className="text-sm font-semibold text-surface-900 dark:text-surface-100 mb-4 font-display">
-          Asignaciones
-        </h2>
+Asignaciones Extracurriculares        </h2>
         {assignments.length === 0 ? (
           <p className="text-sm text-surface-400 dark:text-surface-500">
             Sin asignaciones

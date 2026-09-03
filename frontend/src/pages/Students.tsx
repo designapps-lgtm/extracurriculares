@@ -99,10 +99,10 @@ export default function Students() {
         </div>
         <div className="relative">
           <h1 className="text-2xl sm:text-3xl font-display font-bold text-surface-900 dark:text-surface-50">
-            Estudiantes
+            Estudiantes Extracurriculares
           </h1>
           <p className="text-surface-600 dark:text-surface-400 text-sm mt-1.5">
-            {meta.total} estudiantes registrados en el sistema
+            {meta.total} estudiantes de Extracurriculares registrados en el sistema
           </p>
         </div>
       </div>

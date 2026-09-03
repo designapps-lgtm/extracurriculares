@@ -36,7 +36,7 @@ export default function TeacherAttendance() {
         );
       })
       .catch((err) => {
-        notify.error(err.message || "Error al cargar asistencia");
+        notify.error(err.message || "Error al cargar la Asistencia Extracurriculares");
         navigate("/teacher/dashboard");
       })
       .finally(() => setLoading(false));
@@ -90,6 +90,7 @@ export default function TeacherAttendance() {
           <div className="flex items-center gap-3 min-w-0">
             <Logo chip alt="Extracurriculares" className="h-9 w-auto shrink-0" />
             <div className="min-w-0">
+              <p className="text-xs font-medium text-brand-600 dark:text-brand-400 mb-1">Asistencia Extracurriculares</p>
               <button onClick={() => navigate("/teacher/dashboard")} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
                 ← Volver
               </button>

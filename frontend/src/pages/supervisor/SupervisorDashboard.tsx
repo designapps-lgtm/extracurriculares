@@ -33,7 +33,7 @@ type AttendanceFilters = {
 const EMPTY_FILTERS: AttendanceFilters = { fecha: todayBogota(), grado: "", disciplina: "", profesor: "" };
 
 function toQueryParams(filters: AttendanceFilters, role: RoleKind): Record<string, string> {
-  const params: Record<string, string> = { fecha: todayBogota() };
+  const params: Record<string, string> = { fecha: filters.fecha || todayBogota() };
   if ((role === "secretary" || role === "admin") && filters.grado) params.grado = filters.grado;
   if (filters.disciplina) params.disciplina = filters.disciplina;
   if (filters.profesor) params.profesor = filters.profesor;
@@ -86,7 +86,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
           if (err.message?.includes("401") || err.message?.includes("No autenticado")) {
             navigate("/");
           } else {
-            setListError(err.message || "No se pudieron cargar las asistencias.");
+            setListError(err.message || "No se pudieron cargar la Asistencia Extracurriculares.");
           }
         })
         .finally(() => {
@@ -118,8 +118,19 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
   const handleApplyFilters = () => {
     const nextFilters = {
       ...draftFilters,
-      grado: role === "secretary" ? draftFilters.grado : "",
+      grado: (role === "secretary" || role === "admin") ? draftFilters.grado : "",
     };
+    setAppliedFilters(nextFilters);
+    load(1, nextFilters);
+  };
+
+  const handleToday = () => {
+    const nextFilters = {
+      ...draftFilters,
+      fecha: todayBogota(),
+      grado: (role === "secretary" || role === "admin") ? draftFilters.grado : "",
+    };
+    setDraftFilters(nextFilters);
     setAppliedFilters(nextFilters);
     load(1, nextFilters);
   };
@@ -184,7 +195,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
                 {user?.nombre} {user?.apellido}
               </h1>
-              <p className="text-xs text-surface-500">Asistencias registradas por los profesores</p>
+              <p className="text-xs text-surface-500">Asistencia Extracurriculares registrada por los profesores</p>
             </div>
           </div>
         </div>
@@ -204,15 +215,24 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
           )}
           <div className={`grid gap-3 ${role === "secretary" ? "grid-cols-1 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"}`}>
             <div>
-              <label htmlFor="attendance-fecha" className="block text-xs font-medium text-surface-500 mb-1">Fecha de hoy</label>
-              <input
-                id="attendance-fecha"
-                type="date"
-                value={todayBogota()}
-                readOnly
-                disabled
-                className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 text-sm opacity-80"
-              />
+              <label htmlFor="attendance-fecha" className="block text-xs font-medium text-surface-500 mb-1">Fecha</label>
+              <div className="flex gap-2">
+                <input
+                  id="attendance-fecha"
+                  type="date"
+                  value={draftFilters.fecha}
+                  readOnly
+                  disabled
+                  className="min-w-0 flex-1 px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 text-sm opacity-80"
+                />
+                <button
+                  type="button"
+                  onClick={handleToday}
+                  className="px-3 py-2 rounded-xl border border-brand-600 text-brand-600 dark:text-brand-400 text-sm font-medium hover:bg-brand-50 dark:hover:bg-brand-900/20"
+                >
+                  Hoy
+                </button>
+              </div>
             </div>
             {role === "secretary" && (
               <div>
@@ -313,7 +333,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
             {loading ? (
               <div className="py-8">
                 <Loading />
-                <p className="mt-2 text-center text-sm text-surface-500">Cargando asistencias...</p>
+                <p className="mt-2 text-center text-sm text-surface-500">Cargando Asistencia Extracurriculares...</p>
               </div>
             ) : listError ? (
               <div className="text-center py-12 text-sm text-red-600 dark:text-red-400" role="alert">
@@ -321,7 +341,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
               </div>
             ) : visibleSessions.length === 0 ? (
               <div className="text-center py-12 text-sm text-surface-500" role="status">
-                No hay asistencias registradas con los filtros actuales.
+                No hay registros de Asistencia Extracurriculares con los filtros actuales.
               </div>
             ) : (
               <div className="space-y-3">
@@ -351,7 +371,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
                         </div>
                       </div>
                       <span className="text-sm text-brand-600 dark:text-brand-400 font-medium shrink-0">
-                        Ver asistencia →
+                        Ver Asistencia Extracurriculares →
                       </span>
                     </div>
                   </button>

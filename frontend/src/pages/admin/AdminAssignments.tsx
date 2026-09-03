@@ -265,7 +265,7 @@ export default function AdminAssignments() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">
-          Oferta Extracurricular
+          Oferta académica Extracurriculares
         </h1>
         <button
           onClick={openCreate}

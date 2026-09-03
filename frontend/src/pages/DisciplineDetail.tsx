@@ -103,7 +103,7 @@ export default function DisciplineDetail() {
             d="M15 19l-7-7 7-7"
           />
         </svg>
-        Volver a disciplinas
+        Volver a Disciplinas Extracurriculares
       </Link>
 
       {/* Header card */}
@@ -152,8 +152,7 @@ export default function DisciplineDetail() {
         {/* Teachers */}
         <div className="card p-5">
           <h2 className="text-sm font-semibold text-surface-900 dark:text-surface-100 mb-3 font-display">
-            Profesores
-          </h2>
+Profesores Extracurriculares          </h2>
           {teachers.length > 0 ? (
             <ul className="space-y-2.5">
               {teachers.map((t) => (

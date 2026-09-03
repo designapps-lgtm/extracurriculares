@@ -117,7 +117,7 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
               ← Volver
             </Link>
           </div>
-          <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">Asistencia</h1>
+          <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">Asistencia Extracurriculares</h1>
           <button onClick={() => navigate(`${basePath}/dashboard`)} className="text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300">
             Salir
           </button>
@@ -209,7 +209,7 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
         <div className="card overflow-hidden" aria-live="polite">
           {data.records.length === 0 ? (
             <div className="text-center py-12 text-sm text-surface-500">
-              Esta sesión no tiene registros de asistencia.
+              Esta sesión no tiene registros de Asistencia Extracurriculares.
             </div>
           ) : visibleRecords.length === 0 ? (
             <div className="text-center py-12 px-4 text-sm text-surface-500">

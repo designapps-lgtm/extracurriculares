@@ -244,7 +244,7 @@ export default function StudentProfile() {
       {/* Schedule grouped by day */}
       <div className="card p-6">
         <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-lg mb-5">
-          Horario extracurricular
+          Horario Extracurricular
         </h2>
 
         {groupedByDay.length > 0 ? (

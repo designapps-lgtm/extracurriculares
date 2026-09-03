@@ -172,7 +172,7 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
                 {user?.nombre} {user?.apellido}
               </h1>
               <p className="text-xs text-surface-500">
-                {showAll ? "Todas las clases de todos los profesores" : `Clases de hoy (${data?.dayName ?? ""})`}
+                {showAll ? "Todas las Clases Extracurriculares de todos los profesores" : `Clases Extracurriculares de hoy (${data?.dayName ?? ""})`}
                 {role !== "supervisor" && " · solo lectura"}
               </p>
             </div>
@@ -186,7 +186,7 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
             onClick={toggleAll}
             className="w-full px-4 py-2.5 border border-dashed border-brand-300 dark:border-brand-700 text-brand-600 dark:text-brand-400 text-sm font-medium rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20"
           >
-            Ver todas las listas de todos los profesores →
+            Ver todas las listas de Extracurriculares →
           </button>
         )}
 
@@ -209,8 +209,8 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
         {!loading && visibleByNivel.length === 0 && (
           <div className="card p-10 text-center text-sm text-surface-500">
             {showAll
-              ? "No hay clases registradas."
-              : "No hay clases programadas para hoy."}
+              ? "No hay Clases Extracurriculares registradas."
+              : "No hay Clases Extracurriculares programadas para hoy."}
           </div>
         )}
 
@@ -268,7 +268,7 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
                               onClick={() => handleViewClass(cls)}
                               className="w-full sm:w-auto px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl"
                             >
-                              Ver estudiantes
+                              Ver estudiantes Extracurriculares
                             </button>
                           ) : cls.sessionId ? (
                             <button

@@ -37,9 +37,9 @@ export default function Disciplines() {
   return (
     <div className="space-y-6">
       <div className="page-header">
-        <h1 className="page-title">Disciplinas</h1>
+        Disciplinas Extracurriculares
         <p className="page-subtitle">
-          {meta.total} disciplinas disponibles
+          {meta.total} disciplinas de Extracurriculares disponibles
         </p>
       </div>
 
@@ -77,7 +77,7 @@ export default function Disciplines() {
       ) : error ? (
         <ErrorMessage message={error} onRetry={load} />
       ) : disciplines.length === 0 ? (
-        <EmptyState message="No se encontraron disciplinas." />
+        <EmptyState message="No se encontraron disciplinas de Extracurriculares." />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {disciplines.map((d) => (

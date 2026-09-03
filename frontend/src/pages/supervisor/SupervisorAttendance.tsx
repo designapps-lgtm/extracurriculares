@@ -54,7 +54,7 @@ export default function SupervisorAttendance() {
         );
       })
       .catch((err) => {
-        notify.error(err.message || "Error al cargar asistencia");
+        notify.error(err.message || "Error al cargar la Asistencia Extracurriculares");
         navigate("/supervisor/classes");
       })
       .finally(() => setLoading(false));
@@ -76,7 +76,7 @@ export default function SupervisorAttendance() {
         .filter((s) => s.estado !== "pendiente")
         .map((s) => ({ codigoEstudiante: s.codigoEstudiante, estado: s.estado }));
       await supervisorSaveAttendance(sessionId, records);
-      notify.success("Asistencia guardada");
+      notify.success("Asistencia Extracurriculares guardada");
       navigate("/supervisor/classes");
     } catch (err: any) {
       notify.error(err.message || "Error al guardar");

@@ -91,7 +91,7 @@ export default function TeacherDashboard() {
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
                 {teacher?.nombre} {teacher?.apellido}
               </h1>
-              <p className="text-xs text-surface-500 truncate">Hoy es {DIAS_ES[dayName] || dayName} · {date}</p>
+              <p className="text-xs text-surface-500 truncate">Agenda de Extracurriculares · Hoy es {DIAS_ES[dayName] || dayName} · {date}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -114,7 +114,7 @@ export default function TeacherDashboard() {
             onClick={() => setShowAll(true)}
             className="w-full mb-6 px-4 py-2.5 border border-dashed border-brand-300 dark:border-brand-700 text-brand-600 dark:text-brand-400 text-sm font-medium rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/20"
           >
-            Ver todos los horarios asignados →
+            Ver todos los Horarios Extracurriculares →
           </button>
         )}
         {classes.length === 0 ? (
@@ -124,7 +124,7 @@ export default function TeacherDashboard() {
         ) : !hasVisibleClasses ? (
           <div className="card p-8 text-center space-y-3">
             <p className="text-surface-900 dark:text-surface-100 font-medium">No tienes clases para {showAll ? "mostrar" : "hoy"}.</p>
-            <p className="text-surface-500 text-sm">Puedes ver todos los horarios asignados para revisar las demás jornadas.</p>
+            <p className="text-surface-500 text-sm">Puedes ver todos los Horarios Extracurriculares para revisar las demás jornadas.</p>
             {!showAll && (
               <button
                 onClick={() => setShowAll(true)}

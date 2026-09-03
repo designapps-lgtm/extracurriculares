@@ -152,7 +152,7 @@ function ScheduleBlock({
         )}
 
         <p className="text-xs font-medium uppercase tracking-wide text-surface-400 mb-1 mt-4">
-          Registros de asistencia
+          Registros de Asistencia Extracurriculares
         </p>
         {sessions.length === 0 ? (
           <p className="text-sm text-surface-500">
@@ -317,7 +317,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">
                 {user?.nombre} {user?.apellido}
               </h1>
-              <p className="text-xs text-surface-500">Horarios de todos los profesores</p>
+              <p className="text-xs text-surface-500">Horarios Extracurriculares de todos los profesores</p>
             </div>
           </div>
         </div>
@@ -326,7 +326,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-display font-bold text-surface-900 dark:text-surface-100">
-            Horarios de los profesores
+            Horarios Extracurriculares de los profesores
           </h1>
           {!loading && (
             <span className="text-xs text-surface-400 shrink-0">
@@ -463,7 +463,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
                         </div>
                       )}
                       <span className="text-sm text-brand-600 dark:text-brand-400 font-medium">
-                        {a.teacher.nombre} {a.teacher.apellido} · Ver estudiantes →
+                        {a.teacher.nombre} {a.teacher.apellido} · Ver estudiantes Extracurriculares →
                       </span>
                     </div>
                   </div>

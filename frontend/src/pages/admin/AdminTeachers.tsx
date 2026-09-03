@@ -317,8 +317,7 @@ export default function AdminTeachers() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-display font-bold text-surface-900 dark:text-surface-100">
-          Profesores
-        </h1>
+Profesores Extracurriculares        </h1>
         <button
           onClick={() => {
             setShowCreate(true);
@@ -354,7 +353,7 @@ export default function AdminTeachers() {
           <Loading />
         ) : teachers.length === 0 ? (
           <div className="text-center py-12 text-sm text-surface-500">
-            No se encontraron profesores.
+            No se encontraron profesores de Extracurriculares.
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
