@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { roleApis, type RoleKind, type RoleUser, type RoleFilters } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
@@ -62,6 +62,8 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
   const [exportError, setExportError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = `${location.pathname}${location.search}`;
   const notify = useNotify();
 
   const load = useCallback(
@@ -349,7 +351,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() => navigate(`${basePath}/session/${s.id}`)}
+                    onClick={() => navigate(`${basePath}/session/${s.id}`, { state: { returnTo } })}
                     className="w-full text-left block bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 hover:border-brand-300 dark:hover:border-brand-700 transition-colors p-3 sm:p-4"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">

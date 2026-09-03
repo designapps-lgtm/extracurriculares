@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getTeacherClasses, startSession } from "../../services/teacher";
 import { logout } from "../../services/auth";
 import { useNotify } from "../../components/common/Notify";
@@ -21,6 +21,8 @@ export default function TeacherDashboard() {
   const [starting, setStarting] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = `${location.pathname}${location.search}`;
   const notify = useNotify();
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export default function TeacherDashboard() {
         idAsignacion: cls.idAsignacion,
         idHorario: cls.schedule.idHorario,
       });
-      navigate(`/teacher/session/${session.id}`);
+      navigate(`/teacher/session/${session.id}`, { state: { returnTo } });
     } catch (err: any) {
       notify.error(err.message || "Error al iniciar sesión");
     } finally {
@@ -157,7 +159,7 @@ export default function TeacherDashboard() {
                       return (
                         <div
                           key={key}
-                          onClick={cls.sessionId ? () => navigate(`/teacher/session/${cls.sessionId}`) : undefined}
+                          onClick={cls.sessionId ? () => navigate(`/teacher/session/${cls.sessionId}`, { state: { returnTo } }) : undefined}
                           className={`card p-4 ${isToday ? "ring-2 ring-brand-200 dark:ring-brand-800" : ""} ${
                             cls.sessionId ? "cursor-pointer transition-colors hover:bg-surface-50 dark:hover:bg-surface-800/60" : ""
                           }`}
@@ -187,7 +189,7 @@ export default function TeacherDashboard() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    navigate(`/teacher/session/${cls.sessionId}`);
+                                    navigate(`/teacher/session/${cls.sessionId}`, { state: { returnTo } });
                                   }}
                                   className="w-full sm:w-auto px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600"
                                 >

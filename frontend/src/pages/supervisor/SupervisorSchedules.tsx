@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { roleApis, type RoleKind, type RoleUser } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
@@ -192,6 +192,8 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
   const [startingKey, setStartingKey] = useState<string | null>(null);
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = `${location.pathname}${location.search}`;
   const notify = useNotify();
 
   const load = useCallback(() => {
@@ -235,7 +237,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
     setStartingKey(key);
     try {
       const session = await api.startSession({ idAsignacion: a.idAsignacion, idHorario });
-      navigate(`${basePath}/session-attendance/${session.id}`);
+      navigate(`${basePath}/session-attendance/${session.id}`, { state: { returnTo } });
     } catch (err: any) {
       notify.error(err.message || "Error al iniciar la sesión");
     } finally {
@@ -516,7 +518,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
                     schedule={h.schedule}
                     students={h.students}
                     sessions={h.sessions}
-                    onViewSession={(sessionId) => navigate(`${basePath}/session/${sessionId}`)}
+                    onViewSession={(sessionId) => navigate(`${basePath}/session/${sessionId}`, { state: { returnTo } })}
                   />
                 ))
               )}

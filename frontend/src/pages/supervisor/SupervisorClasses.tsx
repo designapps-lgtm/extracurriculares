@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { roleApis, type RoleKind, type RoleUser } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
@@ -29,6 +29,8 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
   const [niveles, setNiveles] = useState<Nivel[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = `${location.pathname}${location.search}`;
   const notify = useNotify();
 
   const load = useCallback(() => {
@@ -83,7 +85,7 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
         idAsignacion: cls.idAsignacion,
         idHorario: cls.schedule.idHorario,
       });
-      navigate(`${basePath}/session-attendance/${session.id}`);
+      navigate(`${basePath}/session-attendance/${session.id}`, { state: { returnTo } });
     } catch (err: any) {
       notify.error(err.message || "Error al iniciar sesión");
     } finally {
@@ -280,7 +282,7 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
                             </button>
                           ) : cls.sessionId ? (
                             <button
-                              onClick={() => navigate(`${basePath}/session-attendance/${cls.sessionId}`)}
+                              onClick={() => navigate(`${basePath}/session-attendance/${cls.sessionId}`, { state: { returnTo } })}
                               className="w-full sm:w-auto px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600"
                             >
                               Continuar Asistencia Extracurriculares

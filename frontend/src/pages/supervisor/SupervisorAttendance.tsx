@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { roleApis, type RoleKind } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import Logo from "../../components/common/Logo";
@@ -11,6 +11,8 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
   const api = roleApis[role];
   const basePath = role === "admin" ? "/admin" : "/supervisor";
   const { sessionId } = useParams<{ sessionId: string }>();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || `${basePath}/classes`;
   const navigate = useNavigate();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
@@ -45,7 +47,7 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
       })
       .catch((err) => {
         notify.error(err.message || "Error al cargar la Asistencia Extracurriculares");
-        navigate(`${basePath}/classes`);
+        navigate(returnTo);
       })
       .finally(() => setLoading(false));
   }, [sessionId, navigate]);
@@ -67,7 +69,7 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
         .map((s) => ({ codigoEstudiante: s.codigoEstudiante, estado: s.estado }));
       await api.saveAttendance!(sessionId, records);
       notify.success("Asistencia Extracurriculares guardada");
-      navigate(`${basePath}/classes`);
+      navigate(returnTo);
     } catch (err: any) {
       notify.error(err.message || "Error al guardar");
     } finally {
@@ -113,7 +115,7 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
           <div className="flex items-center gap-3 min-w-0">
             <Logo chip alt="Extracurriculares" className="h-9 w-auto shrink-0" />
             <div className="min-w-0">
-              <button onClick={() => navigate(`${basePath}/classes`)} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
+              <button onClick={() => navigate(returnTo)} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
                 ← Volver
               </button>
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 break-words">

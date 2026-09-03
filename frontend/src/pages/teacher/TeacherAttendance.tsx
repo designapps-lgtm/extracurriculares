@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getAttendanceList, saveAttendance, getNovedadesBatch } from "../../services/teacher";
 import { useNotify } from "../../components/common/Notify";
 import Logo from "../../components/common/Logo";
@@ -8,6 +8,8 @@ import type { AttendanceStudent as Student, Schedule, Assignment, Novedad } from
 
 export default function TeacherAttendance() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || "/teacher/dashboard";
   const navigate = useNavigate();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
@@ -37,7 +39,7 @@ export default function TeacherAttendance() {
       })
       .catch((err) => {
         notify.error(err.message || "Error al cargar la Asistencia Extracurriculares");
-        navigate("/teacher/dashboard");
+        navigate(returnTo);
       })
       .finally(() => setLoading(false));
   }, [sessionId, navigate]);
@@ -58,7 +60,7 @@ export default function TeacherAttendance() {
         .filter((s) => s.estado !== "pendiente")
         .map((s) => ({ codigoEstudiante: s.codigoEstudiante, estado: s.estado }));
       await saveAttendance(sessionId, records);
-      navigate("/teacher/dashboard");
+      navigate(returnTo);
     } catch (err: any) {
       notify.error(err.message || "Error al guardar");
     } finally {
@@ -91,7 +93,7 @@ export default function TeacherAttendance() {
             <Logo chip alt="Extracurriculares" className="h-9 w-auto shrink-0" />
             <div className="min-w-0">
               <p className="text-xs font-medium text-brand-600 dark:text-brand-400 mb-1">Asistencia Extracurriculares</p>
-              <button onClick={() => navigate("/teacher/dashboard")} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
+              <button onClick={() => navigate(returnTo)} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
                 ← Volver
               </button>
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 break-words">

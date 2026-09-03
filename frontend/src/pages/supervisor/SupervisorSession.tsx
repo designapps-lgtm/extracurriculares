@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, Link, useLocation } from "react-router-dom";
 import { roleApis, type RoleKind } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
@@ -28,6 +28,8 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
   const api = roleApis[role];
   const basePath = role === "secretary" ? "/secretary" : role === "admin" ? "/admin" : "/supervisor";
   const { sessionId } = useParams<{ sessionId: string }>();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || `${basePath}/dashboard`;
   const [data, setData] = useState<SupervisorSessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -134,12 +136,12 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
         <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Logo chip alt="Extracurriculares" className="h-8 w-auto shrink-0" />
-            <Link to={`${basePath}/dashboard`} className="text-sm text-brand-600 dark:text-brand-400 font-medium hover:underline">
+            <Link to={returnTo} className="text-sm text-brand-600 dark:text-brand-400 font-medium hover:underline">
               ← Volver
             </Link>
           </div>
           <h1 className="order-3 sm:order-none basis-full sm:basis-auto sm:flex-1 min-w-0 text-center text-base sm:text-lg font-display font-bold text-surface-900 dark:text-surface-100 truncate">Asistencia Extracurriculares</h1>
-          <button onClick={() => navigate(`${basePath}/dashboard`)} className="shrink-0 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300">
+          <button onClick={() => navigate(returnTo)} className="shrink-0 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300">
             Salir
           </button>
         </div>
