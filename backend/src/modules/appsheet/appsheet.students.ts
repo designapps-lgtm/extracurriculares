@@ -152,8 +152,10 @@ function failedSync(
 function validateMappedStudents(rows: AppSheetRow[], students: MappedStudent[]): string[] {
   const errors: string[] = [];
   const missingBarcode = rows.length - students.length;
-  if (missingBarcode > 0) {
-    errors.push(`${missingBarcode} fila(s) no tienen BARCODE; se descartó el lote completo`);
+  // AppSheet puede devolver filas vacías del rango usado en Google Sheets.
+  // No deben invalidar el lote completo: sólo se descartan esas filas sin BARCODE.
+  if (students.length === 0) {
+    errors.push("AppSheet no devolvió ninguna fila válida con BARCODE; no se aplicó ningún cambio");
   }
 
   const seen = new Set<string>();
