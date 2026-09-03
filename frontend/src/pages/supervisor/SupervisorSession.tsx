@@ -144,7 +144,6 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
               Ausentes: {counts.ausente || 0}
             </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
-              Justificados: {counts.justificado || 0}
             </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400">
               Total: {data.records.length}

@@ -112,7 +112,6 @@ export default function SupervisorAttendance() {
 
   const presentCount = students.filter((s) => s.estado === "presente").length;
   const absentCount = students.filter((s) => s.estado === "ausente").length;
-  const justifiedCount = students.filter((s) => s.estado === "justificado").length;
   const pendingCount = students.filter((s) => s.estado === "pendiente").length;
 
   return (
@@ -140,7 +139,6 @@ export default function SupervisorAttendance() {
           <div className="text-right text-xs text-surface-500 shrink-0">
             <p>{presentCount} presentes</p>
             <p>{absentCount} ausentes</p>
-            {justifiedCount > 0 && <p>{justifiedCount} justificados</p>}
             {pendingCount > 0 && <p className="text-amber-600">{pendingCount} pendientes</p>}
           </div>
         </div>
