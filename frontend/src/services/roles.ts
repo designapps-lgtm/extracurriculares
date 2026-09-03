@@ -7,7 +7,6 @@ import type {
   SupervisorAssignmentHistory,
   SupervisorStay,
   SupervisorStayStudent,
-  SupervisorTransfer,
   SupervisorClassesResponse,
   StudentNovedades,
   Novedad,
@@ -44,16 +43,6 @@ export interface DailyNovedad {
   novedad: Novedad;
 }
 
-export interface TransferCreatePayload {
-  codigoEstudiante: string;
-  idAsignacionOrigen: string;
-  idAsignacionDestino: string;
-  idHorarioDestino: string;
-  fecha: string;
-  fechaFin?: string;
-  motivo: string;
-}
-
 export interface RoleApi {
   role: RoleKind;
   label: string;
@@ -65,20 +54,16 @@ export interface RoleApi {
   exportSession: (sessionId: string) => Promise<Blob>;
   getTeacherSchedules: () => Promise<SupervisorTeacherSchedule[]>;
   getAssignmentHistory: (asignacionId: string) => Promise<SupervisorAssignmentHistory>;
-  listTransfers: (params?: { codigoEstudiante?: string; fecha?: string; fechaFin?: string }) => Promise<SupervisorTransfer[]>;
   getNovedadesBatch: (codigos: string[], fecha?: string) => Promise<StudentNovedades[]>;
   getNovedadesDiarias: (params?: { fecha?: string; grado?: string }) => Promise<DailyNovedad[]>;
-  // Capacidades: solo el supervisor llama lista y gestiona traslados/niños que se quedan.
+  // Capacidades: solo el supervisor llama lista y gestiona niños que se quedan.
   canCallList: boolean;
-  canManageTransfers: boolean;
   canManageStays: boolean;
   // Vista "Llamar lista": el supervisor la usa para llamar; la secretaria para visualizar.
   getClasses: (todayOnly?: boolean) => Promise<SupervisorClassesResponse>;
   getClassStudents?: (asignacionId: string, horarioId: string) => Promise<SecretaryClassStudentsData>;
   // Operaciones de escritura (solo supervisor; undefined en secretaria).
   startSession?: (data: { idAsignacion: string; idHorario: string }) => Promise<{ id: string }>;
-  createTransfer?: (data: TransferCreatePayload) => Promise<{ id: string }>;
-  deleteTransfer?: (id: string) => Promise<void>;
   searchStudents?: (q: string) => Promise<SupervisorStayStudent[]>;
   getStays?: (idAsignacion: string, idHorario: string, fecha: string) => Promise<SupervisorStay[]>;
 }
@@ -97,16 +82,12 @@ const supervisorRole: RoleApi = {
   exportSession: supervisorApi.exportSupervisorSession,
   getTeacherSchedules: supervisorApi.getSupervisorTeacherSchedules,
   getAssignmentHistory: supervisorApi.getSupervisorAssignmentHistory,
-  listTransfers: supervisorApi.listSupervisorTransfers,
   getNovedadesBatch: supervisorApi.getSupervisorNovedadesBatch,
   getNovedadesDiarias: supervisorApi.getSupervisorNovedadesDiarias,
   canCallList: true,
-  canManageTransfers: true,
   canManageStays: true,
   getClasses: supervisorApi.getSupervisorClasses,
   startSession: supervisorApi.supervisorStartSession,
-  createTransfer: supervisorApi.createSupervisorTransfer,
-  deleteTransfer: supervisorApi.deleteSupervisorTransfer,
   searchStudents: supervisorApi.searchSupervisorStudents,
   getStays: supervisorApi.getSupervisorStays,
 };
@@ -125,11 +106,9 @@ const secretaryRole: RoleApi = {
   exportSession: secretaryApi.exportSecretarySession,
   getTeacherSchedules: secretaryApi.getSecretaryTeacherSchedules,
   getAssignmentHistory: secretaryApi.getSecretaryAssignmentHistory,
-  listTransfers: secretaryApi.listSecretaryTransfers,
   getNovedadesBatch: secretaryApi.getSecretaryNovedadesBatch,
   getNovedadesDiarias: secretaryApi.getSecretaryNovedadesDiarias,
   canCallList: false,
-  canManageTransfers: false,
   canManageStays: false,
   getClasses: secretaryApi.getSecretaryClasses,
   getClassStudents: secretaryApi.getSecretaryClassStudents,
@@ -146,11 +125,9 @@ const adminRole: RoleApi = {
   exportSession: adminApi.exportAdminSession,
   getTeacherSchedules: adminApi.getAdminTeacherSchedules,
   getAssignmentHistory: adminApi.getAdminAssignmentHistory,
-  listTransfers: adminApi.listAdminTransfers,
   getNovedadesBatch: adminApi.getAdminNovedadesBatch,
   getNovedadesDiarias: adminApi.getAdminDailyNovedades,
   canCallList: false,
-  canManageTransfers: false,
   canManageStays: false,
   getClasses: adminApi.getAdminClasses,
   getClassStudents: adminApi.getAdminClassStudents,

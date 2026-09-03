@@ -118,9 +118,6 @@ export default function SecretaryClassStudents({ role = "secretary" }: { role?: 
                       <p className="text-xs text-surface-500">
                         {student.codigoEstudiante} · Grado {student.gradoNombre || "—"} · {student.grupo || "—"}
                         {student.origen === "quedado" && <span className="ml-1 text-brand-600">· Se queda</span>}
-                        {student.origen === "trasladado" && (
-                          <span className="ml-1 text-violet-600">· Trasladado a esta clase</span>
-                        )}
                       </p>
                     </div>
                   </div>

@@ -8,7 +8,7 @@ import {
 import { useNotify } from "../../components/common/Notify";
 import Logo from "../../components/common/Logo";
 import { Avatar } from "../../components/common/Avatar";
-import type { AttendanceStudent as Student, Schedule, Assignment, Novedad, AttendanceResponse } from "../../types";
+import type { AttendanceStudent as Student, Schedule, Assignment, Novedad } from "../../types";
 
 function todayBogotaStr(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -27,8 +27,6 @@ export default function SupervisorAttendance() {
   const [teacher, setTeacher] = useState<{ nombre: string; apellido: string } | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [novedadesMap, setNovedadesMap] = useState<Record<string, Novedad[]>>({});
-  const [transfers, setTransfers] = useState<NonNullable<AttendanceResponse["transfers"]>>([]);
-  const transferCount = transfers.length;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -42,7 +40,6 @@ export default function SupervisorAttendance() {
         setSchedule(data.schedule);
         setTeacher(data.teacher ?? null);
         setStudents(data.students);
-        setTransfers(data.transfers ?? []);
         const codigos = data.students.map((s) => s.codigoEstudiante);
         if (codigos.length === 0) return;
         const novedades = await getSupervisorNovedadesBatch(codigos, todayBogotaStr());
@@ -195,29 +192,6 @@ export default function SupervisorAttendance() {
           );
         })()}
 
-        <section className="card p-5 mb-6">
-          <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base mb-3">
-            Cambios de disciplina del día
-          </h2>
-          {transferCount === 0 ? (
-            <p className="text-sm text-surface-500">No hay cambios de disciplina registrados para este día.</p>
-          ) : (
-            <div className="space-y-2">
-              {transfers.map((t) => (
-                <div key={t.id} className="rounded-lg bg-violet-50 dark:bg-violet-900/30 border border-violet-200 dark:border-violet-800 px-3 py-2 text-xs">
-                  <p className="text-violet-900 dark:text-violet-200 font-semibold">
-                    {t.student.nombre} {t.student.apellido} {t.student.grupo ? `· ${t.student.grupo}` : ""}
-                  </p>
-                  <p className="text-violet-700 dark:text-violet-400 mt-0.5">
-                    {t.origen.nombre || t.origen.codigoDisciplina || "Clase de origen"} → {t.destino.nombre || t.destino.codigoDisciplina || "Clase de destino"}
-                  </p>
-                  {t.motivo && <p className="text-violet-600 dark:text-violet-300 mt-0.5 italic">“{t.motivo}”</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
         <div className="space-y-1">
           {students.map((student, i) => {
             const novedades = novedadesMap[student.codigoEstudiante] || [];
@@ -256,9 +230,6 @@ export default function SupervisorAttendance() {
                       <p className="text-xs text-surface-500">
                         {student.codigoEstudiante} · {student.gradoNombre ? `Grado ${student.gradoNombre} · ` : ""}{student.grupo || "—"}
                         {student.origen === "quedado" && <span className="ml-1 text-brand-600">· Se queda</span>}
-                        {student.origen === "trasladado" && (
-                          <span className="ml-1 text-violet-600">· Trasladado desde {student.origenDisciplina || "otra clase"}</span>
-                        )}
                       </p>
                       {novedades.length > 0 && (
                         <div className="mt-2 space-y-1.5">

@@ -12,7 +12,6 @@ import {
   getSupervisorAssignmentHistory,
   searchSupervisorStudents,
   getSupervisorStays,
-  listSupervisorTransfers,
   getSupervisorClasses,
 } from "../supervisor/supervisor.service";
 import { getSecretaryClassStudents } from "./secretary.service";
@@ -23,7 +22,7 @@ const router = Router();
 router.use(authenticateSecretary, requireActiveSecretary);
 
 // La secretaria solo visualiza: no inicia sesiones, no toma asistencia,
-// no crea ni elimina stays/traslados.
+// ni crea ni elimina stays.
 
 // Vista "Llamar lista" de solo lectura: las clases del día con sus grados.
 router.get("/classes", asyncHandler(getSupervisorClasses));
@@ -49,9 +48,5 @@ router.get("/schedules/:asignacionId", asyncHandler(getSupervisorAssignmentHisto
 
 // Niños que se quedan (solo lectura)
 router.get("/stays/search", asyncHandler(searchSupervisorStudents));
-router.get("/stays", asyncHandler(getSupervisorStays));
-
-// Traslados (solo lectura)
-router.get("/transfers", asyncHandler(listSupervisorTransfers));
 
 export { router as secretaryDashboardRouter };

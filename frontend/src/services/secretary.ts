@@ -9,7 +9,6 @@ import type {
   SupervisorAssignmentHistory,
   SupervisorStay,
   SupervisorStayStudent,
-  SupervisorTransfer,
   SupervisorClassesResponse,
   AttendanceStudent,
   Schedule,
@@ -105,19 +104,6 @@ export async function getSecretaryStays(
   fecha: string,
 ): Promise<SupervisorStay[]> {
   const res = await api.get<ApiResponse<SupervisorStay[]>>("/api/secretary/stays", { idAsignacion, idHorario, fecha });
-  return res.data;
-}
-
-export async function listSecretaryTransfers(params?: {
-  codigoEstudiante?: string;
-  fecha?: string;
-  fechaFin?: string;
-}): Promise<SupervisorTransfer[]> {
-  const res = await api.get<ApiResponse<SupervisorTransfer[]>>(`/api/secretary/transfers`, {
-    codigoEstudiante: params?.codigoEstudiante || "",
-    fecha: params?.fecha || "",
-    fechaFin: params?.fechaFin || "",
-  });
   return res.data;
 }
 

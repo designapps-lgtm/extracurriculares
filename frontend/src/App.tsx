@@ -28,7 +28,6 @@ import SupervisorClasses from "./pages/supervisor/SupervisorClasses";
 import SupervisorAttendance from "./pages/supervisor/SupervisorAttendance";
 import SupervisorNovedad from "./pages/supervisor/SupervisorNovedad";
 import SupervisorDailyNovedades from "./pages/supervisor/SupervisorDailyNovedades";
-import SupervisorTransfers from "./pages/supervisor/SupervisorTransfers";
 import SupervisorLayout from "./pages/supervisor/SupervisorLayout";
 
 // Secretary
@@ -39,7 +38,6 @@ import SecretaryClassStudents from "./pages/secretary/SecretaryClassStudents";
 import SecretarySchedules from "./pages/secretary/SecretarySchedules";
 import SecretarySession from "./pages/secretary/SecretarySession";
 import SecretaryNovedad from "./pages/secretary/SecretaryNovedad";
-import SecretaryTransfers from "./pages/secretary/SecretaryTransfers";
 
 // Admin
 import AdminSupervisors from "./pages/admin/AdminSupervisors";
@@ -79,7 +77,6 @@ function App() {
         <Route path="session-attendance/:sessionId" element={<SupervisorAttendance />} />
         <Route path="novedad/:codigoEstudiante" element={<SupervisorNovedad />} />
         <Route path="novedades" element={<SupervisorDailyNovedades />} />
-        <Route path="transfers" element={<SupervisorTransfers />} />
       </Route>
 
       {/* Secretary routes — mismo flujo que supervisor sin llamar lista ni gestión */}
@@ -92,7 +89,6 @@ function App() {
         <Route path="session/:sessionId" element={<SecretarySession />} />
         <Route path="novedad/:codigoEstudiante" element={<SecretaryNovedad />} />
         <Route path="novedades" element={<SupervisorDailyNovedades role="secretary" />} />
-        <Route path="transfers" element={<SecretaryTransfers />} />
       </Route>
 
       {/* Admin routes — AdminLayout handles auth + sidebar */}
@@ -106,7 +102,6 @@ function App() {
         <Route path="session/:sessionId" element={<SupervisorSession role="admin" />} />
         <Route path="novedad/:codigoEstudiante" element={<SupervisorNovedad role="admin" />} />
         <Route path="novedades" element={<SupervisorDailyNovedades role="admin" />} />
-        <Route path="transfers" element={<SupervisorTransfers role="admin" />} />
         <Route path="students" element={<AdminStudents />} />
         <Route path="students/:codigo" element={<StudentProfile />} />
         <Route path="disciplines" element={<Disciplines />} />

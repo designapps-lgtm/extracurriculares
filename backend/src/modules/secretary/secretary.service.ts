@@ -81,28 +81,6 @@ export async function getSecretaryClassStudents(req: Request, res: Response) {
     codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null; idGrado: number;
   }>;
 
-  // Traslados activos que afectan a esta clase (origen o destino) en la fecha de hoy.
-  const transfers = (await sql`
-    SELECT
-      t."codigoEstudiante", t."idAsignacionOrigen",
-      s."nombre", s."apellido", s."grupo", s."fotoUrl", s."idGrado"
-    FROM "StudentTransfer" t
-    LEFT JOIN "Student" s ON s."codigoEstudiante" = t."codigoEstudiante"
-    WHERE (t."idAsignacionOrigen" = ${idAsignacion} OR t."idAsignacionDestino" = ${idAsignacion})
-      AND t."fecha" <= ${todayStr}::date
-      AND COALESCE(t."fechaFin", t."fecha") >= ${todayStr}::date
-  `) as unknown as Array<{
-    codigoEstudiante: string; idAsignacionOrigen: string;
-    nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null; idGrado: number;
-  }>;
-
-  const awaySet = new Set(
-    transfers.filter((t) => t.idAsignacionOrigen === idAsignacion).map((t) => t.codigoEstudiante)
-  );
-  const inSet = new Map(
-    transfers.filter((t) => t.idAsignacionOrigen !== idAsignacion).map((t) => [t.codigoEstudiante, t])
-  );
-
   const stays = (await sql`
     SELECT
       st."codigoEstudiante",
@@ -117,9 +95,7 @@ export async function getSecretaryClassStudents(req: Request, res: Response) {
   }>;
 
   const students = [
-    ...enrolledStudents
-      .filter((es) => !awaySet.has(es.codigoEstudiante))
-      .map((es) => ({
+    ...enrolledStudents.map((es) => ({
         codigoEstudiante: es.codigoEstudiante,
         nombre: es.nombre,
         apellido: es.apellido,
@@ -129,7 +105,7 @@ export async function getSecretaryClassStudents(req: Request, res: Response) {
         origen: "inscrito" as const,
       })),
     ...stays
-      .filter((st) => !awaySet.has(st.codigoEstudiante) && !enrolledStudents.some((e) => e.codigoEstudiante === st.codigoEstudiante))
+      .filter((st) => !enrolledStudents.some((e) => e.codigoEstudiante === st.codigoEstudiante))
       .map((st) => ({
         codigoEstudiante: st.codigoEstudiante,
         nombre: st.nombre,
@@ -139,15 +115,6 @@ export async function getSecretaryClassStudents(req: Request, res: Response) {
         gradoNombre: gradeNameMap.get(st.idGrado) ?? String(st.idGrado),
         origen: "quedado" as const,
       })),
-    ...Array.from(inSet.entries()).map(([, t]) => ({
-      codigoEstudiante: t.codigoEstudiante,
-      nombre: t.nombre,
-      apellido: t.apellido,
-      grupo: t.grupo,
-      fotoUrl: t.fotoUrl,
-      gradoNombre: gradeNameMap.get(t.idGrado) ?? String(t.idGrado),
-      origen: "trasladado" as const,
-    })),
   ];
 
   res.json({

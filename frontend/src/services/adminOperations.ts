@@ -9,7 +9,6 @@ import type {
   SupervisorAssignmentHistory,
   SupervisorStay,
   SupervisorStayStudent,
-  SupervisorTransfer,
   SupervisorClassesResponse,
   StudentNovedades,
 } from "../types";
@@ -77,15 +76,6 @@ export async function getAdminStays(idAsignacion: string, idHorario: string, fec
 
 export async function searchAdminStudents(q: string): Promise<SupervisorStayStudent[]> {
   const res = await api.get<ApiResponse<SupervisorStayStudent[]>>(`${base}/stays/search`, { q });
-  return res.data;
-}
-
-export async function listAdminTransfers(params?: { codigoEstudiante?: string; fecha?: string; fechaFin?: string }): Promise<SupervisorTransfer[]> {
-  const res = await api.get<ApiResponse<SupervisorTransfer[]>>(`${base}/transfers`, {
-    codigoEstudiante: params?.codigoEstudiante || "",
-    fecha: params?.fecha || "",
-    fechaFin: params?.fechaFin || "",
-  });
   return res.data;
 }
 

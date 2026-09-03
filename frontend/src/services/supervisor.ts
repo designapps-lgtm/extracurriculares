@@ -13,7 +13,6 @@ import type {
   SupervisorClassesResponse,
   AttendanceResponse,
   StudentNovedades,
-  SupervisorTransfer,
 } from "../types";
 
 export async function supervisorLogout(): Promise<void> {
@@ -168,34 +167,4 @@ export async function getSupervisorNovedadesDiarias(params?: { fecha?: string; g
     fecha: params?.fecha || "",
     grado: params?.grado || "",
   })).data;
-}
-
-export async function listSupervisorTransfers(params?: {
-  codigoEstudiante?: string;
-  fecha?: string;
-  fechaFin?: string;
-}): Promise<SupervisorTransfer[]> {
-  const res = await api.get<ApiResponse<SupervisorTransfer[]>>(`/api/supervisor/transfers`, {
-    codigoEstudiante: params?.codigoEstudiante || "",
-    fecha: params?.fecha || "",
-    fechaFin: params?.fechaFin || "",
-  });
-  return res.data;
-}
-
-export async function createSupervisorTransfer(data: {
-  codigoEstudiante: string;
-  idAsignacionOrigen: string;
-  idAsignacionDestino: string;
-  idHorarioDestino: string;
-  fecha: string;
-  fechaFin?: string;
-  motivo: string;
-}): Promise<{ id: string }> {
-  const res = await api.post<ApiResponse<{ id: string }>>(`/api/supervisor/transfers`, data);
-  return res.data;
-}
-
-export async function deleteSupervisorTransfer(id: string): Promise<void> {
-  await api.delete<ApiResponse<{ id: string }>>(`/api/supervisor/transfers/${id}`);
 }

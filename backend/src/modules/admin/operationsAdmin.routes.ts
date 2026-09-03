@@ -12,7 +12,6 @@ import {
   searchSupervisorStudents,
   getSupervisorStays,
   getSupervisorClasses,
-  listSupervisorTransfers,
 } from "../supervisor/supervisor.service";
 import { getSecretaryClassStudents } from "../secretary/secretary.service";
 import { getNovedadesBatch, getNovedadesDiarias } from "../novedades/novedades.controller";
@@ -34,6 +33,5 @@ router.get("/schedules/:asignacionId", asyncHandler(getSupervisorAssignmentHisto
 router.get("/filters", asyncHandler(getSupervisorFilters));
 router.get("/stays/search", asyncHandler(searchSupervisorStudents));
 router.get("/stays", asyncHandler(getSupervisorStays));
-router.get("/transfers", asyncHandler(listSupervisorTransfers));
 
 export { router as adminOperationsRouter };

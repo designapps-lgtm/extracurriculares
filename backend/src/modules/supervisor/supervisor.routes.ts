@@ -18,9 +18,6 @@ import {
   supervisorStartSession,
   getSupervisorAttendanceList,
   supervisorSaveAttendance,
-  createSupervisorTransfer,
-  listSupervisorTransfers,
-  deleteSupervisorTransfer,
 } from "./supervisor.service";
 import { getNovedadesBatch, getNovedadesDiarias } from "../novedades/novedades.controller";
 
@@ -43,11 +40,6 @@ router.get("/stays/search", asyncHandler(searchSupervisorStudents));
 router.get("/stays", asyncHandler(getSupervisorStays));
 router.post("/stays", asyncHandler(createSupervisorStay));
 router.delete("/stays/:stayId", asyncHandler(deleteSupervisorStay));
-
-// Traslados de estudiantes por fecha (trazabilidad)
-router.get("/transfers", asyncHandler(listSupervisorTransfers));
-router.post("/transfers", asyncHandler(createSupervisorTransfer));
-router.delete("/transfers/:id", asyncHandler(deleteSupervisorTransfer));
 
 router.get("/schedules", asyncHandler(getSupervisorTeacherSchedules));
 router.get("/schedules/:asignacionId/:horarioId", asyncHandler(getSupervisorScheduleHistory));
