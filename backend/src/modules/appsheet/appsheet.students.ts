@@ -1,5 +1,5 @@
 import { config } from "../../config";
-import { importStudents } from "../../import/excel/studentImporter";
+import { importStudentsBulk } from "../../import/excel/studentImporter";
 import { normalizeStudentName, type MappedStudent } from "../../import/excel/excelMapper";
 import { findAppSheetRows, type AppSheetRow } from "./appsheet.service";
 
@@ -204,7 +204,7 @@ async function runAppSheetStudentsSync(): Promise<AppSheetStudentSyncResult> {
 
   let result;
   try {
-    result = await importStudents(students, false, {
+    result = await importStudentsBulk(students, false, {
       // Un snapshot AppSheet sin un indicador de completitud no permite saber
       // si una fila ausente fue eliminada o si la respuesta llegó truncada.
       // Los estados explícitos del origen sí se actualizan; no desactivamos por
