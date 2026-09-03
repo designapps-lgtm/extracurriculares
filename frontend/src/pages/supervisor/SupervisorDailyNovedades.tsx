@@ -39,9 +39,9 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
   const [loading, setLoading] = useState(true);
   const notify = useNotify();
 
-  const load = () => {
+  const load = (filters: { fecha?: string; grado?: string } = {}) => {
     setLoading(true);
-    api.getNovedadesDiarias({ fecha, grado })
+    api.getNovedadesDiarias({ fecha: filters.fecha ?? fecha, grado: filters.grado ?? grado })
       .then(setItems)
       .catch((error: any) => notify.error(error.message || "No se pudieron cargar las novedades"))
       .finally(() => setLoading(false));
@@ -90,7 +90,10 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
       <div className="card p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
         <div className="flex-1">
           <label className="block text-xs font-medium text-surface-500 mb-1">Fecha</label>
-          <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm" />
+          <div className="flex gap-2">
+            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="min-w-0 flex-1 px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm" />
+            <button type="button" onClick={() => { const current = today(); setFecha(current); load({ fecha: current }); }} className="px-3 py-2 rounded-xl border border-brand-600 text-brand-600 dark:text-brand-400 text-sm font-medium hover:bg-brand-50 dark:hover:bg-brand-900/20">Hoy</button>
+          </div>
         </div>
         <div className="flex-1">
           <label className="block text-xs font-medium text-surface-500 mb-1">Grado</label>
@@ -99,7 +102,7 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
             {grados.map((g) => <option key={g} value={g}>Grado {g}</option>)}
           </select>
         </div>
-        <button onClick={load} className="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium hover:bg-brand-700">Filtrar</button>
+        <button onClick={() => load()} className="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-medium hover:bg-brand-700">Filtrar</button>
       </div>
 
       <div className="card p-4 space-y-4">
