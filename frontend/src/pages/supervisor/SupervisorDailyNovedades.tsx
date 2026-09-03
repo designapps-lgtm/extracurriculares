@@ -139,14 +139,22 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
                   <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100">{estudiante.nombre} {estudiante.apellido}</h2>
                   <p className="text-xs text-surface-500">Código: {estudiante.codigoEstudiante} · Grado {estudiante.grado || "sin grado"}{estudiante.grupo ? ` · ${estudiante.grupo}` : ""}</p>
                 </div>
-                <span className="text-xs text-surface-400">{formatDate(novedad.fechaNovedad || novedad.fechaHora || novedad.fechaCreacion)}</span>
+                <span className="text-xs text-surface-400">{formatDate(novedad.fechaHora || novedad.fechaNovedad || novedad.fechaCreacion)}</span>
               </div>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                {novedad.descripcion && <div><span className="text-xs text-surface-400 block">Detalle</span><span className="text-surface-800 dark:text-surface-200">{novedad.descripcion}</span></div>}
-                {(novedad.seAusentaCon || novedad.seAusentaConOtro) && <div><span className="text-xs text-surface-400 block">Se ausenta con</span><span className="text-surface-800 dark:text-surface-200">{novedad.seAusentaCon || novedad.seAusentaConOtro}</span></div>}
-                {novedad.tipoNovedad && <div><span className="text-xs text-surface-400 block">Tipo</span><span className="text-surface-800 dark:text-surface-200">{novedad.tipoNovedad}</span></div>}
+                {novedad.tipoNovedad && <div><span className="text-xs text-surface-400 block">Tipo de novedad</span><span className="text-surface-800 dark:text-surface-200">{novedad.tipoNovedad}</span></div>}
+                {novedad.descripcion && <div><span className="text-xs text-surface-400 block">Descripción</span><span className="text-surface-800 dark:text-surface-200">{novedad.descripcion}</span></div>}
+                {(novedad.seAusentaConTipo || novedad.seAusentaCon || novedad.seAusentaConOtro) && <div><span className="text-xs text-surface-400 block">Motivo</span><span className="text-surface-800 dark:text-surface-200">{novedad.seAusentaConTipo || novedad.seAusentaCon || novedad.seAusentaConOtro}</span></div>}
+                {novedad.registradoPor && <div><span className="text-xs text-surface-400 block">Autorizado por</span><span className="text-surface-800 dark:text-surface-200">{novedad.registradoPor}</span></div>}
+                <div><span className="text-xs text-surface-400 block">Fecha y hora de la novedad</span><span className="text-surface-800 dark:text-surface-200">{formatDate(novedad.fechaHora || novedad.fechaNovedad || novedad.fechaCreacion)}</span></div>
                 <div><span className="text-xs text-surface-400 block">Regreso</span><span className="text-surface-800 dark:text-surface-200">{novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}{novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}</span></div>
               </div>
+              {novedad.fotoUrls && (
+                <div className="mt-4">
+                  <span className="text-xs text-surface-400 block mb-1">Foto</span>
+                  <img src={novedad.fotoUrls.split(",")[0].trim()} alt={`Foto de ${estudiante.nombre} ${estudiante.apellido}`} className="max-h-48 max-w-full rounded-xl object-contain border border-surface-200 dark:border-surface-700" />
+                </div>
+              )}
             </article>
           ))}
         </div>
