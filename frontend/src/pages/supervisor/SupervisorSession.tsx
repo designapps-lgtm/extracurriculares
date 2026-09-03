@@ -17,6 +17,8 @@ const ESTADO_LABEL: Record<string, { label: string; className: string }> = {
   justificado: { label: "Justificado", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400" },
 };
 
+type AttendanceFilter = "todos" | "presente" | "ausente";
+
 export interface PageProps {
   role?: RoleKind;
 }
@@ -28,6 +30,7 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
   const [data, setData] = useState<SupervisorSessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [attendanceFilter, setAttendanceFilter] = useState<AttendanceFilter>("todos");
   const navigate = useNavigate();
   const notify = useNotify();
 
@@ -88,6 +91,10 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
     {} as Record<string, number>,
   );
 
+  const visibleRecords = role === "secretary" && attendanceFilter !== "todos"
+    ? data.records.filter((r) => r.estado === attendanceFilter)
+    : data.records;
+
   const openNovedad = (r: { codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null }) => {
     navigate(`${basePath}/novedad/${r.codigoEstudiante}`, {
       state: {
@@ -136,29 +143,90 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
           >
             {exporting ? "Generando..." : "Exportar a Excel"}
           </button>
-          <div className="flex flex-wrap gap-2 mt-3">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400">
-              Presentes: {counts.presente || 0}
-            </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400">
-              Ausentes: {counts.ausente || 0}
-            </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
-            </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400">
-              Total: {data.records.length}
-            </span>
-          </div>
+          {role === "secretary" ? (
+            <div
+              className="flex flex-wrap gap-2 mt-3"
+              role="group"
+              aria-label="Filtrar registros de asistencia"
+            >
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter("todos")}
+                aria-pressed={attendanceFilter === "todos"}
+                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-surface-900 ${
+                  attendanceFilter === "todos"
+                    ? "bg-brand-600 text-white border-brand-600"
+                    : "bg-surface-100 text-surface-600 border-surface-200 hover:bg-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:border-surface-700 dark:hover:bg-surface-700"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter("presente")}
+                aria-pressed={attendanceFilter === "presente"}
+                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-surface-900 ${
+                  attendanceFilter === "presente"
+                    ? "bg-green-600 text-white border-green-600"
+                    : "bg-green-100 text-green-800 border-green-200 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/60"
+                }`}
+              >
+                Presentes: {counts.presente || 0}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter("ausente")}
+                aria-pressed={attendanceFilter === "ausente"}
+                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-surface-900 ${
+                  attendanceFilter === "ausente"
+                    ? "bg-red-600 text-white border-red-600"
+                    : "bg-red-100 text-red-800 border-red-200 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/60"
+                }`}
+              >
+                Ausentes: {counts.ausente || 0}
+              </button>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400">
+                Total: {data.records.length}
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400">
+                Presentes: {counts.presente || 0}
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400">
+                Ausentes: {counts.ausente || 0}
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400">
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400">
+                Total: {data.records.length}
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="card overflow-hidden">
+        <div className="card overflow-hidden" aria-live="polite">
           {data.records.length === 0 ? (
             <div className="text-center py-12 text-sm text-surface-500">
               Esta sesión no tiene registros de asistencia.
             </div>
+          ) : visibleRecords.length === 0 ? (
+            <div className="text-center py-12 px-4 text-sm text-surface-500">
+              <p>
+                No hay estudiantes {attendanceFilter === "presente" ? "presentes" : "ausentes"} en esta sesión.
+              </p>
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter("todos")}
+                className="mt-3 inline-flex items-center px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-medium hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-surface-900"
+              >
+                Mostrar todos
+              </button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-surface-100 dark:bg-surface-800">
-              {data.records.map((r) => (
+              {visibleRecords.map((r) => (
                 <div key={r.codigoEstudiante} className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-surface-900">
                   {r.fotoUrl ? (
                     <img src={r.fotoUrl} alt="" className="h-10 w-10 rounded-xl object-cover shrink-0" />
