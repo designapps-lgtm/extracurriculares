@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { sql } from "../../config/db";
 import { getNovedadesForStudent, syncNovedadesFromDrive } from "./novedades.service";
+import { dayBounds, isOnDay, isActive, novedadDayName } from "./novedades.dates";
 
 async function refreshNovedades(): Promise<void> {
   try {
@@ -8,77 +9,6 @@ async function refreshNovedades(): Promise<void> {
   } catch (e: any) {
     console.error("[Novedades] Error en refresh on-demand:", e?.message || e);
   }
-}
-
-function todayColombiaStart(): Date {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Bogota",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((p) => p.type === type)?.value || "0";
-  return new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00`);
-}
-
-function isActive(n: { fechaNovedad: Date | null; fechaCreacion: Date | null }): boolean {
-  const todayStart = todayColombiaStart();
-  if (n.fechaNovedad) return n.fechaNovedad >= todayStart;
-  if (n.fechaCreacion) return n.fechaCreacion >= todayStart;
-  return false;
-}
-
-function dayBounds(fechaISO: string): { start: Date; end: Date } | null {
-  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(fechaISO);
-  if (dateOnly) {
-    const start = new Date(`${fechaISO}T05:00:00.000Z`);
-    if (isNaN(start.getTime())) return null;
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    return { start, end };
-  }
-
-  const d = new Date(fechaISO);
-  if (isNaN(d.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Bogota",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(d);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value || "0";
-  const start = new Date(`${get("year")}-${get("month")}-${get("day")}T05:00:00.000Z`);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { start, end };
-}
-
-function isOnDay(n: { fechaNovedad: Date | null; fechaCreacion: Date | null }, bounds: { start: Date; end: Date }): boolean {
-  const d = n.fechaNovedad || n.fechaCreacion;
-  if (!d) return false;
-  return d >= bounds.start && d < bounds.end;
-}
-
-const DAY_NAME_MAP: Record<string, string> = {
-  MONDAY: "LUNES",
-  TUESDAY: "MARTES",
-  WEDNESDAY: "MIERCOLES",
-  THURSDAY: "JUEVES",
-  FRIDAY: "VIERNES",
-  SATURDAY: "SABADO",
-  SUNDAY: "DOMINGO",
-};
-
-// Día de la semana (en zona Colombia) de una novedad.
-function novedadDayName(n: any): string {
-  const d = n.fechaNovedad || n.fechaHora || n.fechaCreacion;
-  if (!d) return "";
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Bogota",
-    weekday: "long",
-  }).formatToParts(d);
-  const day = parts.find((p) => p.type === "weekday")?.value.toUpperCase() || "";
-  return DAY_NAME_MAP[day] || "";
 }
 
 // Días de extracurricular por estudiante (StudentSchedule.diaSemana).
@@ -185,4 +115,44 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
   }
 
   res.json({ success: true, data: codigos.map((c) => ({ codigoEstudiante: c, novedades: activas[c] || [] })) });
+}
+
+export async function getNovedadesDiarias(req: Request, res: Response): Promise<void> {
+  await refreshNovedades();
+
+  const fechaParam = String(req.query.fecha || "").trim();
+  const grado = String(req.query.grado || "").trim();
+  const bounds = fechaParam ? dayBounds(fechaParam) : dayBounds(new Date().toISOString());
+  if (!bounds) {
+    res.status(400).json({ success: false, error: { code: "INVALID_DATE", message: "La fecha no es válida" } });
+    return;
+  }
+
+  const rows = (await sql`
+    SELECT n.*, s."nombre" AS "estudianteNombre", s."apellido" AS "estudianteApellido",
+           s."grupo" AS "estudianteGrupo", g."nombre" AS "estudianteGrado"
+    FROM "Novedad" n
+    LEFT JOIN "Student" s ON s."codigoEstudiante" = n."codigoEstudiante"
+    LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
+    WHERE (
+      (n."fechaNovedad" >= ${bounds.start} AND n."fechaNovedad" < ${bounds.end})
+      OR (n."fechaNovedad" IS NULL AND n."fechaCreacion" >= ${bounds.start} AND n."fechaCreacion" < ${bounds.end})
+    )
+    AND (${grado} = '' OR g."nombre" = ${grado})
+    ORDER BY n."fechaNovedad" DESC NULLS LAST, n."fechaCreacion" DESC NULLS LAST
+  `) as unknown as any[];
+
+  res.json({
+    success: true,
+    data: rows.map((row) => ({
+      estudiante: {
+        codigoEstudiante: row.codigoEstudiante,
+        nombre: row.estudianteNombre || "Estudiante",
+        apellido: row.estudianteApellido || "",
+        grupo: row.estudianteGrupo || null,
+        grado: row.estudianteGrado || row.grados || null,
+      },
+      novedad: serialize(row),
+    })),
+  });
 }

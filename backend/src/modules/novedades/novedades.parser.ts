@@ -68,30 +68,46 @@ function parseFlexibleDate(value: unknown): Date | null {
   const str = String(value).trim();
   if (!str) return null;
 
+  // Las celdas de fecha del sheet se mantienen en hora local de Colombia (UTC-5, sin DST).
+  // Para que el "día calendario de Colombia" calce con el filtro, los valores sin zona
+  // horaria explícita se interpretan como reloj de pared de Bogotá (local + 5h = UTC).
+  const toBogotaUtc = (d: Date): Date => new Date(d.getTime() + 5 * 3600 * 1000);
+
   if (/^\d+(\.\d+)?$/.test(str)) {
     const serial = parseFloat(str);
     if (serial > 0 && serial < 80000) {
       const ms = Math.round((serial - 25569) * 86400 * 1000);
       const d = new Date(ms);
-      if (!isNaN(d.getTime())) return d;
+      if (!isNaN(d.getTime())) return toBogotaUtc(d);
     }
   }
 
   const dmy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (dmy) {
     const [, dd, mm, yyyy, hh, min, ss] = dmy;
-    return new Date(
+    // Date(year, ...) depende del huso horario del runtime; usar UTC evita
+    // sumar dos veces las cinco horas cuando el proceso corre en Bogotá.
+    const d = new Date(Date.UTC(
       parseInt(yyyy, 10),
       parseInt(mm, 10) - 1,
       parseInt(dd, 10),
       parseInt(hh || "0", 10),
       parseInt(min || "0", 10),
-      parseInt(ss || "0", 10)
-    );
+      parseInt(ss || "0", 10),
+    ));
+    return toBogotaUtc(d);
   }
 
-  const iso = new Date(str);
-  return isNaN(iso.getTime()) ? null : iso;
+  // ISO con zona horaria explícita (Z/±HH:MM) ya es un instante absoluto → no ajustar.
+  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(str)) {
+    const iso = new Date(str);
+    return isNaN(iso.getTime()) ? null : iso;
+  }
+
+  // ISO sin zona → tratar como reloj de pared de Bogotá.
+  const naive = new Date(str);
+  if (isNaN(naive.getTime())) return null;
+  return toBogotaUtc(naive);
 }
 
 function parseBoolean(value: unknown): boolean {

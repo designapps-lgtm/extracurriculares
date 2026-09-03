@@ -10,6 +10,7 @@ import type {
   SupervisorTransfer,
   SupervisorClassesResponse,
   StudentNovedades,
+  Novedad,
 } from "../types";
 import * as supervisorApi from "./supervisor";
 import * as secretaryApi from "./secretary";
@@ -34,6 +35,12 @@ export interface RoleFilters {
     nombre: string;
     apellido: string;
   }[];
+  grados: string[];
+}
+
+export interface DailyNovedad {
+  estudiante: { codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; grado: string | null };
+  novedad: Novedad;
 }
 
 export interface TransferCreatePayload {
@@ -59,6 +66,7 @@ export interface RoleApi {
   getAssignmentHistory: (asignacionId: string) => Promise<SupervisorAssignmentHistory>;
   listTransfers: (params?: { codigoEstudiante?: string; fecha?: string; fechaFin?: string }) => Promise<SupervisorTransfer[]>;
   getNovedadesBatch: (codigos: string[], fecha?: string) => Promise<StudentNovedades[]>;
+  getNovedadesDiarias: (params?: { fecha?: string; grado?: string }) => Promise<DailyNovedad[]>;
   // Capacidades: solo el supervisor llama lista y gestiona traslados/niños que se quedan.
   canCallList: boolean;
   canManageTransfers: boolean;
@@ -90,6 +98,7 @@ const supervisorRole: RoleApi = {
   getAssignmentHistory: supervisorApi.getSupervisorAssignmentHistory,
   listTransfers: supervisorApi.listSupervisorTransfers,
   getNovedadesBatch: supervisorApi.getSupervisorNovedadesBatch,
+  getNovedadesDiarias: supervisorApi.getSupervisorNovedadesDiarias,
   canCallList: true,
   canManageTransfers: true,
   canManageStays: true,
@@ -117,6 +126,7 @@ const secretaryRole: RoleApi = {
   getAssignmentHistory: secretaryApi.getSecretaryAssignmentHistory,
   listTransfers: secretaryApi.listSecretaryTransfers,
   getNovedadesBatch: secretaryApi.getSecretaryNovedadesBatch,
+  getNovedadesDiarias: secretaryApi.getSecretaryNovedadesDiarias,
   canCallList: false,
   canManageTransfers: false,
   canManageStays: false,

@@ -16,7 +16,7 @@ import {
   getSupervisorClasses,
 } from "../supervisor/supervisor.service";
 import { getSecretaryClassStudents } from "./secretary.service";
-import { getNovedadesBatch } from "../novedades/novedades.controller";
+import { getNovedadesBatch, getNovedadesDiarias } from "../novedades/novedades.controller";
 
 const router = Router();
 
@@ -40,6 +40,7 @@ router.get("/filters", asyncHandler(getSupervisorFilters));
 
 // Novedades para la secretaria (mismo batch de los profesores)
 router.get("/novedades/batch", asyncHandler(getNovedadesBatch));
+router.get("/novedades/diarias", asyncHandler(getNovedadesDiarias));
 
 // Horarios
 router.get("/schedules", asyncHandler(getSupervisorTeacherSchedules));

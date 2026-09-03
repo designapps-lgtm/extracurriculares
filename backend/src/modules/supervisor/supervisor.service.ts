@@ -257,6 +257,7 @@ export async function getSupervisorFilters(req: Request, res: Response) {
   const disciplines = await sql`SELECT "codigoDisciplina", "nombre" FROM "Discipline" ORDER BY "nombre" ASC` as unknown as Array<{ codigoDisciplina: string; nombre: string }>;
   const assignments = await sql`SELECT ea."codigoDisciplina", g."nombre" FROM "ExtracurricularAssignment" ea LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"` as unknown as Array<{ codigoDisciplina: string; nombre: string | null }>;
   const teachers = await sql`SELECT "idProfesor", "nombre", "apellido" FROM "Teacher" WHERE "estado" = 'activo' ORDER BY "apellido" ASC, "nombre" ASC` as unknown as Array<{ idProfesor: string; nombre: string; apellido: string }>;
+  const grades = await sql`SELECT "nombre" FROM "Grade" WHERE "estado" = 'activo' ORDER BY "idGrado" ASC` as unknown as Array<{ nombre: string }>;
 
   const gradeNamesByCode = new Map<string, Set<string>>();
   for (const a of assignments) {
@@ -276,7 +277,7 @@ export async function getSupervisorFilters(req: Request, res: Response) {
     }),
   }));
 
-  res.json({ success: true, data: { disciplinas, profesores: teachers } });
+  res.json({ success: true, data: { disciplinas, profesores: teachers, grados: grades.map((g) => g.nombre) } });
 }
 
 const ESTADO_ASISTENCIA_LABEL: Record<string, string> = {

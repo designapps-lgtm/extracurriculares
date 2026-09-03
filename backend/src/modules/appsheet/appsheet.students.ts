@@ -88,8 +88,44 @@ export interface AppSheetStudentSyncResult {
 }
 
 export async function syncAppSheetStudents(): Promise<AppSheetStudentSyncResult> {
-  const rows = await findAppSheetRows(DEMOGRAFICOS_TABLE);
+  let rows: AppSheetRow[];
+  try {
+    rows = await findAppSheetRows(DEMOGRAFICOS_TABLE);
+  } catch (error) {
+    return {
+      ok: false,
+      table: DEMOGRAFICOS_TABLE,
+      processed: 0,
+      created: 0,
+      updated: 0,
+      errors: [error instanceof Error ? error.message : String(error)],
+    };
+  }
+  // No borrar/desactivar toda la base si AppSheet devuelve una respuesta vacía
+  // por un nombre de tabla incorrecto, una clave inválida o una falla temporal.
+  if (rows.length === 0) {
+    return {
+      ok: false,
+      table: DEMOGRAFICOS_TABLE,
+      processed: 0,
+      created: 0,
+      updated: 0,
+      errors: ["AppSheet devolvió 0 filas; no se aplicó ningún cambio"],
+    };
+  }
+
   const students = mapAppSheetStudents(rows);
+  if (students.length === 0) {
+    return {
+      ok: false,
+      table: DEMOGRAFICOS_TABLE,
+      processed: 0,
+      created: 0,
+      updated: 0,
+      errors: ["AppSheet devolvió filas, pero ninguna contiene BARCODE válido; no se aplicó ningún cambio"],
+    };
+  }
+
   const result = await importStudents(students, false);
 
   return {

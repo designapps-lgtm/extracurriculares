@@ -57,10 +57,11 @@ export interface SecretaryFilterData {
     nombre: string;
     apellido: string;
   }[];
+  grados: string[];
 }
 
 export async function getSecretaryFilters(): Promise<SecretaryFilterData> {
-  const res = await api.get<ApiResponse<{ disciplinas: SecretaryFilterData["disciplinas"]; profesores: SecretaryFilterData["profesores"] }>>(
+  const res = await api.get<ApiResponse<SecretaryFilterData>>(
     "/api/secretary/filters",
   );
   return res.data;
@@ -134,6 +135,13 @@ export async function getSecretaryNovedadesBatch(
     fecha: fecha || "",
   });
   return res.data;
+}
+
+export async function getSecretaryNovedadesDiarias(params?: { fecha?: string; grado?: string }) {
+  return (await api.get<ApiResponse<import("./roles").DailyNovedad[]>>("/api/secretary/novedades/diarias", {
+    fecha: params?.fecha || "",
+    grado: params?.grado || "",
+  })).data;
 }
 
 export async function getSecretaryClasses(todayOnly?: boolean): Promise<SupervisorClassesResponse> {

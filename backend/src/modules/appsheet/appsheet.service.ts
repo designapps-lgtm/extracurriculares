@@ -41,6 +41,8 @@ export async function findAppSheetRows(tableName: string, selector?: string): Pr
     throw new Error(`AppSheet API ${response.status}: ${detail}`);
   }
 
-  const payload = await response.json() as { Rows?: AppSheetRow[] };
-  return payload.Rows || [];
+  // AppSheet REST API devuelve Find como un arreglo directamente (aunque
+  // algunas respuestas/documentaciones lo muestran envuelto en `Rows`).
+  const payload = await response.json() as AppSheetRow[] | { Rows?: AppSheetRow[] };
+  return Array.isArray(payload) ? payload : payload.Rows || [];
 }

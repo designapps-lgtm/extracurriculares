@@ -22,7 +22,7 @@ import {
   listSupervisorTransfers,
   deleteSupervisorTransfer,
 } from "./supervisor.service";
-import { getNovedadesBatch } from "../novedades/novedades.controller";
+import { getNovedadesBatch, getNovedadesDiarias } from "../novedades/novedades.controller";
 
 const router = Router();
 
@@ -37,6 +37,7 @@ router.post("/sessions/:sessionId/attendance", asyncHandler(supervisorSaveAttend
 
 // Novedades para el supervisor (mismo batch de los profesores)
 router.get("/novedades/batch", asyncHandler(getNovedadesBatch));
+router.get("/novedades/diarias", asyncHandler(getNovedadesDiarias));
 
 router.get("/stays/search", asyncHandler(searchSupervisorStudents));
 router.get("/stays", asyncHandler(getSupervisorStays));

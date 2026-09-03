@@ -15,11 +15,6 @@ export default {
 
   // Cron trigger definido en wrangler.toml. Reemplaza al setInterval de server.ts.
   async scheduled(_controller: unknown, _env: unknown, _ctx: unknown) {
-    if (!config.googleServiceAccountJson || !config.googleDriveFolderId) {
-      console.log("[Novedades] Sync desactivado: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
-      return;
-    }
-
     try {
       // Estudiantes: si AppSheet está configurado, la fuente de verdad es la
       // tabla "Demograficos" (evita depender de permisos de la service account
@@ -33,6 +28,13 @@ export default {
         }
       } else {
         console.log("[AppSheet] Sync desactivado: faltan APPSHEET_APP_ID o APPSHEET_APPLICATION_ACCESS_KEY");
+      }
+
+      // AppSheet y Drive son integraciones independientes. La falta de
+      // credenciales de Drive no debe impedir que se actualicen estudiantes.
+      if (!config.googleServiceAccountJson || !config.googleDriveFolderId) {
+        console.log("[Drive] Sync desactivado: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
+        return;
       }
 
       if (config.googleDriveWebhookUrl && config.googleDriveWebhookToken) {

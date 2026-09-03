@@ -49,10 +49,11 @@ export interface SupervisorFilterData {
     nombre: string;
     apellido: string;
   }[];
+  grados: string[];
 }
 
 export async function getSupervisorFilters(): Promise<SupervisorFilterData> {
-  const res = await api.get<ApiResponse<{ disciplinas: SupervisorFilterData["disciplinas"]; profesores: SupervisorFilterData["profesores"] }>>(
+  const res = await api.get<ApiResponse<SupervisorFilterData>>(
     "/api/supervisor/filters",
   );
   return res.data;
@@ -160,6 +161,13 @@ export async function getSupervisorNovedadesBatch(
     fecha: fecha || "",
   });
   return res.data;
+}
+
+export async function getSupervisorNovedadesDiarias(params?: { fecha?: string; grado?: string }) {
+  return (await api.get<ApiResponse<import("./roles").DailyNovedad[]>>("/api/supervisor/novedades/diarias", {
+    fecha: params?.fecha || "",
+    grado: params?.grado || "",
+  })).data;
 }
 
 export async function listSupervisorTransfers(params?: {

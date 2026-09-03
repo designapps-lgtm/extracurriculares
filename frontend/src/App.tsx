@@ -27,6 +27,7 @@ import SupervisorSchedules from "./pages/supervisor/SupervisorSchedules";
 import SupervisorClasses from "./pages/supervisor/SupervisorClasses";
 import SupervisorAttendance from "./pages/supervisor/SupervisorAttendance";
 import SupervisorNovedad from "./pages/supervisor/SupervisorNovedad";
+import SupervisorDailyNovedades from "./pages/supervisor/SupervisorDailyNovedades";
 import SupervisorTransfers from "./pages/supervisor/SupervisorTransfers";
 import SupervisorLayout from "./pages/supervisor/SupervisorLayout";
 
@@ -77,6 +78,7 @@ function App() {
         <Route path="session/:sessionId" element={<SupervisorSession />} />
         <Route path="session-attendance/:sessionId" element={<SupervisorAttendance />} />
         <Route path="novedad/:codigoEstudiante" element={<SupervisorNovedad />} />
+        <Route path="novedades" element={<SupervisorDailyNovedades />} />
         <Route path="transfers" element={<SupervisorTransfers />} />
       </Route>
 
@@ -89,6 +91,7 @@ function App() {
         <Route path="schedules" element={<SecretarySchedules />} />
         <Route path="session/:sessionId" element={<SecretarySession />} />
         <Route path="novedad/:codigoEstudiante" element={<SecretaryNovedad />} />
+        <Route path="novedades" element={<SupervisorDailyNovedades role="secretary" />} />
         <Route path="transfers" element={<SecretaryTransfers />} />
       </Route>
 

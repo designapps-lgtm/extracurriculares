@@ -187,7 +187,10 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
       for (const [dia, newEntry] of newMap) {
         const existing = existingMap.get(dia);
         if (!existing) {
-          await sql`INSERT INTO "StudentSchedule" ("codigoEstudiante", "codigoDisciplina", "diaSemana") VALUES (${student.codigoEstudiante}, ${newEntry.codigoDisciplina}, ${dia})`;
+          // La tabla de producción actualmente no tiene default para `id`,
+          // aunque el schema Prisma declare @default(uuid()). Generarlo aquí
+          // mantiene el importador compatible con ambas estructuras.
+          await sql`INSERT INTO "StudentSchedule" ("id", "codigoEstudiante", "codigoDisciplina", "diaSemana") VALUES (gen_random_uuid(), ${student.codigoEstudiante}, ${newEntry.codigoDisciplina}, ${dia})`;
           result.activitiesCreated++;
         } else if (existing.codigoDisciplina !== newEntry.codigoDisciplina) {
           await sql`UPDATE "StudentSchedule" SET "codigoDisciplina" = ${newEntry.codigoDisciplina} WHERE "id" = ${existing.id}`;

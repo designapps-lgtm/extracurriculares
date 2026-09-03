@@ -12,7 +12,8 @@
     "seed": "ts-node prisma/seed.ts",
     "import:students": "ts-node src/import/cli/importStudents.ts",
     "import:offer": "ts-node src/import/cli/importOffer.ts",
-    "import:photo-links": "ts-node src/import/cli/importPhotoLinks.ts"
+    "import:photo-links": "ts-node src/import/cli/importPhotoLinks.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.0",
@@ -41,7 +42,8 @@
     "@types/node": "^22.9.0",
     "prisma": "^5.22.0",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
   },
   "overrides": {
     "iconv-lite": "0.6.3"
