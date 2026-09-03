@@ -18,7 +18,7 @@ import { getNovedadesBatch, getNovedadesDiarias } from "../novedades/novedades.c
 import {
   adminStartSession,
   attendanceList,
-  attendanceSave,
+  adminSaveAttendance,
 } from "../attendance/attendance.service";
 
 const router = Router();
@@ -27,7 +27,7 @@ const router = Router();
 // pero bajo autenticación Admin y limitado a clases del día.
 router.post("/sessions/start", asyncHandler(adminStartSession));
 router.get("/sessions/:sessionId/attendance", asyncHandler(attendanceList));
-router.post("/sessions/:sessionId/attendance", asyncHandler(attendanceSave));
+router.post("/sessions/:sessionId/attendance", asyncHandler(adminSaveAttendance));
 
 // Operación en modo consulta para el panel administrador.
 router.get("/classes", asyncHandler(getSupervisorClasses));

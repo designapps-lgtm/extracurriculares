@@ -380,6 +380,17 @@ export async function attendanceSave(req: Request, res: Response) {
   res.json({ success: true, data: await saveAttendance(param(req, "sessionId"), records) });
 }
 
+export async function adminSaveAttendance(req: Request, res: Response) {
+  const { records } = req.body as { records?: AttendanceRecordInput[] };
+  if (!Array.isArray(records)) {
+    throw new AppError(400, "VALIDATION_ERROR", "records debe ser un array");
+  }
+  res.json({
+    success: true,
+    data: await saveAttendance(param(req, "sessionId"), records, { allowFinalizedEdit: true }),
+  });
+}
+
 export async function supervisorSaveAttendance(req: Request, res: Response) {
   const { records } = req.body as { records?: AttendanceRecordInput[] };
   if (!Array.isArray(records)) {

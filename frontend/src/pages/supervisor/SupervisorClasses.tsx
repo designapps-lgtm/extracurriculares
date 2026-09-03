@@ -274,11 +274,10 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
                             </button>
                           ) : cls.sessionId && cls.sessionEstado === "finalizada" ? (
                             <button
-                              type="button"
-                              disabled
-                              className="w-full sm:w-auto px-4 py-2 bg-surface-200 dark:bg-surface-700 text-surface-500 text-sm font-medium rounded-xl cursor-not-allowed"
+                              onClick={() => navigate(`${basePath}/session-attendance/${cls.sessionId}`, { state: { returnTo } })}
+                              className="w-full sm:w-auto px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600"
                             >
-                              Asistencia Extracurriculares registrada
+                              Editar Asistencia Extracurriculares
                             </button>
                           ) : cls.sessionId ? (
                             <button
