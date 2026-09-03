@@ -120,7 +120,7 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
     }
 
     for (const codigo of result.newDisciplines) {
-      await sql`INSERT INTO "Discipline" ("codigoDisciplina", "nombre") VALUES (${codigo}, ${codigo}) ON CONFLICT ("codigoDisciplina") DO NOTHING`;
+      await sql`INSERT INTO "Discipline" ("codigoDisciplina", "nombre", "createdAt", "updatedAt") VALUES (${codigo}, ${codigo}, now(), now()) ON CONFLICT ("codigoDisciplina") DO NOTHING`;
     }
   }
 
