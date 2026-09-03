@@ -1,28 +1,31 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getSecretaryClassStudents, type SecretaryClassStudentsData } from "../../services/secretary";
+import { type SecretaryClassStudentsData } from "../../services/secretary";
+import { roleApis, type RoleKind } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
 import { Avatar } from "../../components/common/Avatar";
 
-export default function SecretaryClassStudents() {
-  const { asignacionId, horarioId } = useParams<{ asignacionId: string; horarioId: string }>();
+export default function SecretaryClassStudents({ role = "secretary" }: { role?: RoleKind }) {
+  const api = roleApis[role];
+  const basePath = role === "admin" ? "/admin" : "/secretary";
   const navigate = useNavigate();
   const [data, setData] = useState<SecretaryClassStudentsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { asignacionId, horarioId } = useParams<{ asignacionId: string; horarioId: string }>();
   const notify = useNotify();
 
   useEffect(() => {
-    if (!asignacionId || !horarioId) return;
-    getSecretaryClassStudents(asignacionId, horarioId)
+    if (!asignacionId || !horarioId || !api.getClassStudents) return;
+    api.getClassStudents(asignacionId, horarioId)
       .then(setData)
       .catch((err) => {
         notify.error(err.message || "Error al cargar los estudiantes");
-        navigate("/secretary/classes");
+        navigate(`${basePath}/classes`);
       })
       .finally(() => setLoading(false));
-  }, [asignacionId, horarioId, navigate, notify]);
+  }, [api, asignacionId, horarioId, basePath, navigate, notify]);
 
   if (loading) {
     return (
@@ -53,7 +56,7 @@ export default function SecretaryClassStudents() {
           <div className="flex items-center gap-3 min-w-0">
             <Logo chip alt="Extracurriculares" className="h-9 w-auto shrink-0" />
             <div className="min-w-0">
-              <button onClick={() => navigate("/secretary/classes")} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
+              <button onClick={() => navigate(`${basePath}/classes`)} className="text-xs text-brand-600 hover:text-brand-700 mb-1">
                 ← Volver
               </button>
               <h1 className="text-lg font-display font-bold text-surface-900 dark:text-surface-100 break-words">

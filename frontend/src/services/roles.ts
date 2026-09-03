@@ -15,8 +15,9 @@ import type {
 import * as supervisorApi from "./supervisor";
 import * as secretaryApi from "./secretary";
 import type { SecretaryClassStudentsData } from "./secretary";
+import * as adminApi from "./adminOperations";
 
-export type RoleKind = "supervisor" | "secretary";
+export type RoleKind = "supervisor" | "secretary" | "admin";
 
 export interface RoleUser {
   nombre: string;
@@ -134,9 +135,33 @@ const secretaryRole: RoleApi = {
   getClassStudents: secretaryApi.getSecretaryClassStudents,
 };
 
+const adminRole: RoleApi = {
+  role: "admin",
+  label: "Administrador",
+  me: adminApi.adminMe,
+  getSessions: adminApi.getAdminOperationalSessions,
+  getSession: adminApi.getAdminOperationalSession,
+  getFilters: adminApi.getAdminOperationalFilters,
+  exportAttendance: adminApi.exportAdminAttendance,
+  exportSession: adminApi.exportAdminSession,
+  getTeacherSchedules: adminApi.getAdminTeacherSchedules,
+  getAssignmentHistory: adminApi.getAdminAssignmentHistory,
+  listTransfers: adminApi.listAdminTransfers,
+  getNovedadesBatch: adminApi.getAdminNovedadesBatch,
+  getNovedadesDiarias: adminApi.getAdminDailyNovedades,
+  canCallList: false,
+  canManageTransfers: false,
+  canManageStays: false,
+  getClasses: adminApi.getAdminClasses,
+  getClassStudents: adminApi.getAdminClassStudents,
+  searchStudents: adminApi.searchAdminStudents,
+  getStays: adminApi.getAdminStays,
+};
+
 export const roleApis: Record<RoleKind, RoleApi> = {
   supervisor: supervisorRole,
   secretary: secretaryRole,
+  admin: adminRole,
 };
 
 export type { ApiResponse };

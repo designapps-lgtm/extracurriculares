@@ -44,7 +44,6 @@ import SecretaryTransfers from "./pages/secretary/SecretaryTransfers";
 // Admin
 import AdminSupervisors from "./pages/admin/AdminSupervisors";
 import AdminSecretaries from "./pages/admin/AdminSecretaries";
-import { adminNovedadesApi } from "./services/admin";
 
 function App() {
   return (
@@ -100,7 +99,14 @@ function App() {
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
-        <Route path="novedades" element={<SupervisorDailyNovedades novedadesApi={adminNovedadesApi} />} />
+        <Route path="attendance" element={<SupervisorDashboard role="admin" />} />
+        <Route path="classes" element={<SupervisorClasses role="admin" />} />
+        <Route path="classes/:asignacionId/:horarioId/students" element={<SecretaryClassStudents role="admin" />} />
+        <Route path="schedules" element={<SupervisorSchedules role="admin" />} />
+        <Route path="session/:sessionId" element={<SupervisorSession role="admin" />} />
+        <Route path="novedad/:codigoEstudiante" element={<SupervisorNovedad role="admin" />} />
+        <Route path="novedades" element={<SupervisorDailyNovedades role="admin" />} />
+        <Route path="transfers" element={<SupervisorTransfers role="admin" />} />
         <Route path="students" element={<AdminStudents />} />
         <Route path="students/:codigo" element={<StudentProfile />} />
         <Route path="disciplines" element={<Disciplines />} />

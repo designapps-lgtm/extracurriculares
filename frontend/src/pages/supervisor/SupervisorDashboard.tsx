@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { roleApis, type RoleKind, type RoleUser, type RoleFilters } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
@@ -6,6 +6,7 @@ import { Loading } from "../../components/common/States";
 import { Pagination } from "../../components/common/Pagination";
 import Logo from "../../components/common/Logo";
 import type { SupervisorSessionItem } from "../../types";
+import { NIVELES, nivelDeGrado, nivelLabel, type Nivel } from "../../utils/niveles";
 
 function formatFecha(iso: string): string {
   const d = new Date(iso);
@@ -30,7 +31,7 @@ const EMPTY_FILTERS: AttendanceFilters = { fecha: "", grado: "", disciplina: "",
 function toQueryParams(filters: AttendanceFilters, role: RoleKind): Record<string, string> {
   const params: Record<string, string> = {};
   if (filters.fecha) params.fecha = filters.fecha;
-  if (role === "secretary" && filters.grado) params.grado = filters.grado;
+  if ((role === "secretary" || role === "admin") && filters.grado) params.grado = filters.grado;
   if (filters.disciplina) params.disciplina = filters.disciplina;
   if (filters.profesor) params.profesor = filters.profesor;
   return params;
@@ -42,13 +43,14 @@ export interface PageProps {
 
 export default function SupervisorDashboard({ role = "supervisor" }: PageProps) {
   const api = roleApis[role];
-  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
+  const basePath = role === "secretary" ? "/secretary" : role === "admin" ? "/admin" : "/supervisor";
   const [user, setUser] = useState<RoleUser | null>(null);
   const [sessions, setSessions] = useState<SupervisorSessionItem[]>([]);
   const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [filterData, setFilterData] = useState<RoleFilters | null>(null);
   const [draftFilters, setDraftFilters] = useState<AttendanceFilters>({ ...EMPTY_FILTERS });
   const [appliedFilters, setAppliedFilters] = useState<AttendanceFilters>({ ...EMPTY_FILTERS });
+  const [niveles, setNiveles] = useState<Nivel[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -123,6 +125,7 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
     const emptyFilters = { ...EMPTY_FILTERS };
     setDraftFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
+    setNiveles([]);
     load(1, emptyFilters);
   };
 
@@ -155,6 +158,18 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
   const updateDraft = (key: keyof AttendanceFilters, value: string) => {
     setDraftFilters((current) => ({ ...current, [key]: value }));
   };
+
+  const toggleNivel = (nivel: Nivel) => {
+    setNiveles((current) => current.includes(nivel) ? current.filter((item) => item !== nivel) : [...current, nivel]);
+  };
+
+  const visibleSessions = useMemo(() => {
+    if (niveles.length === 0) return sessions;
+    return sessions.filter((session) => {
+      const nivel = nivelDeGrado(session.assignment.grade.nombre);
+      return nivel !== null && niveles.includes(nivel);
+    });
+  }, [niveles, sessions]);
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
@@ -275,6 +290,20 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
           )}
         </div>
 
+        {role === "secretary" && (
+          <div className="card p-4">
+            <p className="text-xs font-medium text-surface-500 mb-2">Filtrar por nivel</p>
+            <div className="flex flex-wrap gap-4">
+              {NIVELES.map((nivel) => (
+                <label key={nivel} className="inline-flex items-center gap-2 text-sm text-surface-700 dark:text-surface-300 cursor-pointer">
+                  <input type="checkbox" checked={niveles.includes(nivel)} onChange={() => toggleNivel(nivel)} className="h-4 w-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
+                  {nivelLabel(nivel)}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="card overflow-hidden p-4">
           <div aria-live="polite" aria-busy={loading}>
             {loading ? (
@@ -286,13 +315,13 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
               <div className="text-center py-12 text-sm text-red-600 dark:text-red-400" role="alert">
                 {listError}
               </div>
-            ) : sessions.length === 0 ? (
+            ) : visibleSessions.length === 0 ? (
               <div className="text-center py-12 text-sm text-surface-500" role="status">
                 No hay asistencias registradas con los filtros actuales.
               </div>
             ) : (
               <div className="space-y-3">
-                {sessions.map((s) => (
+                {visibleSessions.map((s) => (
                   <button
                     key={s.id}
                     type="button"

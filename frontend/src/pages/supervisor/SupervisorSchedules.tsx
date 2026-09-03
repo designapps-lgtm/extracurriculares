@@ -176,7 +176,7 @@ export interface PageProps {
 
 export default function SupervisorSchedules({ role = "supervisor" }: PageProps) {
   const api = roleApis[role];
-  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
+  const basePath = role === "secretary" ? "/secretary" : role === "admin" ? "/admin" : "/supervisor";
   const [user, setUser] = useState<RoleUser | null>(null);
   const [assignments, setAssignments] = useState<SupervisorTeacherSchedule[]>([]);
   const [loading, setLoading] = useState(true);

@@ -30,6 +30,7 @@ import { adminDashboardRouter } from "./modules/admin/dashboardAdmin.routes";
 import { adminSupervisorRouter } from "./modules/admin/supervisorAdmin.routes";
 import { adminSecretaryRouter } from "./modules/admin/secretaryAdmin.routes";
 import { adminNovedadesRouter } from "./modules/admin/novedadesAdmin.routes";
+import { adminOperationsRouter } from "./modules/admin/operationsAdmin.routes";
 import { driveSyncRouter } from "./modules/driveSync/driveSync.routes";
 import { appSheetSyncRouter } from "./modules/appsheet/appsheet.routes";
 
@@ -103,6 +104,7 @@ app.use("/api/admin/admins", authenticate, requireAdmin, adminUserRouter);
 app.use("/api/admin/supervisors", authenticate, requireAdmin, adminSupervisorRouter);
 app.use("/api/admin/secretaries", authenticate, requireAdmin, adminSecretaryRouter);
 app.use("/api/admin/novedades", authenticate, requireAdmin, adminNovedadesRouter);
+app.use("/api/admin/operations", authenticate, requireAdmin, adminOperationsRouter);
 
 // Teacher auth (login/logout don't need auth)
 app.use("/api/teacher/auth", teacherAuthRouter);

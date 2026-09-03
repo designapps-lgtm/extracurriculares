@@ -25,7 +25,7 @@ export interface PageProps {
 
 export default function SupervisorNovedad({ role = "supervisor" }: PageProps) {
   const api = roleApis[role];
-  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
+  const basePath = role === "secretary" ? "/secretary" : role === "admin" ? "/admin" : "/supervisor";
   const { codigoEstudiante } = useParams<{ codigoEstudiante: string }>();
   const location = useLocation();
   const navigate = useNavigate();

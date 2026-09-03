@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { roleApis, type RoleKind, type RoleUser } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
 import type { SupervisorCallableClass, SupervisorClassesResponse } from "../../types";
+import { NIVELES, nivelDeGrado, nivelLabel, type Nivel } from "../../utils/niveles";
 
 const DIAS_CORTO: Record<string, string> = {
   LUNES: "Lun", MARTES: "Mar", MIERCOLES: "Mié", JUEVES: "Jue",
@@ -19,12 +20,13 @@ export interface PageProps {
 
 export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
   const api = roleApis[role];
-  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
+  const basePath = role === "secretary" ? "/secretary" : role === "admin" ? "/admin" : "/supervisor";
   const [user, setUser] = useState<RoleUser | null>(null);
   const [data, setData] = useState<SupervisorClassesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [niveles, setNiveles] = useState<Nivel[]>([]);
   const navigate = useNavigate();
   const notify = useNotify();
 
@@ -107,7 +109,22 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
     ? data!.classes
     : data!.classes.filter((c) => c.isToday);
 
-  const grouped = visible
+  const visibleByNivel = useMemo(() => {
+    if (niveles.length === 0) return visible;
+    return visible.filter((cls) => {
+      const grades = cls.grades?.length ? cls.grades : [cls.grade];
+      return grades.some((grade) => {
+        const nivel = nivelDeGrado(grade.nombre);
+        return nivel !== null && niveles.includes(nivel);
+      });
+    });
+  }, [niveles, visible]);
+
+  const toggleNivel = (nivel: Nivel) => {
+    setNiveles((current) => current.includes(nivel) ? current.filter((item) => item !== nivel) : [...current, nivel]);
+  };
+
+  const grouped = visibleByNivel
     .sort(
       (a, b) =>
         DIAS_ORDEN.indexOf(a.schedule.diaSemana) - DIAS_ORDEN.indexOf(b.schedule.diaSemana) ||
@@ -135,7 +152,7 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
               </h1>
               <p className="text-xs text-surface-500">
                 {showAll ? "Todas las clases de todos los profesores" : `Clases de hoy (${data?.dayName ?? ""})`}
-                {role === "secretary" && " · solo lectura"}
+                {role !== "supervisor" && " · solo lectura"}
               </p>
             </div>
           </div>
@@ -154,7 +171,21 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
 
         {loading && <Loading />}
 
-        {!loading && visible.length === 0 && (
+        {role === "secretary" && (
+          <div className="card p-4">
+            <p className="text-xs font-medium text-surface-500 mb-2">Filtrar por nivel</p>
+            <div className="flex flex-wrap gap-4">
+              {NIVELES.map((nivel) => (
+                <label key={nivel} className="inline-flex items-center gap-2 text-sm text-surface-700 dark:text-surface-300 cursor-pointer">
+                  <input type="checkbox" checked={niveles.includes(nivel)} onChange={() => toggleNivel(nivel)} className="h-4 w-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
+                  {nivelLabel(nivel)}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!loading && visibleByNivel.length === 0 && (
           <div className="card p-10 text-center text-sm text-surface-500">
             {showAll
               ? "No hay clases registradas."

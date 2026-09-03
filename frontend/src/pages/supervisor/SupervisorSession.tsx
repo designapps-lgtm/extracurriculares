@@ -25,7 +25,7 @@ export interface PageProps {
 
 export default function SupervisorSession({ role = "supervisor" }: PageProps) {
   const api = roleApis[role];
-  const basePath = role === "secretary" ? "/secretary" : "/supervisor";
+  const basePath = role === "secretary" ? "/secretary" : role === "admin" ? "/admin" : "/supervisor";
   const { sessionId } = useParams<{ sessionId: string }>();
   const [data, setData] = useState<SupervisorSessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
