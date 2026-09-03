@@ -26,7 +26,17 @@ interface StudentCodeRow { codigoEstudiante: string }
 interface GradeIdRow { idGrado: number }
 interface ScheduleRow { id: string; diaSemana: string; codigoDisciplina: string }
 
-export async function importStudents(students: MappedStudent[], dryRun: boolean): Promise<ImportResult> {
+export interface ImportStudentsOptions {
+  /** Evita desactivar registros cuando la fuente llegó parcialmente validada. */
+  deactivateAbsent?: boolean;
+}
+
+export async function importStudents(
+  students: MappedStudent[],
+  dryRun: boolean,
+  options: ImportStudentsOptions = {},
+): Promise<ImportResult> {
+  const deactivateAbsent = options.deactivateAbsent ?? true;
   const result: ImportResult = {
     processed: 0,
     created: 0,
@@ -84,15 +94,17 @@ export async function importStudents(students: MappedStudent[], dryRun: boolean)
 
   const excelBarcodes = new Set(students.map((s) => s.codigoEstudiante));
   const absentBarcodes: string[] = [];
-  for (const barcode of existingBarcodes) {
-    if (!excelBarcodes.has(barcode)) {
-      result.absentStudents.push(barcode);
-      result.absent++;
-      absentBarcodes.push(barcode);
+  if (deactivateAbsent) {
+    for (const barcode of existingBarcodes) {
+      if (!excelBarcodes.has(barcode)) {
+        result.absentStudents.push(barcode);
+        result.absent++;
+        absentBarcodes.push(barcode);
+      }
     }
   }
 
-  if (!dryRun && absentBarcodes.length > 0) {
+  if (!dryRun && deactivateAbsent && absentBarcodes.length > 0) {
     await sql`UPDATE "Student" SET "estado" = 'inactivo' WHERE "codigoEstudiante" = ANY(${absentBarcodes})`;
   }
 

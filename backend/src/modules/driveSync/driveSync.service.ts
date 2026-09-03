@@ -99,13 +99,14 @@ async function findTargetFiles(files: DriveFile[]): Promise<DriveFile[]> {
   return [...targets.values()];
 }
 
-export async function syncDriveSources(): Promise<{ students: number; offerEntries: number; files: number; errors: string[] }> {
+export async function syncDriveSources(options: { syncStudents?: boolean } = {}): Promise<{ students: number; offerEntries: number; files: number; errors: string[] }> {
   const creds = await getCreds();
   const folderId = config.googleDriveFolderId!;
   const errors: string[] = [];
   let students = 0;
   let offerEntries = 0;
   let files = 0;
+  const shouldSyncStudents = options.syncStudents ?? !(config.appsheetAppId && config.appsheetAccessKey);
 
   const folderFiles = await listFolderFiles(folderId, creds);
   const targets = await findTargetFiles(folderFiles);
@@ -113,21 +114,38 @@ export async function syncDriveSources(): Promise<{ students: number; offerEntri
   for (const file of targets) {
     const normalized = normalize(file.name);
     try {
+      // No descargar el Excel base cuando AppSheet terminó correctamente.
+      // Esto evita que un archivo de Drive viejo o inaccesible genere errores
+      // innecesarios o pueda pisar la fuente primaria.
+      if (normalized === normalize("Extracurriculares_base.xlsx") && !shouldSyncStudents) {
+        continue;
+      }
+
       const buffer = await downloadSpreadsheet(file, creds);
 
       if (normalized === normalize("Extracurriculares_base.xlsx")) {
-        // Si AppSheet está configurado, los estudiantes se sincronizan desde la
-        // tabla "Demograficos" y este archivo se ignora (evita pisar el sync).
-        if (config.appsheetAppId && config.appsheetAccessKey) {
+        // AppSheet es la fuente primaria cuando su sincronización terminó bien.
+        // El Worker puede habilitar este archivo como fallback si AppSheet falla.
+
+        const rows = readExcelBuffer(buffer);
+        if (rows.length === 0) {
+          errors.push("Base: no se encontraron filas con BARCODE; no se aplicó ningún cambio");
           continue;
         }
-        const rows = readExcelBuffer(buffer);
         const { valid, errors: validationErrors } = validateRows(rows);
         if (validationErrors.length > 0) {
-          errors.push(`Base: ${validationErrors[0].error}`);
+          errors.push(`Base: ${validationErrors.slice(0, 5).map((e) => e.error).join(" | ")}`);
+        }
+        if (valid.length === 0) {
+          errors.push("Base: ninguna fila pasó la validación; no se aplicó ningún cambio");
+          continue;
         }
         const mapped = mapStudents(valid);
-        const result = await importStudents(mapped, false);
+        const result = await importStudents(mapped, false, {
+          // No se desactivan ausentes desde una respuesta que puede estar
+          // truncada; la baja debe llegar como estado explícito del origen.
+          deactivateAbsent: false,
+        });
         students += result.processed;
         files += 1;
       }

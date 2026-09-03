@@ -12,6 +12,7 @@ const VALID_GRADES = new Set([
   "PV", "K3", "K4", "K5",
   "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12",
 ]);
+const VALID_STATES = new Set(["ACTIVE", "ACTIVO", "ACTIVA", "INACTIVE", "INACTIVO", "INACTIVA"]);
 
 const DAY_COLUMNS = ["ccLunes", "ccMartes", "ccMiercoles", "ccJueves", "ccViernes", "ccSabado"] as const;
 
@@ -38,6 +39,17 @@ export function validateRows(rows: RawStudentRow[]): ValidationResult {
         field: "grade",
         value: row.grade,
         error: `Grado inválido: "${row.grade}"`,
+      });
+      hasError = true;
+    }
+
+    if (row.estado && !VALID_STATES.has(row.estado.toUpperCase())) {
+      errors.push({
+        row: row._excelRow,
+        codigoEstudiante: row.BARCODE,
+        field: "estado",
+        value: row.estado,
+        error: `Estado inválido: "${row.estado}"`,
       });
       hasError = true;
     }

@@ -16,22 +16,25 @@ export default {
   // Cron trigger definido en wrangler.toml. Reemplaza al setInterval de server.ts.
   async scheduled(_controller: unknown, _env: unknown, _ctx: unknown) {
     try {
-      // Estudiantes: si AppSheet está configurado, la fuente de verdad es la
-      // tabla "Demograficos" (evita depender de permisos de la service account
-      // sobre el Sheet compartido con la cuenta del colegio).
+      let shouldSyncDriveStudents = true;
       if (config.appsheetAppId && config.appsheetAccessKey) {
         const students = await syncAppSheetStudents();
+        // Sólo es seguro usar Drive cuando AppSheet no llegó a iniciar la
+        // importación. Si hubo errores después de comenzar, el lote pudo ser
+        // aplicado parcialmente y Drive no debe pisarlo.
+        shouldSyncDriveStudents = !students.ok && students.processed === 0;
         if (students.errors.length > 0) {
-          console.error(`[AppSheet] Sync de estudiantes con errores: ${students.errors.join(" | ")}`);
+          console.error(`[AppSheet] Sync de estudiantes con errores (${students.received} recibidas, ${students.mapped} mapeadas, ${students.middleNames} con segundo nombre): ${students.errors.join(" | ")}`);
         } else {
-          console.log(`[AppSheet] Estudiantes OK: ${students.processed} procesados (${students.created} nuevos, ${students.updated} actualizados)`);
+          console.log(`[AppSheet] Estudiantes OK: ${students.processed} procesados (${students.created} nuevos, ${students.updated} actualizados, ${students.middleNames} con segundo nombre)`);
         }
       } else {
         console.log("[AppSheet] Sync desactivado: faltan APPSHEET_APP_ID o APPSHEET_APPLICATION_ACCESS_KEY");
       }
 
-      // AppSheet y Drive son integraciones independientes. La falta de
-      // credenciales de Drive no debe impedir que se actualicen estudiantes.
+      // AppSheet y Drive son integraciones independientes. Si AppSheet falla
+      // o recibe un lote incompleto, el Excel actualizado de Drive actúa como
+      // respaldo y evita dejar la base con datos antiguos.
       if (!config.googleServiceAccountJson || !config.googleDriveFolderId) {
         console.log("[Drive] Sync desactivado: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
         return;
@@ -43,7 +46,7 @@ export default {
         console.log("[Drive] Webhook no configurado; se ejecuta solo sync de respaldo");
       }
 
-      const driveResult = await syncDriveSources();
+      const driveResult = await syncDriveSources({ syncStudents: shouldSyncDriveStudents });
       if (driveResult.errors.length > 0) {
         console.error(`[Drive] Sync con errores: ${driveResult.errors.join(" | ")}`);
       } else {

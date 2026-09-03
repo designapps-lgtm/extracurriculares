@@ -26,6 +26,7 @@ export default function AdminStudents() {
     return v === "true" || v === "false" ? v : "";
   };
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterGrado, setFilterGrado] = useState("");
   const [filterInscrito, setFilterInscrito] = useState(initialInscrito);
   const [loading, setLoading] = useState(true);
@@ -36,10 +37,18 @@ export default function AdminStudents() {
   const notify = useNotify();
   const navigate = useNavigate();
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const load = (page = 1, overrides?: { search?: string; filtroGrado?: string; filtroInscrito?: string }) => {
     setLoading(true);
     const params: Record<string, string> = { page: String(page), limit: "20" };
-    const searchValue = overrides?.search ?? search;
+    const searchValue = overrides?.search ?? debouncedSearch;
     const gradoValue = overrides?.filtroGrado ?? filterGrado;
     const inscritoValue = overrides?.filtroInscrito ?? filterInscrito;
     if (searchValue) params.search = searchValue;
@@ -60,6 +69,13 @@ export default function AdminStudents() {
     getAdminGrades().then((res) => setGrades(res.data)).catch(console.error);
     getAdminDisciplines({ limit: "100" }).then((res) => setDisciplines(res.data)).catch(console.error);
   }, []);
+
+  // Auto-search when debounced search changes
+  useEffect(() => {
+    if (debouncedSearch !== undefined) {
+      load(1);
+    }
+  }, [debouncedSearch, filterGrado, filterInscrito]);
 
   const handleSearch = () => load(1);
 
@@ -107,8 +123,7 @@ export default function AdminStudents() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="Buscar por código, nombre o apellido..."
+            placeholder="Buscar por código, nombre o apellido (búsqueda automática)..."
             className="flex-1 min-w-[200px] px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
           <select
@@ -130,8 +145,8 @@ export default function AdminStudents() {
             <option value="true">Inscritos</option>
             <option value="false">No inscritos</option>
           </select>
-          <button onClick={handleSearch} className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors">
-            Buscar
+          <button onClick={handleSearch} disabled={loading} className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-50 transition-colors">
+            {loading ? "Buscando..." : "Buscar"}
           </button>
         </div>
       </div>

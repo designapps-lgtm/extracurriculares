@@ -3,8 +3,10 @@ import * as XLSX from "xlsx";
 export interface RawStudentRow {
   BARCODE: string;
   firstName: string;
+  middleName: string;
   lastName: string;
   grade: string;
+  estado: string;
   homeroom: string;
   email: string;
   ccLunes: string;
@@ -53,8 +55,10 @@ function readWorkbook(workbook: XLSX.WorkBook): RawStudentRow[] {
       return {
         BARCODE: barcode,
         firstName: String(row["FIRST NAME"] || "").trim(),
+        middleName: String(row["MIDDLE NAME"] || "").trim(),
         lastName: String(row["LAST NAME"] || "").trim(),
         grade: String(row["GRADE"] || "").trim(),
+        estado: String(row["ACTIVE_INACTIVE"] || "").trim(),
         homeroom: String(row["HOMEROOM"] || "").trim(),
         email: String(row["STUDENT_EMAIL"] || "").trim(),
         ccLunes: String(row["CC_LUNES"] || "").trim(),
