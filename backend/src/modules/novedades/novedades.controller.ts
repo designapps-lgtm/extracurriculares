@@ -130,7 +130,8 @@ export async function getNovedadesDiarias(req: Request, res: Response): Promise<
 
   const rows = (await sql`
     SELECT n.*, s."nombre" AS "estudianteNombre", s."apellido" AS "estudianteApellido",
-           s."grupo" AS "estudianteGrupo", g."nombre" AS "estudianteGrado"
+           s."grupo" AS "estudianteGrupo", s."fotoUrl" AS "estudianteFotoUrl",
+           g."nombre" AS "estudianteGrado"
     FROM "Novedad" n
     LEFT JOIN "Student" s ON s."codigoEstudiante" = n."codigoEstudiante"
     LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
@@ -151,6 +152,7 @@ export async function getNovedadesDiarias(req: Request, res: Response): Promise<
         apellido: row.estudianteApellido || "",
         grupo: row.estudianteGrupo || null,
         grado: row.estudianteGrado || row.grados || null,
+        fotoUrl: row.estudianteFotoUrl || null,
       },
       novedad: serialize(row),
     })),

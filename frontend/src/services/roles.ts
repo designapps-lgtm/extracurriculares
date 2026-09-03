@@ -39,7 +39,7 @@ export interface RoleFilters {
 }
 
 export interface DailyNovedad {
-  estudiante: { codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; grado: string | null };
+  estudiante: { codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; grado: string | null; fotoUrl: string | null };
   novedad: Novedad;
 }
 

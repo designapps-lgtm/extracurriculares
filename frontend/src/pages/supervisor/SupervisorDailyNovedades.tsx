@@ -149,10 +149,10 @@ export default function SupervisorDailyNovedades({ role = "supervisor" }: { role
                 <div><span className="text-xs text-surface-400 block">Fecha y hora de la novedad</span><span className="text-surface-800 dark:text-surface-200">{formatDate(novedad.fechaHora || novedad.fechaNovedad || novedad.fechaCreacion)}</span></div>
                 <div><span className="text-xs text-surface-400 block">Regreso</span><span className="text-surface-800 dark:text-surface-200">{novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}{novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}</span></div>
               </div>
-              {novedad.fotoUrls && (
+              {estudiante.fotoUrl && (
                 <div className="mt-4">
                   <span className="text-xs text-surface-400 block mb-1">Foto</span>
-                  <img src={novedad.fotoUrls.split(",")[0].trim()} alt={`Foto de ${estudiante.nombre} ${estudiante.apellido}`} className="max-h-48 max-w-full rounded-xl object-contain border border-surface-200 dark:border-surface-700" />
+                  <img src={estudiante.fotoUrl} alt={`Foto de ${estudiante.nombre} ${estudiante.apellido}`} className="max-h-48 max-w-full rounded-xl object-contain border border-surface-200 dark:border-surface-700" />
                 </div>
               )}
             </article>
