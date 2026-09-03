@@ -38,8 +38,8 @@ export const config = {
   appsheetAccessKey: process.env.APPSHEET_APPLICATION_ACCESS_KEY || null,
   appsheetDemograficosTable: process.env.APPSHEET_DEMOGRAFICOS_TABLE || "Demograficos",
   googleDriveStudentsFileName: process.env.GOOGLE_DRIVE_STUDENTS_FILE_NAME || "DEMOGRAFICOS 2026-2027",
-  // La fuente primaria de estudiantes es el Excel de Drive. AppSheet queda
-  // como respaldo si Drive no está configurado o el archivo no llega.
+  // AppSheet es la fuente primaria de estudiantes: su tabla Demograficos
+  // está conectada al archivo DEMOGRAFICOS 2026-2027 en Google.
   studentsSyncSource: process.env.STUDENTS_SYNC_SOURCE?.toLowerCase() === "appsheet" ? "appsheet" : "drive",
   novedadesSyncMinutes: parseInt(process.env.NOVEDADES_SYNC_MINUTES || "10", 10),
   googleClientId: process.env.GOOGLE_CLIENT_ID || null,
