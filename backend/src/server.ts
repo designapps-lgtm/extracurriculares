@@ -11,74 +11,59 @@ async function start() {
     console.log(`[Backend] Server running on port ${PORT}`);
   });
 
+  // AppSheet/Demograficos es la única fuente de Student y StudentSchedule.
+  // Ante un fallo se conserva el último snapshot válido; nunca se usa Drive
+  // como fallback para no reintroducir datos externos.
   const runStudentSync = async () => {
-    const driveConfigured = Boolean(config.googleServiceAccountJson && config.googleDriveFolderId);
-    const driveIsPrimary = config.studentsSyncSource === "drive" && driveConfigured;
-    let shouldSyncDriveStudents = driveIsPrimary;
-
-    if (!driveIsPrimary && config.appsheetAppId && config.appsheetAccessKey) {
-      const result = await syncAppSheetStudents();
-      // No usar un Excel posiblemente viejo después de una importación AppSheet
-      // parcial: sólo se habilita el fallback si no se procesó ninguna fila.
-      shouldSyncDriveStudents = !result.ok && result.processed === 0;
-      if (result.errors.length > 0) {
-        console.error(`[AppSheet] Sync con errores (${result.received} recibidas, ${result.mapped} mapeadas, ${result.middleNames} con segundo nombre): ${result.errors.join(" | ")}`);
-      } else {
-        console.log(`[AppSheet] Estudiantes OK: ${result.processed} procesados (${result.created} nuevos, ${result.updated} actualizados, ${result.middleNames} con segundo nombre)`);
-      }
+    if (!config.appsheetAppId || !config.appsheetAccessKey) {
+      console.log("[AppSheet] Sync de estudiantes desactivado: faltan APPSHEET_APP_ID o APPSHEET_APPLICATION_ACCESS_KEY");
+      return;
     }
 
-    if (driveConfigured && shouldSyncDriveStudents) {
-      const driveResult = await syncDriveSources({ syncStudents: true });
-      if (driveResult.errors.length > 0) {
-        console.error(`[Drive] Sync de estudiantes con errores: ${driveResult.errors.join(" | ")}`);
-      } else {
-        console.log(`[Drive] Estudiantes OK: ${driveResult.students} procesados`);
-      }
-
-      if (driveIsPrimary && driveResult.students === 0 && config.appsheetAppId && config.appsheetAccessKey) {
-        const fallback = await syncAppSheetStudents();
-        if (fallback.errors.length > 0) {
-          console.error(`[AppSheet] Fallback con errores: ${fallback.errors.join(" | ")}`);
-        } else {
-          console.log(`[AppSheet] Fallback OK: ${fallback.processed} estudiantes (${fallback.middleNames} con segundo nombre)`);
-        }
-      }
-    } else if (!driveIsPrimary && !config.appsheetAppId) {
-      console.log("[Students] Sync desactivado: faltan credenciales de AppSheet y Drive");
+    const result = await syncAppSheetStudents();
+    if (result.errors.length > 0) {
+      console.error(`[AppSheet] Sync con errores (${result.received} recibidas, ${result.mapped} mapeadas, ${result.middleNames} con segundo nombre): ${result.errors.join(" | ")}`);
+    } else {
+      console.log(`[AppSheet] Estudiantes OK: ${result.processed} procesados (${result.created} nuevos, ${result.updated} actualizados, ${result.middleNames} con segundo nombre)`);
     }
   };
 
+  // Drive se conserva únicamente para oferta/horarios y novedades; no importa
+  // estudiantes ni inscripciones.
   const runDriveSync = async () => {
     if (!config.googleServiceAccountJson || !config.googleDriveFolderId) {
       return;
     }
-    const result = await syncNovedadesFromDrive();
-    if (result.errors.length > 0) {
-      console.error(`[Novedades] Sync con errores: ${result.errors.join(" | ")}`);
+
+    const offerResult = await syncDriveSources();
+    if (offerResult.errors.length > 0) {
+      console.error(`[Drive] Sync de oferta con errores: ${offerResult.errors.join(" | ")}`);
     } else {
-      console.log(`[Novedades] Sync OK: ${result.files} archivos, ${result.novedades} novedades`);
+      console.log(`[Drive] Oferta OK: ${offerResult.offerEntries} entradas, ${offerResult.files} archivos procesados`);
+    }
+
+    const novedadesResult = await syncNovedadesFromDrive();
+    if (novedadesResult.errors.length > 0) {
+      console.error(`[Novedades] Sync con errores: ${novedadesResult.errors.join(" | ")}`);
+    } else {
+      console.log(`[Novedades] Sync OK: ${novedadesResult.files} archivos, ${novedadesResult.novedades} novedades`);
     }
   };
 
-  if (
-    (config.studentsSyncSource === "drive" && config.googleServiceAccountJson && config.googleDriveFolderId) ||
-    (config.appsheetAppId && config.appsheetAccessKey)
-  ) {
-    setTimeout(() => { runStudentSync().catch((e) => console.error("[Students] Error en sync inicial:", e.message)); }, 5000);
-    setInterval(() => { runStudentSync().catch((e) => console.error("[Students] Error en sync periódico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
-    console.log(`[Students] Sync programado cada ${config.novedadesSyncMinutes} minutos usando ${config.studentsSyncSource}`);
+  if (config.appsheetAppId && config.appsheetAccessKey) {
+    setTimeout(() => { runStudentSync().catch((e) => console.error("[AppSheet] Error en sync inicial:", e.message)); }, 5000);
+    setInterval(() => { runStudentSync().catch((e) => console.error("[AppSheet] Error en sync periódico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
+    console.log(`[AppSheet] Sync de estudiantes programado cada ${config.novedadesSyncMinutes} minutos`);
   } else {
-    console.log("[Students] Sync desactivado: faltan credenciales de la fuente configurada");
+    console.log("[AppSheet] Sync de estudiantes desactivado: faltan credenciales");
   }
 
   if (config.googleServiceAccountJson && config.googleDriveFolderId) {
-    // Primer sync unos segundos después de arrancar (espera a que la DB esté lista)
-    setTimeout(() => { runDriveSync().catch((e) => console.error("[Novedades] Error en sync inicial:", e.message)); }, 5000);
-    setInterval(() => { runDriveSync().catch((e) => console.error("[Novedades] Error en sync periódico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
-    console.log(`[Novedades] Sync programado cada ${config.novedadesSyncMinutes} minutos`);
+    setTimeout(() => { runDriveSync().catch((e) => console.error("[Drive] Error en sync inicial:", e.message)); }, 5000);
+    setInterval(() => { runDriveSync().catch((e) => console.error("[Drive] Error en sync periódico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
+    console.log(`[Drive] Oferta y novedades programadas cada ${config.novedadesSyncMinutes} minutos`);
   } else {
-    console.log("[Novedades] Sync desactivado: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
+    console.log("[Drive] Oferta y novedades desactivadas: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
   }
 }
 

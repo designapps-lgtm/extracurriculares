@@ -22,10 +22,15 @@ import {
   supervisorSaveAttendance,
 } from "../attendance/attendance.service";
 import { getNovedadesBatch, getNovedadesDiarias } from "../novedades/novedades.controller";
+import { getStudents, getStudentProfile } from "../secretary/studentSecretary.controller";
 
 const router = Router();
 
 router.use(authenticateSupervisor, requireActiveSupervisor);
+
+// Directorio de estudiantes: consultas de sólo lectura para Supervisión.
+router.get("/students", asyncHandler(getStudents));
+router.get("/students/:codigo/profile", asyncHandler(getStudentProfile));
 
 router.get("/classes", asyncHandler(getSupervisorClasses));
 

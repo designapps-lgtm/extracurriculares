@@ -5,7 +5,14 @@ import { mapStudents } from "../excel/excelMapper";
 import { importStudents } from "../excel/studentImporter";
 
 const dryRun = process.argv.includes("--dry-run");
-const excelPath = process.env.EXCEL_PATH || "/app/Extracurriculares_base.xlsx";
+// La carga automática de estudiantes se realiza exclusivamente desde AppSheet.
+// Este CLI histórico sólo puede usarse de forma explícita para una migración
+// extraordinaria y nunca debe tomar un archivo predeterminado.
+const excelPath = process.env.EXCEL_PATH;
+
+if (!excelPath) {
+  throw new Error("EXCEL_PATH es obligatorio para el importador manual de estudiantes; la fuente normal es AppSheet/Demograficos");
+}
 
 async function main() {
   console.log(`\n${"=".repeat(60)}`);
