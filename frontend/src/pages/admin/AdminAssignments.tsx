@@ -27,6 +27,7 @@ const DIAS_CORTO: Record<string, string> = {
 };
 
 const DIAS_ORDEN = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
+const NO_ATTENDANCE_MESSAGE = "Todavía no se registró asistencia para este horario.";
 
 export default function AdminAssignments() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -203,11 +204,10 @@ export default function AdminAssignments() {
   };
 
   const schedulesByDay = (schedules: Assignment["schedules"]) => {
-    const grouped: Record<string, string[]> = {};
+    const grouped: Record<string, Assignment["schedules"]> = {};
     for (const s of schedules) {
       const day = s.schedule.diaSemana;
-      const time = `${s.schedule.horaInicio || "?"}–${s.schedule.horaFin || "?"}`;
-      (grouped[day] = grouped[day] || []).push(time);
+      (grouped[day] = grouped[day] || []).push(s);
     }
     return grouped;
   };
@@ -218,7 +218,11 @@ export default function AdminAssignments() {
 
   const autoScheduleInfo = sortedSchedules
     .filter((s) => autoSchedules.includes(s.idHorario))
-    .map((s) => `${s.diaSemana} ${s.horaInicio || "?"}-${s.horaFin || "?"}${s.aula ? ` (${s.aula})` : ""}`)
+    .map((s) =>
+      s.horaInicio && s.horaFin
+        ? `${s.diaSemana} ${s.horaInicio}-${s.horaFin}${s.aula ? ` (${s.aula})` : ""}`
+        : NO_ATTENDANCE_MESSAGE,
+    )
     .join(" · ");
 
   const groupedAssignments = (() => {
@@ -326,8 +330,12 @@ export default function AdminAssignments() {
                             <span className="font-medium">
                               {DIAS_CORTO[day] || day}
                             </span>
-                            {times.map((t, i) => (
-                              <span key={i}>{t}</span>
+                            {times.map((s) => (
+                              <span key={s.schedule.idHorario}>
+                                {s.schedule.horaInicio && s.schedule.horaFin
+                                  ? `${s.schedule.horaInicio}–${s.schedule.horaFin}`
+                                  : NO_ATTENDANCE_MESSAGE}
+                              </span>
                             ))}
                           </span>
                         ))}
@@ -599,8 +607,10 @@ export default function AdminAssignments() {
                           onChange={() => toggleSchedule(s.idHorario)}
                           className="rounded border-surface-300"
                         />
-                        {s.diaSemana} {s.horaInicio || "NULL"}–
-                        {s.horaFin || "NULL"} {s.aula ? `(${s.aula})` : ""}
+                        {s.horaInicio && s.horaFin
+                          ? `${s.diaSemana} ${s.horaInicio}–${s.horaFin}`
+                          : NO_ATTENDANCE_MESSAGE}
+                        {s.aula ? ` (${s.aula})` : ""}
                       </label>
                     ))}
                   </div>

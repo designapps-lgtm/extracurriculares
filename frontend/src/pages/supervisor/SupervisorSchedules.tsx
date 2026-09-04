@@ -23,6 +23,7 @@ const DIAS_CORTO: Record<string, string> = {
 };
 
 const DIAS_ORDEN = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
+const NO_ATTENDANCE_MESSAGE = "Todavía no se registró asistencia para este horario.";
 
 function diaDeFecha(fecha: string): string {
   const d = new Date(`${fecha}T12:00:00Z`);
@@ -126,12 +127,20 @@ function ScheduleBlock({
   return (
     <div className="rounded-xl border border-surface-200 dark:border-surface-800 overflow-hidden">
       <div className="px-3 py-2 bg-surface-50 dark:bg-surface-800/60 flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">
-          {DIAS_CORTO[schedule.diaSemana] || schedule.diaSemana}
-        </span>
-        <span className="text-xs text-surface-500 tabular-nums">
-          {schedule.horaInicio ?? "?"}–{schedule.horaFin ?? "?"}
-        </span>
+        {schedule.horaInicio && schedule.horaFin ? (
+          <>
+            <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">
+              {DIAS_CORTO[schedule.diaSemana] || schedule.diaSemana}
+            </span>
+            <span className="text-xs text-surface-500 tabular-nums">
+              {schedule.horaInicio}–{schedule.horaFin}
+            </span>
+          </>
+        ) : (
+          <span className="text-xs text-surface-500">
+            {NO_ATTENDANCE_MESSAGE}
+          </span>
+        )}
         {schedule.aula && <span className="text-xs text-surface-400">· {schedule.aula}</span>}
         <span className="ml-auto text-xs text-surface-400">
           {students.length} estudiante{students.length === 1 ? "" : "s"}
@@ -298,8 +307,14 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
           key={sch.idHorario}
           className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-800"
         >
-          <span className="font-medium">{DIAS_CORTO[sch.diaSemana] || sch.diaSemana}</span>
-          <span className="tabular-nums">{sch.horaInicio ?? "?"}–{sch.horaFin ?? "?"}</span>
+          {sch.horaInicio && sch.horaFin ? (
+            <>
+              <span className="font-medium">{DIAS_CORTO[sch.diaSemana] || sch.diaSemana}</span>
+              <span className="tabular-nums">{sch.horaInicio}–{sch.horaFin}</span>
+            </>
+          ) : (
+            <span>{NO_ATTENDANCE_MESSAGE}</span>
+          )}
         </span>
       ));
 
