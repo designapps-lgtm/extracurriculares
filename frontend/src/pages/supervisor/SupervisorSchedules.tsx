@@ -4,6 +4,7 @@ import { roleApis, type RoleKind, type RoleUser } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
+import { matchesSearchText } from "../../utils/search";
 import type {
   SupervisorTeacherSchedule,
   SupervisorAssignmentHistory,
@@ -183,6 +184,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
 
   const [profesor, setProfesor] = useState("");
   const [profesorQuery, setProfesorQuery] = useState("");
+  const [disciplinaQuery, setDisciplinaQuery] = useState("");
   const [grado, setGrado] = useState("");
   const [fecha, setFecha] = useState("");
 
@@ -267,12 +269,13 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
     let list = assignments;
     if (profesor) list = list.filter((a) => a.teacher.idProfesor === profesor);
     if (profesorQuery.trim()) {
-      const q = profesorQuery.trim().toLowerCase();
-      list = list.filter(
-        (a) =>
-          a.teacher.nombre.toLowerCase().includes(q) ||
-          a.teacher.apellido.toLowerCase().includes(q) ||
-          `${a.teacher.nombre} ${a.teacher.apellido}`.toLowerCase().includes(q),
+      list = list.filter((a) =>
+        matchesSearchText(`${a.teacher.nombre} ${a.teacher.apellido}`, profesorQuery),
+      );
+    }
+    if (disciplinaQuery.trim()) {
+      list = list.filter((a) =>
+        matchesSearchText(`${a.discipline.codigoDisciplina} ${a.discipline.nombre}`, disciplinaQuery),
       );
     }
     if (grado) list = list.filter((a) => String(a.grade.idGrado) === grado);
@@ -281,7 +284,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
       list = list.filter((a) => a.schedules.some((sc) => sc.diaSemana === d));
     }
     return list;
-  }, [assignments, profesor, profesorQuery, grado, fecha]);
+  }, [assignments, profesor, profesorQuery, disciplinaQuery, grado, fecha]);
 
   const renderSchedules = (a: SupervisorTeacherSchedule) =>
     [...a.schedules]
@@ -307,7 +310,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
         (x.schedule.horaInicio ?? "").localeCompare(y.schedule.horaInicio ?? ""),
     );
 
-  const hasActiveFilters = profesor !== "" || profesorQuery !== "" || grado !== "" || fecha !== "";
+  const hasActiveFilters = profesor !== "" || profesorQuery !== "" || disciplinaQuery !== "" || grado !== "" || fecha !== "";
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950">
@@ -338,7 +341,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
         </div>
 
         <div className="card p-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
               <label className="block text-xs font-medium text-surface-500 mb-1">Buscar profesor</label>
               <input
@@ -346,6 +349,16 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
                 value={profesorQuery}
                 onChange={(e) => setProfesorQuery(e.target.value)}
                 placeholder="Nombre o apellido…"
+                className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-surface-500 mb-1">Disciplina</label>
+              <input
+                type="text"
+                value={disciplinaQuery}
+                onChange={(e) => setDisciplinaQuery(e.target.value)}
+                placeholder="Nombre o código…"
                 className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
@@ -409,6 +422,7 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
                 onClick={() => {
                   setProfesor("");
                   setProfesorQuery("");
+                  setDisciplinaQuery("");
                   setGrado("");
                   setFecha("");
                 }}

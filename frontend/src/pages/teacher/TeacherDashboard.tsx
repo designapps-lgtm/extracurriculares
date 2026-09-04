@@ -5,6 +5,7 @@ import { logout } from "../../services/auth";
 import { useNotify } from "../../components/common/Notify";
 import type { TeacherClass } from "../../types";
 import Logo from "../../components/common/Logo";
+import { matchesSearchText } from "../../utils/search";
 
 const DIAS_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 const DIAS_ES: Record<string, string> = {
@@ -27,6 +28,7 @@ export default function TeacherDashboard() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [disciplineQuery, setDisciplineQuery] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
@@ -76,7 +78,17 @@ export default function TeacherDashboard() {
     );
   }
 
-  const grouped = classes.reduce((acc, cls) => {
+  const disciplineSearch = disciplineQuery.trim();
+  const filteredClasses = disciplineSearch
+    ? classes.filter((cls) =>
+        matchesSearchText(
+          `${cls.discipline.codigoDisciplina} ${cls.discipline.nombre}`,
+          disciplineSearch,
+        ),
+      )
+    : classes;
+
+  const grouped = filteredClasses.reduce((acc, cls) => {
     const day = cls.schedule.diaSemana;
     (acc[day] = acc[day] || []).push(cls);
     return acc;
@@ -126,23 +138,51 @@ export default function TeacherDashboard() {
             Ver todos los Horarios Extracurriculares →
           </button>
         )}
+        {classes.length > 0 && (
+          <div className="card p-4 mb-6">
+            <label htmlFor="teacher-discipline-search" className="block text-xs font-medium text-surface-500 mb-1">
+              Buscar disciplina
+            </label>
+            <input
+              id="teacher-discipline-search"
+              type="text"
+              value={disciplineQuery}
+              onChange={(event) => setDisciplineQuery(event.target.value)}
+              placeholder="Nombre o código de disciplina…"
+              className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+        )}
         {classes.length === 0 ? (
           <div className="card p-8 text-center">
             <p className="text-surface-500">No tienes asignaciones registradas.</p>
           </div>
         ) : !hasVisibleClasses ? (
-          <div className="card p-8 text-center space-y-3">
-            <p className="text-surface-900 dark:text-surface-100 font-medium">No tienes clases para {showAll ? "mostrar" : "hoy"}.</p>
-            <p className="text-surface-500 text-sm">Puedes ver todos los Horarios Extracurriculares para revisar las demás jornadas.</p>
-            {!showAll && (
+          disciplineQuery.trim() ? (
+            <div className="card p-8 text-center space-y-3">
+              <p className="text-surface-900 dark:text-surface-100 font-medium">No hay clases que coincidan con la disciplina buscada.</p>
+              <p className="text-surface-500 text-sm">Prueba con el nombre o código de otra disciplina.</p>
               <button
-                onClick={() => setShowAll(true)}
+                onClick={() => setDisciplineQuery("")}
                 className="inline-flex px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
               >
-                Ver todos
+                Limpiar búsqueda
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="card p-8 text-center space-y-3">
+              <p className="text-surface-900 dark:text-surface-100 font-medium">No tienes clases para {showAll ? "mostrar" : "hoy"}.</p>
+              <p className="text-surface-500 text-sm">Puedes ver todos los Horarios Extracurriculares para revisar las demás jornadas.</p>
+              {!showAll && (
+                <button
+                  onClick={() => setShowAll(true)}
+                  className="inline-flex px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700"
+                >
+                  Ver todos
+                </button>
+              )}
+            </div>
+          )
         ) : (
           <div className="space-y-6">
             {visibleDays.map((day) => {
