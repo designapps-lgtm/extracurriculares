@@ -220,7 +220,7 @@ export default function TeacherDashboard() {
                               <p className="text-sm text-surface-500 mt-0.5">
                                 {cls.grades && cls.grades.length > 0
                                   ? `Grados ${cls.grades.map((g) => g.nombre).join(", ")}`
-                                  : `Grado ${cls.grade.nombre}`} · {cls.schedule.horaInicio} - {cls.schedule.horaFin}
+                                  : `Grado ${cls.grade.nombre}`} · {cls.schedule.horaInicio && cls.schedule.horaFin ? `${cls.schedule.horaInicio} - ${cls.schedule.horaFin}` : "Todavía no se registró asistencia para este horario."}
                                 {cls.schedule.aula && ` · ${cls.schedule.aula}`}
                               </p>
                               <p className="text-xs text-surface-400 mt-1">

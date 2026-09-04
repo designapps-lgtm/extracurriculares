@@ -361,7 +361,8 @@ export default function SupervisorDashboard({ role = "supervisor" }: PageProps) 
                           <span className="ml-2 text-xs text-surface-500">Grado {s.assignment.grade.nombre}</span>
                         </p>
                         <p className="text-sm text-surface-500 mt-0.5">
-                          {s.teacher.nombre} {s.teacher.apellido} · {s.schedule.diaSemana} {s.schedule.horaInicio} - {s.schedule.horaFin}
+                          {s.teacher.nombre} {s.teacher.apellido} · {s.schedule.diaSemana}{" "}
+                          {s.schedule.horaInicio && s.schedule.horaFin ? `${s.schedule.horaInicio} - ${s.schedule.horaFin}` : "Todavía no se registró asistencia para este horario."}
                         </p>
                         <p className="text-xs text-surface-400 mt-1">{formatFecha(s.fecha)}</p>
                         <div className="flex flex-wrap gap-2 mt-2">
