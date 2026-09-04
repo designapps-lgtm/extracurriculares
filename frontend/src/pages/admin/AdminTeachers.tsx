@@ -26,6 +26,8 @@ import type {
   Schedule,
 } from "../../types";
 
+const NO_ATTENDANCE_MESSAGE = "Todavía no se registró asistencia para este horario.";
+
 export default function AdminTeachers() {
   const navigate = useNavigate();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -310,7 +312,11 @@ export default function AdminTeachers() {
 
   const autoScheduleText = allSchedules
     .filter((s) => autoSchedules.includes(s.idHorario))
-    .map((s) => `${s.diaSemana} ${s.horaInicio || "?"}-${s.horaFin || "?"}`)
+    .map((s) =>
+      s.horaInicio && s.horaFin
+        ? `${s.diaSemana} ${s.horaInicio}-${s.horaFin}`
+        : NO_ATTENDANCE_MESSAGE,
+    )
     .join(" · ");
 
   return (
@@ -565,9 +571,10 @@ Profesores Extracurriculares        </h1>
                             <p className="text-sm text-surface-400 mt-0.5">
                               {a.schedules.length > 0
                                 ? a.schedules
-                                    .map(
-                                      (s) =>
-                                        `${s.schedule.diaSemana} ${s.schedule.horaInicio}-${s.schedule.horaFin}`,
+                                    .map((s) =>
+                                      s.schedule.horaInicio && s.schedule.horaFin
+                                        ? `${s.schedule.diaSemana} ${s.schedule.horaInicio}-${s.schedule.horaFin}`
+                                        : NO_ATTENDANCE_MESSAGE,
                                     )
                                     .join(", ")
                                 : "Sin horario"}
@@ -703,7 +710,9 @@ Profesores Extracurriculares        </h1>
                                         : "bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-200"
                                     }`}
                                   >
-                                    {s.horaInicio}-{s.horaFin}
+                                    {s.horaInicio && s.horaFin
+                                      ? `${s.horaInicio}-${s.horaFin}`
+                                      : NO_ATTENDANCE_MESSAGE}
                                   </button>
                                 ))}
                               </div>
