@@ -41,6 +41,17 @@ DATABASE_URL="postgresql://USER:PASS@HOST/neondb?sslmode=require" npx prisma db 
 
 > No hay migraciones (`prisma/migrations` vacío), por eso usamos `db push` para
 > crear las tablas. En el futuro conviene `prisma migrate dev` y comitear migraciones.
+>
+> Para el registro de llamadas, después de sincronizar el schema hay que ejecutar
+> también el SQL de backfill antes de desplegar el backend nuevo:
+>
+> ```bash
+> cd backend
+> psql "postgresql://USER:PASS@HOST/neondb?sslmode=require" -f prisma/AttendanceCallStatus.sql
+> ```
+>
+> El script es idempotente: crea las columnas/índices si faltan y marca sesiones
+> históricas en curso o finalizadas como `historico`, sin atribuirlas a un usuario.
 
 ---
 

@@ -16,8 +16,8 @@ function nowColombia() {
 }
 
 // Roster de SOLO LECTURA para la secretaria: dados una asignación y un horario,
-// devuelve los estudiantes de TODOS los grados del código que dicta ese profesor
-// para el día de la clase, sin crear sesión ni poder marcar asistencia.
+// devuelve la clase lógica completa (todos los grados y co-profesores del código)
+// para el día, sin crear sesión ni poder marcar asistencia.
 export async function getSecretaryClassStudents(req: Request, res: Response) {
   const idAsignacion = param(req, "asignacionId");
   const idHorario = param(req, "horarioId");
@@ -45,12 +45,13 @@ export async function getSecretaryClassStudents(req: Request, res: Response) {
     throw new AppError(404, "SCHEDULE_NOT_FOUND", "Horario no encontrado");
   }
 
-  // Todos los grados que el mismo profesor dicta bajo ese código.
+  // Todos los grados activos de la clase compartida en este horario.
   const codeGrades = (await sql`
     SELECT DISTINCT ea."idGrado"
     FROM "ExtracurricularAssignment" ea
+    INNER JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
     WHERE ea."codigoDisciplina" = ${assignment.codigoDisciplina}
-      AND ea."idProfesor" = ${assignment.idProfesor}
+      AND asch."idHorario" = ${idHorario}
       AND ea."estado" = 'activo'
   `) as unknown as Array<{ idGrado: number }>;
   const gradeIds = codeGrades.map((g) => g.idGrado);

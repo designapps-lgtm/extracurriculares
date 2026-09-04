@@ -47,18 +47,21 @@ export default function TeacherAttendance() {
   const toggleAttendance = (codigoEstudiante: string, newEstado: string) => {
     setStudents((prev) =>
       prev.map((s) =>
-        s.codigoEstudiante === codigoEstudiante ? { ...s, estado: s.estado === newEstado ? "pendiente" : newEstado } : s
+        s.codigoEstudiante === codigoEstudiante ? { ...s, estado: newEstado } : s
       )
     );
   };
 
   const handleSave = async () => {
     if (!sessionId) return;
+    const pendingCount = students.filter((s) => s.estado === "pendiente").length;
+    if (pendingCount > 0) {
+      notify.error(`Debe marcar Presente o Ausente para los ${pendingCount} estudiantes pendientes`);
+      return;
+    }
     setSaving(true);
     try {
-      const records = students
-        .filter((s) => s.estado !== "pendiente")
-        .map((s) => ({ codigoEstudiante: s.codigoEstudiante, estado: s.estado }));
+      const records = students.map((s) => ({ codigoEstudiante: s.codigoEstudiante, estado: s.estado }));
       await saveAttendance(sessionId, records);
       navigate(returnTo);
     } catch (err: any) {
@@ -124,9 +127,6 @@ export default function TeacherAttendance() {
           </button>
           <button onClick={() => markAll("ausente")} className="px-3 py-2 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200">
             Todos ausentes
-          </button>
-          <button onClick={() => markAll("pendiente")} className="px-3 py-2 text-xs font-medium bg-surface-100 text-surface-600 rounded-lg hover:bg-surface-200">
-            Limpiar
           </button>
         </div>
 

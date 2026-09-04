@@ -29,6 +29,7 @@ interface SessionWhere {
 }
 
 // Las asistencias operativas siempre corresponden al día actual en Colombia.
+// Sólo se muestran sesiones que el profesor cerró oficialmente.
 function buildSessionWhereSQL(query: Record<string, string>): SessionWhere {
   const { grado, disciplina, profesor } = query;
   const conditions: string[] = [];
@@ -44,11 +45,30 @@ function buildSessionWhereSQL(query: Record<string, string>): SessionWhere {
   }
   if (profesor) {
     params.push(profesor);
-    conditions.push(`cs."idProfesor" = $${params.length}`);
+    conditions.push(`EXISTS (
+      SELECT 1
+      FROM "ExtracurricularAssignment" professorAssignment
+      INNER JOIN "AssignmentSchedule" professorSchedule
+        ON professorSchedule."idAsignacion" = professorAssignment."idAsignacion"
+      WHERE professorAssignment."idProfesor" = $${params.length}
+        AND professorAssignment."codigoDisciplina" = ea."codigoDisciplina"
+        AND professorAssignment."estado" = 'activo'
+        AND professorSchedule."idHorario" = cs."idHorario"
+    )`);
   }
   if (grado) {
     params.push(grado);
-    conditions.push(`g."nombre" = $${params.length}`);
+    conditions.push(`EXISTS (
+      SELECT 1
+      FROM "ExtracurricularAssignment" gradeAssignment
+      INNER JOIN "AssignmentSchedule" gradeSchedule
+        ON gradeSchedule."idAsignacion" = gradeAssignment."idAsignacion"
+      INNER JOIN "Grade" filterGrade ON filterGrade."idGrado" = gradeAssignment."idGrado"
+      WHERE gradeAssignment."codigoDisciplina" = ea."codigoDisciplina"
+        AND gradeAssignment."estado" = 'activo'
+        AND gradeSchedule."idHorario" = cs."idHorario"
+        AND filterGrade."nombre" = $${params.length}
+    )`);
   }
 
   return { conditions, params };
@@ -138,6 +158,28 @@ const SESSION_JOIN = `
   LEFT JOIN "AttendanceRecord" a ON a."sessionId" = cs."id"
 `;
 
+// Las sesiones duplicadas históricas no se eliminan. Para lectura se conserva
+// una sola sesión canónica por disciplina + horario + fecha, priorizando una
+// finalizada y, entre equivalentes, la que tenga más registros.
+const CANONICAL_SESSION_JOIN = `
+  INNER JOIN (
+    SELECT "sessionId"
+    FROM (
+      SELECT cs2."id" AS "sessionId",
+             ROW_NUMBER() OVER (
+               PARTITION BY ea2."codigoDisciplina", cs2."idHorario", cs2."fecha"::date
+               ORDER BY
+                 CASE WHEN cs2."estado" = 'finalizada' THEN 0 WHEN cs2."llamadaAt" IS NOT NULL THEN 1 ELSE 2 END,
+                 (SELECT COUNT(*) FROM "AttendanceRecord" ar2 WHERE ar2."sessionId" = cs2."id") DESC,
+                 cs2."updatedAt" DESC
+             ) AS "sessionRank"
+      FROM "ClassSession" cs2
+      INNER JOIN "ExtracurricularAssignment" ea2 ON ea2."idAsignacion" = cs2."idAsignacion"
+    ) rankedSessions
+    WHERE "sessionRank" = 1
+  ) canonicalSession ON canonicalSession."sessionId" = cs."id"
+`;
+
 export async function getSupervisorSessions(req: Request, res: Response) {
   const pagination = parsePagination(req.query as Record<string, string>);
   const { conditions, params } = buildSessionWhereSQL(req.query as Record<string, string>);
@@ -148,6 +190,7 @@ export async function getSupervisorSessions(req: Request, res: Response) {
     `SELECT COUNT(DISTINCT cs."id")::int AS total FROM "ClassSession" cs
      LEFT JOIN "ExtracurricularAssignment" ea ON ea."idAsignacion" = cs."idAsignacion"
      LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
+     ${CANONICAL_SESSION_JOIN}
      ${where}`,
     params
   ) as unknown as Array<{ total: number }>;
@@ -160,6 +203,7 @@ export async function getSupervisorSessions(req: Request, res: Response) {
   const rows = await sql(
     `SELECT ${SESSION_SELECT}
      ${SESSION_JOIN}
+     ${CANONICAL_SESSION_JOIN}
      ${where}
      GROUP BY cs."id", ea."idAsignacion", d."codigoDisciplina", g."idGrado", sc."idHorario", t."idProfesor"
      ORDER BY cs."fecha" DESC, cs."updatedAt" DESC
@@ -208,6 +252,8 @@ export async function getSupervisorSessionAttendance(req: Request, res: Response
     throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
   }
 
+  // Historial inmutable: se muestran exactamente los registros que guardó el
+  // profesor, aunque hoy cambien las inscripciones o el grado del estudiante.
   const records = await sql(
     `SELECT a."codigoEstudiante", st."nombre", st."apellido", st."grupo", st."fotoUrl", a."estado"
      FROM "AttendanceRecord" a
@@ -325,6 +371,7 @@ async function sessionsWithAttendances(conditions: string[], params: any[]): Pro
   const sessions = await sql(
     `SELECT ${SESSION_SELECT}
      ${SESSION_JOIN}
+     ${CANONICAL_SESSION_JOIN}
      ${where}
      GROUP BY cs."id", ea."idAsignacion", d."codigoDisciplina", g."idGrado", sc."idHorario", t."idProfesor"
      ORDER BY cs."fecha" DESC, cs."updatedAt" DESC`,
@@ -342,7 +389,6 @@ async function sessionsWithAttendances(conditions: string[], params: any[]): Pro
      ORDER BY st."apellido" ASC, st."nombre" ASC`,
     [sessionIds]
   ) as unknown as Array<AttendanceRow & { sessionId: string }>;
-
   const bySession = new Map<string, AttendanceRow[]>();
   for (const r of records) {
     if (!bySession.has(r.sessionId)) bySession.set(r.sessionId, []);
@@ -429,6 +475,31 @@ const SUP_DIA_MAP_COL: Record<string, string> = {
   4: "JUEVES", 5: "VIERNES", 6: "SABADO",
 };
 
+type CallStatus = "no_llamada" | "en_curso" | "finalizada";
+type CallType = "teacher" | "supervisor" | "admin" | "historico";
+
+function getCalledBy(row: {
+  llamadaAt: Date | string | null;
+  llamadaPorTipo: string | null;
+  llamadaPorId: string | null;
+  llamadaNombre: string | null;
+  llamadaApellido: string | null;
+}) {
+  if (!row.llamadaAt) return null;
+  const type: CallType = row.llamadaPorTipo === "teacher" || row.llamadaPorTipo === "supervisor" || row.llamadaPorTipo === "admin"
+    ? row.llamadaPorTipo
+    : "historico";
+  if (type === "historico") {
+    return { type, id: null, nombre: "Registro histórico", apellido: "" };
+  }
+  return {
+    type,
+    id: row.llamadaPorId,
+    nombre: row.llamadaNombre || "Usuario no disponible",
+    apellido: row.llamadaApellido || "",
+  };
+}
+
 // Clases de todos los profesores. Con `today=1` devuelve solo las del día de
 // hoy; si no, todas (el supervisor puede llamar a lista en cualquiera).
 export async function getSupervisorClasses(req: Request, res: Response) {
@@ -450,7 +521,8 @@ export async function getSupervisorClasses(req: Request, res: Response) {
     LEFT JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
     LEFT JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
     WHERE ea."estado" = 'activo'
-    ORDER BY sc."diaSemana" ASC, t."apellido" ASC, t."nombre" ASC
+    ORDER BY sc."diaSemana" ASC, t."apellido" ASC, t."nombre" ASC,
+             ea."esPrincipal" DESC, ea."idGrado" ASC
   `) as unknown as Array<{
     idAsignacion: string; codigoDisciplina: string; idGrado: number; esPrincipal: boolean;
     disciplinaNombre: string; gradoIdGrado: number; gradoNombre: string;
@@ -462,37 +534,120 @@ export async function getSupervisorClasses(req: Request, res: Response) {
   // N+1 eliminado: en vez de 1 query por clase (~600 subrequests en Workers),
   // traemos conteos y sesiones del día con dos queries agrupadas y combinamos
   // en memoria. Cloudflare Workers limita los subrequests por invocación.
-  const enrolledRows = (await sql`
-    SELECT ss."codigoDisciplina", ss."diaSemana", st."idGrado", COUNT(*)::int AS cnt
-    FROM "StudentSchedule" ss
-    LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
-    GROUP BY ss."codigoDisciplina", ss."diaSemana", st."idGrado"
-  `) as unknown as Array<{ codigoDisciplina: string; diaSemana: string; idGrado: number; cnt: number }>;
-
-  const sessionRows = (await sql`
-    SELECT cs."idAsignacion", cs."idHorario", cs."id", cs."estado",
-           COUNT(ar."id")::int AS "attendanceCount"
-    FROM "ClassSession" cs
-    LEFT JOIN "AttendanceRecord" ar ON ar."sessionId" = cs."id"
-    WHERE cs."fecha"::date = ${todayStr}::date
-    GROUP BY cs."idAsignacion", cs."idHorario", cs."id", cs."estado"
+  // Conteos del mismo roster que devuelve attendance.service: grados activos
+  // de la clase lógica y stays compartidos no duplicados con los inscritos.
+  const rosterStatsRows = (await sql`
+    WITH logical_grades AS (
+      SELECT DISTINCT ea."codigoDisciplina", asch."idHorario", sc."diaSemana", ea."idGrado"
+      FROM "ExtracurricularAssignment" ea
+      INNER JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
+      INNER JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
+      WHERE ea."estado" = 'activo'
+    ), enrolled AS (
+      SELECT DISTINCT lg."codigoDisciplina", lg."idHorario", ss."codigoEstudiante"
+      FROM logical_grades lg
+      INNER JOIN "StudentSchedule" ss
+        ON ss."codigoDisciplina" = lg."codigoDisciplina"
+       AND ss."diaSemana" = lg."diaSemana"
+      INNER JOIN "Student" st
+        ON st."codigoEstudiante" = ss."codigoEstudiante"
+       AND st."idGrado" = lg."idGrado"
+      WHERE st."estado" = 'activo'
+    ), extra_stays AS (
+      SELECT DISTINCT stayAssignment."codigoDisciplina", stay."idHorario", stay."codigoEstudiante"
+      FROM "SupervisorStay" stay
+      INNER JOIN "ExtracurricularAssignment" stayAssignment
+        ON stayAssignment."idAsignacion" = stay."idAsignacion"
+      INNER JOIN "Student" st ON st."codigoEstudiante" = stay."codigoEstudiante"
+      WHERE stay."fecha" = ${todayStr}::date
+        AND st."estado" = 'activo'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM enrolled
+          WHERE enrolled."codigoDisciplina" = stayAssignment."codigoDisciplina"
+            AND enrolled."idHorario" = stay."idHorario"
+            AND enrolled."codigoEstudiante" = stay."codigoEstudiante"
+        )
+    ), logical_classes AS (
+      SELECT DISTINCT "codigoDisciplina", "idHorario" FROM logical_grades
+    )
+    SELECT lc."codigoDisciplina", lc."idHorario",
+           (SELECT COUNT(*)::int FROM enrolled
+             WHERE enrolled."codigoDisciplina" = lc."codigoDisciplina"
+               AND enrolled."idHorario" = lc."idHorario") AS "enrolledCount",
+           (SELECT COUNT(*)::int FROM extra_stays
+             WHERE extra_stays."codigoDisciplina" = lc."codigoDisciplina"
+               AND extra_stays."idHorario" = lc."idHorario") AS "stayCount",
+           ARRAY(
+             SELECT enrolled."codigoEstudiante" FROM enrolled
+             WHERE enrolled."codigoDisciplina" = lc."codigoDisciplina"
+               AND enrolled."idHorario" = lc."idHorario"
+             UNION
+             SELECT extra_stays."codigoEstudiante" FROM extra_stays
+             WHERE extra_stays."codigoDisciplina" = lc."codigoDisciplina"
+               AND extra_stays."idHorario" = lc."idHorario"
+           ) AS "rosterCodes"
+    FROM logical_classes lc
   `) as unknown as Array<{
-    idAsignacion: string; idHorario: string; id: string; estado: string; attendanceCount: number;
+    codigoDisciplina: string; idHorario: string; enrolledCount: number; stayCount: number; rosterCodes: string[];
   }>;
 
-  const enrolledKey = (d: string, dia: string) => `${d}|${dia}`;
-  const enrolledMap = new Map<string, number>();
-  for (const r of enrolledRows) {
-    const key = enrolledKey(r.codigoDisciplina, r.diaSemana);
-    enrolledMap.set(key, (enrolledMap.get(key) ?? 0) + r.cnt);
-  }
+  const sessionRows = (await sql`
+    SELECT sessionAssignment."codigoDisciplina", cs."idAsignacion", cs."idHorario", cs."id", cs."estado",
+           cs."llamadaAt", cs."llamadaPorTipo", cs."llamadaPorId", cs."updatedAt",
+           MAX(COALESCE(callTeacher."nombre", callSupervisor."nombre", callAdmin."nombre")) AS "llamadaNombre",
+           MAX(COALESCE(callTeacher."apellido", callSupervisor."apellido", callAdmin."apellido")) AS "llamadaApellido",
+           COUNT(ar."id")::int AS "attendanceCount"
+    FROM "ClassSession" cs
+    INNER JOIN "ExtracurricularAssignment" sessionAssignment
+      ON sessionAssignment."idAsignacion" = cs."idAsignacion"
+    LEFT JOIN "AttendanceRecord" ar ON ar."sessionId" = cs."id"
+    LEFT JOIN "Teacher" callTeacher
+      ON cs."llamadaPorTipo" = 'teacher' AND cs."llamadaPorId" = callTeacher."idProfesor"
+    LEFT JOIN "Supervisor" callSupervisor
+      ON cs."llamadaPorTipo" = 'supervisor' AND cs."llamadaPorId" = callSupervisor."idSupervisor"
+    LEFT JOIN "AdminUser" callAdmin
+      ON cs."llamadaPorTipo" = 'admin' AND cs."llamadaPorId" = callAdmin."id"
+    WHERE cs."fecha"::date = ${todayStr}::date
+    GROUP BY sessionAssignment."codigoDisciplina", cs."idAsignacion", cs."idHorario", cs."id", cs."estado",
+             cs."llamadaAt", cs."llamadaPorTipo", cs."llamadaPorId", cs."updatedAt"
+    ORDER BY
+      CASE WHEN cs."estado" = 'finalizada' THEN 0 WHEN cs."llamadaAt" IS NOT NULL THEN 1 ELSE 2 END,
+      COUNT(ar."id") DESC,
+      cs."updatedAt" DESC
+  `) as unknown as Array<{
+    codigoDisciplina: string; idAsignacion: string; idHorario: string; id: string; estado: string;
+    llamadaAt: Date | string | null; llamadaPorTipo: string | null; llamadaPorId: string | null;
+    llamadaNombre: string | null; llamadaApellido: string | null; attendanceCount: number;
+  }>;
 
-  const sessionKey = (a: string, h: string) => `${a}|${h}`;
-  const sessionMap = new Map<string, { id: string; estado: string; attendanceCount: number }>();
+  const classKey = (discipline: string, schedule: string) => `${discipline}|${schedule}`;
+  const rosterStatsMap = new Map(
+    rosterStatsRows.map((row) => [classKey(row.codigoDisciplina, row.idHorario), row]),
+  );
+
+  const sessionKey = classKey;
+  const sessionMap = new Map<string, {
+    id: string;
+    estado: string;
+    attendanceCount: number;
+    llamadaAt: Date | string | null;
+    llamadaPorTipo: string | null;
+    llamadaPorId: string | null;
+    calledBy: ReturnType<typeof getCalledBy>;
+  }>();
   for (const r of sessionRows) {
-    const key = sessionKey(r.idAsignacion, r.idHorario);
+    const key = sessionKey(r.codigoDisciplina, r.idHorario);
     if (!sessionMap.has(key)) {
-      sessionMap.set(key, { id: r.id, estado: r.estado, attendanceCount: r.attendanceCount });
+      sessionMap.set(key, {
+        id: r.id,
+        estado: r.estado,
+        attendanceCount: r.attendanceCount,
+        llamadaAt: r.llamadaAt,
+        llamadaPorTipo: r.llamadaPorTipo,
+        llamadaPorId: r.llamadaPorId,
+        calledBy: getCalledBy(r),
+      });
     }
   }
 
@@ -509,6 +664,7 @@ export async function getSupervisorClasses(req: Request, res: Response) {
     const key = groupKey(a);
     let g = groups.get(key);
     if (!g) {
+      const rosterStats = rosterStatsMap.get(classKey(a.codigoDisciplina, a.idHorario));
       g = {
         idAsignacion: a.idAsignacion,
         discipline: { codigoDisciplina: a.codigoDisciplina, nombre: a.disciplinaNombre },
@@ -516,21 +672,36 @@ export async function getSupervisorClasses(req: Request, res: Response) {
         teacher: { idProfesor: a.idProfesor, nombre: a.profesorNombre, apellido: a.profesorApellido },
         schedule: { idHorario: a.idHorario, diaSemana: a.diaSemana, horaInicio: a.horaInicio, horaFin: a.horaFin, aula: a.aula },
         isToday: a.diaSemana === todayDay,
-        enrolledCount: enrolledMap.get(enrolledKey(a.codigoDisciplina, a.diaSemana!)) ?? 0,
+        enrolledCount: rosterStats?.enrolledCount ?? 0,
+        stayCount: rosterStats?.stayCount ?? 0,
         sessionId: null,
         sessionEstado: null,
         attendanceCount: 0,
+        llamadaAt: null,
+        llamadaPorTipo: null,
+        llamadaPorId: null,
+        calledBy: null,
+        callStatus: "no_llamada" as CallStatus,
       };
       groups.set(key, g);
     }
     if (!g.grades.some((x: { idGrado: number }) => x.idGrado === a.idGrado)) {
       g.grades.push({ idGrado: a.gradoIdGrado, nombre: a.gradoNombre });
     }
-    const sessionRow = sessionMap.get(sessionKey(a.idAsignacion, a.idHorario!));
+    const sessionRow = sessionMap.get(sessionKey(a.codigoDisciplina, a.idHorario!));
     if (sessionRow) {
+      // El panel informa lo que se guardó. Cambios posteriores en estudiantes
+      // o inscripciones no cambian ni el estado ni el conteo histórico.
       g.sessionId = sessionRow.id;
-      g.sessionEstado = sessionRow.estado;
       g.attendanceCount = sessionRow.attendanceCount;
+      g.llamadaAt = sessionRow.llamadaAt;
+      g.llamadaPorTipo = sessionRow.llamadaPorTipo;
+      g.llamadaPorId = sessionRow.llamadaPorId;
+      g.calledBy = sessionRow.calledBy;
+      g.callStatus = sessionRow.estado === "finalizada"
+        ? "finalizada"
+        : sessionRow.llamadaAt ? "en_curso" : "no_llamada";
+      g.sessionEstado = g.callStatus;
     }
   }
 

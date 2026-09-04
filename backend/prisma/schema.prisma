@@ -283,6 +283,9 @@ model ClassSession {
   idHorario      String
   fecha          DateTime
   estado         String   @default("programada")
+  llamadaAt      DateTime? @db.Timestamptz(3)
+  llamadaPorTipo String?
+  llamadaPorId   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -295,6 +298,8 @@ model ClassSession {
   @@unique([idAsignacion, idHorario, fecha])
   @@index([idProfesor])
   @@index([fecha])
+  @@index([fecha, llamadaAt])
+  @@index([llamadaPorTipo, llamadaPorId])
   @@index([idAsignacion])
 }
 
