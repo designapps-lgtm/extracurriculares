@@ -2,6 +2,7 @@ import { useParams, Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getStudentProfile } from "../services/students";
 import { getSecretaryStudentProfile } from "../services/secretary";
+import { getSupervisorStudentProfile } from "../services/supervisor";
 import { updateAdminStudent } from "../services/admin";
 import { useNotify } from "../components/common/Notify";
 import { Loading, ErrorMessage } from "../components/common/States";
@@ -30,11 +31,12 @@ export default function StudentProfile() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
   const isSecretary = location.pathname.startsWith("/secretary");
+  const isSupervisor = location.pathname.startsWith("/supervisor");
   const from = location.state as { from?: string; disciplina?: string } | null;
 
   const backTo = from?.from === "discipline" && from.disciplina
-    ? `${isAdmin ? "/admin" : isSecretary ? "/secretary" : ""}/disciplines/${from.disciplina}`
-    : isAdmin ? "/admin/students" : isSecretary ? "/secretary/students" : "/students";
+    ? `${isAdmin ? "/admin" : isSecretary ? "/secretary" : isSupervisor ? "/supervisor" : ""}/disciplines/${from.disciplina}`
+    : isAdmin ? "/admin/students" : isSecretary ? "/secretary/students" : isSupervisor ? "/supervisor/students" : "/students";
 
   const [profile, setProfile] = useState<StudentProfileType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,9 @@ export default function StudentProfile() {
     setError(null);
     const request = isSecretary
       ? getSecretaryStudentProfile(codigo)
-      : getStudentProfile(codigo);
+      : isSupervisor
+        ? getSupervisorStudentProfile(codigo)
+        : getStudentProfile(codigo);
     request
       .then((res) => {
         setProfile(res.data);

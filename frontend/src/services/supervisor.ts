@@ -12,6 +12,8 @@ import type {
   SupervisorStayStudent,
   SupervisorClassesResponse,
   AttendanceResponse,
+  Student,
+  StudentProfile,
   StudentNovedades,
 } from "../types";
 
@@ -56,6 +58,15 @@ export async function getSupervisorFilters(): Promise<SupervisorFilterData> {
     "/api/supervisor/filters",
   );
   return res.data;
+}
+
+/** Consultas de estudiantes de sólo lectura para cuentas supervisoras. */
+export async function getSupervisorStudents(params?: Record<string, string>) {
+  return api.get<PaginatedResponse<Student>>("/api/supervisor/students", params);
+}
+
+export async function getSupervisorStudentProfile(codigo: string) {
+  return api.get<ApiResponse<StudentProfile>>(`/api/supervisor/students/${encodeURIComponent(codigo)}/profile`);
 }
 
 export async function getSupervisorTeacherSchedules(): Promise<SupervisorTeacherSchedule[]> {

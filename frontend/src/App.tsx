@@ -29,6 +29,7 @@ import SupervisorClasses from "./pages/supervisor/SupervisorClasses";
 import SupervisorAttendance from "./pages/supervisor/SupervisorAttendance";
 import SupervisorNovedad from "./pages/supervisor/SupervisorNovedad";
 import SupervisorDailyNovedades from "./pages/supervisor/SupervisorDailyNovedades";
+import SupervisorStudents from "./pages/supervisor/SupervisorStudents";
 import SupervisorLayout from "./pages/supervisor/SupervisorLayout";
 
 // Secretary
@@ -74,6 +75,8 @@ function App() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<SupervisorDashboard />} />
         <Route path="classes" element={<SupervisorClasses />} />
+        <Route path="students" element={<SupervisorStudents />} />
+        <Route path="students/:codigo" element={<StudentProfile />} />
         <Route path="schedules" element={<SupervisorSchedules />} />
         <Route path="session/:sessionId" element={<SupervisorSession />} />
         <Route path="session-attendance/:sessionId" element={<SupervisorAttendance />} />

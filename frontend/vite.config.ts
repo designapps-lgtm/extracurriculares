@@ -7,6 +7,11 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    // Google Identity Services necesita conservar el vínculo con su popup.
+    // Esta cabecera sólo se aplica al servidor de desarrollo de Vite.
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    },
     watch: {
       usePolling: true,
       interval: 100,
