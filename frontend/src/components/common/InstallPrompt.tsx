@@ -38,6 +38,7 @@ export default function InstallPrompt() {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
   const [ios, setIos] = useState(false);
+  const [iosInstructionsVisible, setIosInstructionsVisible] = useState(false);
 
   useEffect(() => {
     if (isStandalone() || wasDismissedRecently()) return;
@@ -72,7 +73,10 @@ export default function InstallPrompt() {
   };
 
   const install = async () => {
-    if (!installEvent) return;
+    if (!installEvent) {
+      if (ios) setIosInstructionsVisible(true);
+      return;
+    }
     await installEvent.prompt();
     const choice = await installEvent.userChoice;
     setInstallEvent(null);
@@ -95,10 +99,14 @@ export default function InstallPrompt() {
           <p className="mt-1 text-sm leading-5 text-surface-600 dark:text-surface-300">
             Crea un acceso directo de Extracurriculares en la pantalla de inicio de tu dispositivo.
           </p>
-          {ios && !installEvent && (
-            <p className="mt-2 text-xs leading-5 text-surface-500 dark:text-surface-400">
-              En Safari: toca <strong>Compartir</strong> y luego <strong>Agregar a pantalla de inicio</strong>.
-            </p>
+          {ios && !installEvent && iosInstructionsVisible && (
+            <div className="mt-3 rounded-xl bg-brand-50 dark:bg-brand-950/40 px-3 py-2.5 text-xs leading-5 text-brand-800 dark:text-brand-200" aria-live="polite">
+              <p className="font-semibold">Cómo instalar en iPhone</p>
+              <ol className="mt-1 list-decimal list-inside">
+                <li>Toca <strong>Compartir</strong> en Safari.</li>
+                <li>Selecciona <strong>Agregar al inicio</strong>.</li>
+              </ol>
+            </div>
           )}
         </div>
         <button type="button" onClick={close} aria-label="Cerrar aviso" className="p-1 text-surface-400 hover:text-surface-700 dark:hover:text-surface-200">
@@ -107,7 +115,7 @@ export default function InstallPrompt() {
       </div>
       <div className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
         <button type="button" onClick={close} className="btn-secondary w-full sm:w-auto">Ahora no</button>
-        {installEvent && <button type="button" onClick={install} className="btn-primary w-full sm:w-auto">Instalar aplicación</button>}
+        {(installEvent || ios) && <button type="button" onClick={install} className="btn-primary w-full sm:w-auto">Instalar aplicación</button>}
       </div>
     </aside>
   );
