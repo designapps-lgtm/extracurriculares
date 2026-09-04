@@ -232,6 +232,16 @@ export interface SupervisorStay {
   };
 }
 
+export type AttendanceCallStatus = "no_llamada" | "en_curso" | "finalizada";
+export type AttendanceCallerType = "teacher" | "supervisor" | "admin" | "historico";
+
+export interface AttendanceCaller {
+  type: AttendanceCallerType;
+  id: string | null;
+  nombre: string;
+  apellido: string;
+}
+
 export interface TeacherClass {
   idAsignacion: string;
   discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
@@ -239,8 +249,13 @@ export interface TeacherClass {
   grades?: { idGrado: number; nombre: string }[];
   schedule: Schedule;
   enrolledCount: number;
+  stayCount: number;
   sessionId: string | null;
   sessionEstado: string | null;
+  llamadaAt: string | null;
+  llamadaPorTipo: AttendanceCallerType | null;
+  llamadaPorId: string | null;
+  callStatus: AttendanceCallStatus;
   attendanceCount: number;
 }
 
@@ -270,6 +285,9 @@ export interface AttendanceResponse {
     id: string;
     estado: string;
     fecha: string;
+    llamadaAt?: string | null;
+    llamadaPorTipo?: AttendanceCallerType | null;
+    llamadaPorId?: string | null;
   };
   teacher?: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
 }
@@ -283,8 +301,14 @@ export interface SupervisorCallableClass {
   schedule: Schedule;
   isToday: boolean;
   enrolledCount: number;
+  stayCount: number;
   sessionId: string | null;
   sessionEstado: string | null;
+  llamadaAt: string | null;
+  llamadaPorTipo: AttendanceCallerType | null;
+  llamadaPorId: string | null;
+  calledBy: AttendanceCaller | null;
+  callStatus: AttendanceCallStatus;
   attendanceCount: number;
 }
 

@@ -12,6 +12,13 @@ const DIAS_ES: Record<string, string> = {
   JUEVES: "Jueves", VIERNES: "Viernes", SABADO: "Sábado", DOMINGO: "Domingo",
 };
 
+function formatCallTime(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota" });
+}
+
 export default function TeacherDashboard() {
   const [teacher, setTeacher] = useState<{ idProfesor: string; nombre: string; apellido: string } | null>(null);
   const [classes, setClasses] = useState<TeacherClass[]>([]);
@@ -178,8 +185,18 @@ export default function TeacherDashboard() {
                               </p>
                               <p className="text-xs text-surface-400 mt-1">
                                 {cls.enrolledCount} inscritos
+                                {cls.stayCount > 0 && (
+                                  <span className="ml-2 text-brand-600">· {cls.stayCount} se quedan</span>
+                                )}
                                 {cls.attendanceCount > 0 && (
                                   <span className="ml-2 text-green-600">· {cls.attendanceCount} asistencias</span>
+                                )}
+                                {cls.callStatus === "no_llamada" ? (
+                                  <span className="ml-2 text-red-600 dark:text-red-400">· lista no llamada</span>
+                                ) : (
+                                  <span className="ml-2 text-brand-600 dark:text-brand-400">
+                                    · lista llamada{formatCallTime(cls.llamadaAt) ? ` a las ${formatCallTime(cls.llamadaAt)}` : ""}
+                                  </span>
                                 )}
                               </p>
                             </div>

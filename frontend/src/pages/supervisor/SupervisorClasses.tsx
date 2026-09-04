@@ -14,6 +14,20 @@ const DIAS_CORTO: Record<string, string> = {
 
 const DIAS_ORDEN = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 
+function formatCallTime(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: "America/Bogota" });
+}
+
+function callerLabel(cls: SupervisorCallableClass): string {
+  if (cls.callStatus === "no_llamada") return "Lista no llamada";
+  if (!cls.calledBy) return "Lista llamada";
+  const role = cls.calledBy.type === "teacher" ? "Profesor" : cls.calledBy.type === "supervisor" ? "Supervisora" : cls.calledBy.type === "admin" ? "Administrador" : "Histórico";
+  return `Lista llamada por ${role}: ${cls.calledBy.nombre} ${cls.calledBy.apellido}`.trim();
+}
+
 export interface PageProps {
   role?: RoleKind;
 }
@@ -258,9 +272,15 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
                           </p>
                           <p className="text-xs text-surface-400 mt-1">
                             {cls.enrolledCount} inscritos
+                            {cls.stayCount > 0 && (
+                              <span className="ml-2 text-brand-600">· {cls.stayCount} se quedan</span>
+                            )}
                             {cls.attendanceCount > 0 && (
                               <span className="ml-2 text-green-600">· {cls.attendanceCount} asistencias</span>
                             )}
+                          </p>
+                          <p className={`text-xs mt-1 ${cls.callStatus === "no_llamada" ? "text-red-600 dark:text-red-400" : "text-brand-600 dark:text-brand-400"}`}>
+                            {callerLabel(cls)}{formatCallTime(cls.llamadaAt) ? ` · ${formatCallTime(cls.llamadaAt)}` : ""}
                           </p>
                         </div>
 

@@ -14,6 +14,7 @@ import AdminStudents from "./pages/admin/AdminStudents";
 import AdminTeachers from "./pages/admin/AdminTeachers";
 import AdminAssignments from "./pages/admin/AdminAssignments";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminAttendanceCallStatus from "./pages/admin/AdminAttendanceCallStatus";
 
 // Teacher
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
@@ -99,6 +100,7 @@ function App() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="attendance" element={<SupervisorDashboard role="admin" />} />
+        <Route path="call-status" element={<AdminAttendanceCallStatus />} />
         <Route path="classes" element={<SupervisorClasses role="admin" />} />
         <Route path="classes/:asignacionId/:horarioId/students" element={<SecretaryClassStudents role="admin" />} />
         <Route path="schedules" element={<SupervisorSchedules role="admin" />} />

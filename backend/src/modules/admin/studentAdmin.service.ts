@@ -26,7 +26,8 @@ export async function getStudents(query: { search?: string; grado?: string; insc
     const tokens = search.trim().split(/\s+/).filter(Boolean);
     const parts = tokens.map((token) => {
       const p = next(`%${token}%`);
-      return `(${fullName} LIKE ${p} OR ${code} LIKE ${p})`;
+      const normalizedPattern = normalizedExpr(p);
+      return `(${fullName} LIKE ${normalizedPattern} OR ${code} LIKE ${normalizedPattern})`;
     });
     conditions.push(`(${parts.join(" AND ")})`);
   }

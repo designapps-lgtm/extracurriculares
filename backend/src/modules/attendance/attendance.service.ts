@@ -20,10 +20,18 @@ type AttendanceRecordInput = {
   estado?: unknown;
 };
 
+export type AttendanceCaller = {
+  type: "teacher" | "supervisor" | "admin";
+  id: string;
+};
+
 type AttendanceSessionRow = {
   id: string;
   estado: string;
   fecha: Date | string;
+  llamadaAt: Date | string | null;
+  llamadaPorTipo: string | null;
+  llamadaPorId: string | null;
   idAsignacion: string;
   codigoDisciplina: string;
   discNombre: string;
@@ -81,7 +89,7 @@ async function getAttendanceSession(sessionId: string): Promise<AttendanceSessio
   const row = await first<AttendanceSessionRow>(
     (await sql`
       SELECT
-        cs."id", cs."estado", cs."fecha", cs."idAsignacion", cs."idProfesor",
+        cs."id", cs."estado", cs."fecha", cs."llamadaAt", cs."llamadaPorTipo", cs."llamadaPorId", cs."idAsignacion", cs."idProfesor",
         ea."codigoDisciplina",
         d."nombre" AS "discNombre",
         g."idGrado" AS "gradoIdGrado", g."nombre" AS "gradoNombre",
@@ -106,11 +114,16 @@ async function getAttendanceSession(sessionId: string): Promise<AttendanceSessio
 }
 
 async function getRoster(session: AttendanceSessionRow): Promise<RosterResult> {
+  // La lista pertenece a la clase lógica (disciplina + horario), no a un
+  // profesor individual. Si una clase tiene co-profesores, ambos deben ver y
+  // guardar exactamente el mismo roster.
   const gradeRows = (await sql`
     SELECT DISTINCT ea."idGrado"
     FROM "ExtracurricularAssignment" ea
+    INNER JOIN "AssignmentSchedule" asch
+      ON asch."idAsignacion" = ea."idAsignacion"
     WHERE ea."codigoDisciplina" = ${session.codigoDisciplina}
-      AND ea."idProfesor" = ${session.idProfesor}
+      AND asch."idHorario" = ${session.idHorario}
       AND ea."estado" = 'activo'
   `) as unknown as Array<{ idGrado: number }>;
   const gradeIds = gradeRows.map((row) => row.idGrado);
@@ -147,12 +160,14 @@ async function getRoster(session: AttendanceSessionRow): Promise<RosterResult> {
     : [];
 
   const stays = (await sql`
-    SELECT
+    SELECT DISTINCT
       ss."codigoEstudiante",
       st."nombre", st."apellido", st."grupo", st."fotoUrl"
     FROM "SupervisorStay" ss
+    INNER JOIN "ExtracurricularAssignment" stayAssignment
+      ON stayAssignment."idAsignacion" = ss."idAsignacion"
     LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
-    WHERE ss."idAsignacion" = ${session.idAsignacion}
+    WHERE stayAssignment."codigoDisciplina" = ${session.codigoDisciplina}
       AND ss."idHorario" = ${session.idHorario}
       AND ss."fecha" = ${sessionDate(session)}::date
       AND st."estado" = 'activo'
@@ -192,15 +207,15 @@ async function getRoster(session: AttendanceSessionRow): Promise<RosterResult> {
 export async function startAttendanceSession(
   idAsignacion: string,
   idHorario: string,
-  options: { onlyToday?: boolean } = {},
+  options: { onlyToday?: boolean; caller?: AttendanceCaller } = {},
 ) {
-  const assignment = await first<{ idProfesor: string; estado: string }>(
+  const assignment = await first<{ idProfesor: string; estado: string; codigoDisciplina: string }>(
     (await sql`
-      SELECT "idProfesor", "estado"
+      SELECT "idProfesor", "estado", "codigoDisciplina"
       FROM "ExtracurricularAssignment"
       WHERE "idAsignacion" = ${idAsignacion}
       LIMIT 1
-    `) as unknown as Array<{ idProfesor: string; estado: string }>
+    `) as unknown as Array<{ idProfesor: string; estado: string; codigoDisciplina: string }>
   );
 
   if (!assignment) {
@@ -230,34 +245,70 @@ export async function startAttendanceSession(
   }
 
   const date = todayColombia();
-  let session = await first<any>(
+  const findSharedSession = async () => first<any>(
     (await sql`
-      SELECT "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado"
-      FROM "ClassSession"
-      WHERE "idAsignacion" = ${idAsignacion}
-        AND "idHorario" = ${idHorario}
-        AND "fecha"::date = ${date}::date
+      SELECT cs."id", cs."idAsignacion", cs."idHorario", cs."idProfesor", cs."fecha",
+             cs."estado", cs."llamadaAt", cs."llamadaPorTipo", cs."llamadaPorId"
+      FROM "ClassSession" cs
+      INNER JOIN "ExtracurricularAssignment" sessionAssignment
+        ON sessionAssignment."idAsignacion" = cs."idAsignacion"
+      WHERE sessionAssignment."codigoDisciplina" = ${assignment.codigoDisciplina}
+        AND cs."idHorario" = ${idHorario}
+        AND cs."fecha"::date = ${date}::date
+      ORDER BY
+        CASE WHEN cs."estado" = 'finalizada' THEN 0 WHEN cs."llamadaAt" IS NOT NULL THEN 1 ELSE 2 END,
+        (SELECT COUNT(*) FROM "AttendanceRecord" ar WHERE ar."sessionId" = cs."id") DESC,
+        cs."updatedAt" DESC
       LIMIT 1
     `) as unknown as Array<any>
   );
 
-  if (session?.estado === "finalizada") {
-    throw new AppError(409, "SESSION_FINALIZED", "La Asistencia Extracurriculares de esta clase ya fue finalizada");
+  // Una clase compartida se identifica por disciplina + horario + fecha. La
+  // asignación y el profesor sólo indican quién puede acceder, no crean listas
+  // independientes.
+  let session = await findSharedSession();
+
+  if (!session) {
+    const lockKey = `${assignment.codigoDisciplina}:${idHorario}:${date}`;
+    const transactionResult = await sql.transaction((tx) => [
+      tx`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`,
+      tx`
+        INSERT INTO "ClassSession" ("id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt", "llamadaAt", "llamadaPorTipo", "llamadaPorId")
+        SELECT gen_random_uuid(), ${idAsignacion}, ${idHorario}, ${assignment.idProfesor}, ${today}, 'en_curso', now(), now(), now(), ${options.caller?.type ?? null}, ${options.caller?.id ?? null}
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM "ClassSession" existingSession
+          INNER JOIN "ExtracurricularAssignment" existingAssignment
+            ON existingAssignment."idAsignacion" = existingSession."idAsignacion"
+          WHERE existingAssignment."codigoDisciplina" = ${assignment.codigoDisciplina}
+            AND existingSession."idHorario" = ${idHorario}
+            AND existingSession."fecha"::date = ${date}::date
+        )
+        RETURNING "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "llamadaAt", "llamadaPorTipo", "llamadaPorId"
+      `,
+    ]);
+    const created = (transactionResult[1] || []) as unknown as Array<any>;
+    session = created[0] ?? await findSharedSession();
   }
 
   if (!session) {
-    const created = (await sql`
-      INSERT INTO "ClassSession" ("id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt")
-      VALUES (gen_random_uuid(), ${idAsignacion}, ${idHorario}, ${assignment.idProfesor}, ${today}, 'en_curso', now(), now())
-      RETURNING "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado"
-    `) as unknown as Array<any>;
-    session = created[0];
-  } else if (session.estado === "programada") {
+    throw new AppError(409, "SESSION_CREATE_FAILED", "No se pudo iniciar la Asistencia Extracurriculares");
+  }
+
+  // Si un co-profesor abre una lista ya finalizada, se reutiliza para consulta
+  // o edición autorizada; nunca se crea otra sesión vacía para la misma clase.
+  if (session.estado === "finalizada") return session;
+
+  if (session.estado === "programada" || !session.llamadaAt) {
     const updated = (await sql`
       UPDATE "ClassSession"
-      SET "estado" = 'en_curso', "updatedAt" = now()
+      SET "estado" = 'en_curso',
+          "updatedAt" = now(),
+          "llamadaAt" = COALESCE("llamadaAt", now()),
+          "llamadaPorTipo" = CASE WHEN "llamadaAt" IS NULL THEN ${options.caller?.type ?? null} ELSE "llamadaPorTipo" END,
+          "llamadaPorId" = CASE WHEN "llamadaAt" IS NULL THEN ${options.caller?.id ?? null} ELSE "llamadaPorId" END
       WHERE "id" = ${session.id}
-      RETURNING "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado"
+      RETURNING "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "llamadaAt", "llamadaPorTipo", "llamadaPorId"
     `) as unknown as Array<any>;
     session = updated[0];
   }
@@ -276,7 +327,14 @@ export async function getAttendanceData(sessionId: string) {
   const attendanceMap = new Map(existingAttendance.map((record) => [record.codigoEstudiante, record.estado]));
 
   return {
-    session: { id: session.id, estado: session.estado, fecha: session.fecha },
+    session: {
+      id: session.id,
+      estado: session.estado,
+      fecha: session.fecha,
+      llamadaAt: session.llamadaAt,
+      llamadaPorTipo: session.llamadaPorTipo,
+      llamadaPorId: session.llamadaPorId,
+    },
     assignment: {
       idAsignacion: session.idAsignacion,
       discipline: { codigoDisciplina: session.codigoDisciplina, nombre: session.discNombre },
@@ -357,7 +415,9 @@ export async function supervisorStartSession(req: Request, res: Response) {
   if (!idAsignacion || !idHorario) {
     throw new AppError(400, "VALIDATION_ERROR", "idAsignacion e idHorario son requeridos");
   }
-  res.json({ success: true, data: await startAttendanceSession(idAsignacion, idHorario) });
+  res.json({ success: true, data: await startAttendanceSession(idAsignacion, idHorario, {
+    caller: { type: "supervisor", id: req.supervisor!.supervisorId },
+  }) });
 }
 
 export async function adminStartSession(req: Request, res: Response) {
@@ -365,7 +425,10 @@ export async function adminStartSession(req: Request, res: Response) {
   if (!idAsignacion || !idHorario) {
     throw new AppError(400, "VALIDATION_ERROR", "idAsignacion e idHorario son requeridos");
   }
-  res.json({ success: true, data: await startAttendanceSession(idAsignacion, idHorario, { onlyToday: true }) });
+  res.json({ success: true, data: await startAttendanceSession(idAsignacion, idHorario, {
+    onlyToday: true,
+    caller: { type: "admin", id: req.admin!.adminId },
+  }) });
 }
 
 export async function attendanceList(req: Request, res: Response) {

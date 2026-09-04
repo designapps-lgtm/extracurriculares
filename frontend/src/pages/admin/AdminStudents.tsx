@@ -77,7 +77,10 @@ export default function AdminStudents() {
     }
   }, [debouncedSearch, filterGrado, filterInscrito]);
 
-  const handleSearch = () => load(1);
+  const handleSearch = () => {
+    setDebouncedSearch(search);
+    load(1, { search });
+  };
 
   const handleEdit = (student: Student) => {
     setEditing(student);

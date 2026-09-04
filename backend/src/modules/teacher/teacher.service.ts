@@ -2,7 +2,11 @@ import { Request, Response } from "express";
 import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
 import { param } from "../../utils/reqParams";
-import { saveAttendance as saveAttendanceRecords } from "../attendance/attendance.service";
+import {
+  getAttendanceData,
+  saveAttendance as saveAttendanceRecords,
+  startAttendanceSession,
+} from "../attendance/attendance.service";
 
 function nowColombia() {
   const now = new Date();
@@ -67,6 +71,10 @@ export async function getTeacherClasses(req: Request, res: Response) {
         stayCount: 0,
         sessionId: null,
         sessionEstado: null,
+        llamadaAt: null,
+        llamadaPorTipo: null,
+        llamadaPorId: null,
+        callStatus: "no_llamada",
         attendanceCount: 0,
       };
       groups.set(key, g);
@@ -78,30 +86,87 @@ export async function getTeacherClasses(req: Request, res: Response) {
 
   const classesWithStats = await Promise.all(
     Array.from(groups.values()).map(async (g) => {
-      const enrolledCountRow = (await sql`
-        SELECT COUNT(*)::int AS cnt
-        FROM "StudentSchedule" ss
-        WHERE ss."codigoDisciplina" = ${g.discipline.codigoDisciplina}
-          AND ss."diaSemana" = ${g.schedule.diaSemana}
-      `) as unknown as Array<{ cnt: number }>;
+      const statsRow = await first<{ enrolledCount: number; stayCount: number; rosterCodes: string[] }>(
+        (await sql`
+          WITH enrolled AS (
+            SELECT DISTINCT ss."codigoEstudiante"
+            FROM "StudentSchedule" ss
+            INNER JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
+            WHERE ss."codigoDisciplina" = ${g.discipline.codigoDisciplina}
+              AND ss."diaSemana" = ${g.schedule.diaSemana}
+              AND st."estado" = 'activo'
+              AND EXISTS (
+                SELECT 1
+                FROM "ExtracurricularAssignment" rosterAssignment
+                INNER JOIN "AssignmentSchedule" rosterSchedule
+                  ON rosterSchedule."idAsignacion" = rosterAssignment."idAsignacion"
+                WHERE rosterAssignment."codigoDisciplina" = ${g.discipline.codigoDisciplina}
+                  AND rosterAssignment."idGrado" = st."idGrado"
+                  AND rosterAssignment."estado" = 'activo'
+                  AND rosterSchedule."idHorario" = ${g.schedule.idHorario}
+              )
+          ), extra_stays AS (
+            SELECT DISTINCT stay."codigoEstudiante"
+            FROM "SupervisorStay" stay
+            INNER JOIN "ExtracurricularAssignment" stayAssignment
+              ON stayAssignment."idAsignacion" = stay."idAsignacion"
+            INNER JOIN "Student" st ON st."codigoEstudiante" = stay."codigoEstudiante"
+            WHERE stayAssignment."codigoDisciplina" = ${g.discipline.codigoDisciplina}
+              AND stay."idHorario" = ${g.schedule.idHorario}
+              AND stay."fecha" = ${todayStr}::date
+              AND st."estado" = 'activo'
+              AND NOT EXISTS (
+                SELECT 1 FROM enrolled WHERE enrolled."codigoEstudiante" = stay."codigoEstudiante"
+              )
+          )
+          SELECT
+            (SELECT COUNT(*)::int FROM enrolled) AS "enrolledCount",
+            (SELECT COUNT(*)::int FROM extra_stays) AS "stayCount",
+            ARRAY(
+              SELECT "codigoEstudiante" FROM enrolled
+              UNION
+              SELECT "codigoEstudiante" FROM extra_stays
+            ) AS "rosterCodes"
+        `) as unknown as Array<{ enrolledCount: number; stayCount: number; rosterCodes: string[] }>
+      );
 
       const sessionRow = await first<{
-        id: string; estado: string; attendanceCount: number;
+        id: string; estado: string; llamadaAt: Date | string | null;
+        llamadaPorTipo: string | null; llamadaPorId: string | null; attendanceCount: number;
       }>((await sql`
-        SELECT cs."id", cs."estado",
+        SELECT cs."id", cs."estado", cs."llamadaAt", cs."llamadaPorTipo", cs."llamadaPorId",
                COUNT(ar."id")::int AS "attendanceCount"
         FROM "ClassSession" cs
+        INNER JOIN "ExtracurricularAssignment" sessionAssignment
+          ON sessionAssignment."idAsignacion" = cs."idAsignacion"
         LEFT JOIN "AttendanceRecord" ar ON ar."sessionId" = cs."id"
-        WHERE cs."idAsignacion" = ${g.idAsignacion}
+        WHERE sessionAssignment."codigoDisciplina" = ${g.discipline.codigoDisciplina}
           AND cs."idHorario" = ${g.schedule.idHorario}
           AND cs."fecha"::date = ${todayStr}::date
-        GROUP BY cs."id", cs."estado"
-      `) as unknown as Array<{ id: string; estado: string; attendanceCount: number }>);
+        GROUP BY cs."id", cs."estado", cs."llamadaAt", cs."llamadaPorTipo", cs."llamadaPorId", cs."updatedAt"
+        ORDER BY
+          CASE WHEN cs."estado" = 'finalizada' THEN 0 WHEN cs."llamadaAt" IS NOT NULL THEN 1 ELSE 2 END,
+          COUNT(ar."id") DESC,
+          cs."updatedAt" DESC
+        LIMIT 1
+      `) as unknown as Array<{
+        id: string; estado: string; llamadaAt: Date | string | null;
+        llamadaPorTipo: string | null; llamadaPorId: string | null; attendanceCount: number;
+      }>);
 
-      g.enrolledCount = enrolledCountRow[0]?.cnt ?? 0;
+      g.enrolledCount = statsRow?.enrolledCount ?? 0;
+      g.stayCount = statsRow?.stayCount ?? 0;
       g.sessionId = sessionRow?.id ?? null;
-      g.sessionEstado = sessionRow?.estado ?? null;
+      g.llamadaAt = sessionRow?.llamadaAt ?? null;
+      g.llamadaPorTipo = sessionRow?.llamadaPorTipo ?? null;
+      g.llamadaPorId = sessionRow?.llamadaPorId ?? null;
+      // Las asistencias guardadas son históricas: el estado de la llamada se
+      // decide por la sesión almacenada, no por cambios posteriores del roster.
       g.attendanceCount = sessionRow?.attendanceCount ?? 0;
+      g.callStatus = sessionRow?.estado === "finalizada"
+        ? "finalizada"
+        : sessionRow?.llamadaAt ? "en_curso" : "no_llamada";
+      g.sessionEstado = g.callStatus;
       g.grades.sort((x: { idGrado: number }, y: { idGrado: number }) => x.idGrado - y.idGrado);
       return g;
     })
@@ -219,35 +284,9 @@ export async function startSession(req: Request, res: Response) {
     throw new AppError(400, "INVALID_SCHEDULE", "El horario no pertenece a esta asignación");
   }
 
-  const today = nowColombia();
-
-  let session = await first<{ id: string; estado: string }>(
-    (await sql`
-      SELECT "id", "estado"
-      FROM "ClassSession"
-      WHERE "idAsignacion" = ${idAsignacion}
-        AND "idHorario" = ${idHorario}
-        AND "fecha"::date = ${today.toISOString().split("T")[0]}::date
-      LIMIT 1
-    `) as unknown as Array<{ id: string; estado: string }>
-  );
-
-  if (!session) {
-    const created = (await sql`
-      INSERT INTO "ClassSession" ("id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt")
-      VALUES (gen_random_uuid(), ${idAsignacion}, ${idHorario}, ${teacherId}, ${today}, 'en_curso', now(), now())
-      RETURNING "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt"
-    `) as unknown as Array<any>;
-    session = created[0];
-  } else if (session.estado === "programada") {
-    const updated = (await sql`
-      UPDATE "ClassSession"
-      SET "estado" = 'en_curso', "updatedAt" = now()
-      WHERE "id" = ${session.id}
-      RETURNING "id", "idAsignacion", "idHorario", "idProfesor", "fecha", "estado", "createdAt", "updatedAt"
-    `) as unknown as Array<any>;
-    session = updated[0];
-  }
+  const session = await startAttendanceSession(idAsignacion, idHorario, {
+    caller: { type: "teacher", id: teacherId },
+  });
 
   res.json({ success: true, data: session });
 }
@@ -256,132 +295,62 @@ export async function getAttendanceList(req: Request, res: Response) {
   const teacherId = req.teacher!.teacherId;
   const sessionId = param(req, "sessionId");
 
-  const sessionRow = await first<any>(
+  // El profesor puede abrir la sesión aunque la haya iniciado un co-profesor,
+  // siempre que tenga una asignación activa para la misma clase lógica.
+  const teacherAccess = await first<{ idAsignacion: string }>(
     (await sql`
-      SELECT
-        cs."id", cs."estado", cs."fecha", cs."idProfesor",
-        ea."idAsignacion", ea."codigoDisciplina",
-        d."nombre" AS "discNombre",
-        g."idGrado" AS "gradoIdGrado", g."nombre" AS "gradoNombre",
-        sc."idHorario", sc."diaSemana", sc."horaInicio", sc."horaFin", sc."aula"
+      SELECT teacherAssignment."idAsignacion"
       FROM "ClassSession" cs
-      LEFT JOIN "ExtracurricularAssignment" ea ON ea."idAsignacion" = cs."idAsignacion"
-      LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
-      LEFT JOIN "Grade" g ON g."idGrado" = ea."idGrado"
-      LEFT JOIN "Schedule" sc ON sc."idHorario" = cs."idHorario"
+      INNER JOIN "ExtracurricularAssignment" sessionAssignment
+        ON sessionAssignment."idAsignacion" = cs."idAsignacion"
+      INNER JOIN "ExtracurricularAssignment" teacherAssignment
+        ON teacherAssignment."codigoDisciplina" = sessionAssignment."codigoDisciplina"
+      INNER JOIN "AssignmentSchedule" teacherSchedule
+        ON teacherSchedule."idAsignacion" = teacherAssignment."idAsignacion"
+       AND teacherSchedule."idHorario" = cs."idHorario"
       WHERE cs."id" = ${sessionId}
+        AND teacherAssignment."idProfesor" = ${teacherId}
+        AND teacherAssignment."estado" = 'activo'
       LIMIT 1
-    `) as unknown as Array<any>
+    `) as unknown as Array<{ idAsignacion: string }>
   );
 
-  if (!sessionRow || sessionRow.idProfesor !== teacherId) {
+  if (!teacherAccess) {
     throw new AppError(404, "SESSION_NOT_FOUND", "Sesión no encontrada");
   }
 
-  // Llamar lista es por CÓDIGO de disciplina: el roster incluye todos los grados
-  // que este profesor dicta bajo ese código (ej: XC_23_Voleibol con grados 2 y 3).
-  const codeGrades = (await sql`
-    SELECT DISTINCT ea."idGrado"
-    FROM "ExtracurricularAssignment" ea
-    WHERE ea."codigoDisciplina" = ${sessionRow.codigoDisciplina}
-      AND ea."idProfesor" = ${sessionRow.idProfesor}
-      AND ea."estado" = 'activo'
-  `) as unknown as Array<{ idGrado: number }>;
-  const gradeIds = codeGrades.map((g) => g.idGrado);
-
-  const gradeNameRows = (await sql`
-    SELECT "idGrado", "nombre" FROM "Grade" WHERE "idGrado" = ANY(${gradeIds})
-  `) as unknown as Array<{ idGrado: number; nombre: string }>;
-  const gradeNameMap = new Map(gradeNameRows.map((g) => [g.idGrado, g.nombre]));
-  const sessionGrades = gradeIds
-    .slice()
-    .sort((a, b) => a - b)
-    .map((idGrado) => ({ idGrado, nombre: gradeNameMap.get(idGrado) ?? String(idGrado) }));
-
-  const enrolledStudents = (await sql`
-    SELECT
-      ss."codigoEstudiante",
-      st."nombre", st."apellido", st."grupo", st."fotoUrl", st."idGrado"
-    FROM "StudentSchedule" ss
-    LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
-    WHERE ss."codigoDisciplina" = ${sessionRow.codigoDisciplina}
-      AND ss."diaSemana" = ${sessionRow.diaSemana}
-  `) as unknown as Array<{
-    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null; idGrado: number;
-  }>;
-
-  const stays = (await sql`
-    SELECT
-      st."codigoEstudiante",
-      s."nombre", s."apellido", s."grupo", s."fotoUrl"
-    FROM "SupervisorStay" st
-    LEFT JOIN "Student" s ON s."codigoEstudiante" = st."codigoEstudiante"
-    WHERE st."idAsignacion" = ${sessionRow.idAsignacion}
-      AND st."idHorario" = ${sessionRow.idHorario}
-      AND st."fecha" = ${sessionRow.fecha}::date
-  `) as unknown as Array<{
-    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null;
-  }>;
-
-  const allStudents = [
-    ...enrolledStudents.map((es) => ({
-        ...es,
-        origen: "inscrito" as const,
-        gradoNombre: gradeNameMap.get(es.idGrado) ?? String(es.idGrado),
-      })),
-    ...stays
-      .filter((st) => !enrolledStudents.some((e) => e.codigoEstudiante === st.codigoEstudiante))
-      .map((st) => ({ ...st, origen: "quedado" as const })),
-  ];
-
-  const existingAttendance = (await sql`
-    SELECT "codigoEstudiante", "estado"
-    FROM "AttendanceRecord"
-    WHERE "sessionId" = ${sessionId}
-  `) as unknown as Array<{ codigoEstudiante: string; estado: string }>;
-
-  const attendanceMap = new Map(existingAttendance.map((a) => [a.codigoEstudiante, a.estado]));
-
-  const students = allStudents.map((es) => ({
-    codigoEstudiante: es.codigoEstudiante,
-    nombre: es.nombre,
-    apellido: es.apellido,
-    grupo: es.grupo,
-    fotoUrl: es.fotoUrl,
-    origen: es.origen,
-    origenDisciplina: (es as any).origenDisciplina,
-    gradoNombre: (es as any).gradoNombre,
-    estado: attendanceMap.get(es.codigoEstudiante) || "pendiente",
-  }));
-
-  res.json({
-    success: true,
-    data: {
-      session: { id: sessionRow.id, estado: sessionRow.estado, fecha: sessionRow.fecha },
-      assignment: {
-        idAsignacion: sessionRow.idAsignacion,
-        discipline: { codigoDisciplina: sessionRow.codigoDisciplina, nombre: sessionRow.discNombre },
-        grade: { idGrado: sessionRow.gradoIdGrado, nombre: sessionRow.gradoNombre },
-        grades: sessionGrades,
-      },
-      schedule: { idHorario: sessionRow.idHorario, diaSemana: sessionRow.diaSemana, horaInicio: sessionRow.horaInicio, horaFin: sessionRow.horaFin, aula: sessionRow.aula },
-      students,
-    },
-  });
+  // Una sola implementación construye grados, inscritos, stays y estados para
+  // profesor, supervisor y administrador.
+  res.json({ success: true, data: await getAttendanceData(sessionId) });
 }
 
 export async function saveAttendance(req: Request, res: Response) {
   const teacherId = req.teacher!.teacherId;
   const sessionId = param(req, "sessionId");
-  const session = await first<{ id: string; idProfesor: string }>(
+  const session = await first<{ id: string; codigoDisciplina: string; idHorario: string }>(
     (await sql`
-      SELECT "id", "idProfesor"
-      FROM "ClassSession"
-      WHERE "id" = ${sessionId}
+      SELECT cs."id", ea."codigoDisciplina", cs."idHorario"
+      FROM "ClassSession" cs
+      INNER JOIN "ExtracurricularAssignment" ea ON ea."idAsignacion" = cs."idAsignacion"
+      WHERE cs."id" = ${sessionId}
       LIMIT 1
-    `) as unknown as Array<{ id: string; idProfesor: string }>
+    `) as unknown as Array<{ id: string; codigoDisciplina: string; idHorario: string }>
   );
-  if (!session || session.idProfesor !== teacherId) {
+  const teacherAccess = session
+    ? await first<{ idAsignacion: string }>(
+        (await sql`
+          SELECT ea."idAsignacion"
+          FROM "ExtracurricularAssignment" ea
+          INNER JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
+          WHERE ea."idProfesor" = ${teacherId}
+            AND ea."codigoDisciplina" = ${session.codigoDisciplina}
+            AND asch."idHorario" = ${session.idHorario}
+            AND ea."estado" = 'activo'
+          LIMIT 1
+        `) as unknown as Array<{ idAsignacion: string }>
+      )
+    : null;
+  if (!session || !teacherAccess) {
     throw new AppError(404, "SESSION_NOT_FOUND", "Sesión de Asistencia Extracurriculares no encontrada");
   }
 
