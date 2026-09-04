@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import { sql } from "../../config/db";
-import { getNovedadesForStudent, syncNovedadesFromDrive } from "./novedades.service";
+import {
+  CANONICAL_NOVEDADES_DB_NAMES,
+  getNovedadesForStudent,
+  syncNovedadesFromDrive,
+} from "./novedades.service";
 import { dayBounds, isOnDay, novedadDayName } from "./novedades.dates";
 
 async function refreshNovedades(): Promise<void> {
@@ -87,7 +91,8 @@ export async function getNovedadesByCodigo(req: Request, res: Response): Promise
   const filtered = bounds
     ? todos.filter((n) => matchesExtracurricularDay(n, daysByStudent) && isOnDay(n, bounds))
     : [];
-  res.json({ success: true, data: filtered.filter(isRelevantNovedad).map(serialize) });
+  const relevantes = filtered.filter(isRelevantNovedad);
+  res.json({ success: true, data: relevantes.map(serialize) });
 }
 
 export async function getNovedadesBatch(req: Request, res: Response): Promise<void> {
@@ -104,6 +109,7 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
   const rows = (await sql`
     SELECT * FROM "Novedad"
     WHERE "codigoEstudiante" = ANY(${codigos})
+      AND LOWER("archivo") = ANY(${CANONICAL_NOVEDADES_DB_NAMES})
     ORDER BY "fechaNovedad" DESC NULLS LAST, "fechaCreacion" DESC NULLS LAST
   `) as unknown as any[];
 
@@ -138,12 +144,11 @@ export async function getNovedadesDiarias(req: Request, res: Response): Promise<
     FROM "Novedad" n
     LEFT JOIN "Student" s ON s."codigoEstudiante" = n."codigoEstudiante"
     LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
-    WHERE (
-      (n."fechaNovedad" >= ${bounds.start} AND n."fechaNovedad" < ${bounds.end})
-      OR (n."fechaNovedad" IS NULL AND n."fechaCreacion" >= ${bounds.start} AND n."fechaCreacion" < ${bounds.end})
-    )
+    WHERE LOWER(n."archivo") = ANY(${CANONICAL_NOVEDADES_DB_NAMES})
+      AND COALESCE(n."fechaNovedad", n."fechaHora", n."fechaCreacion") >= ${bounds.start}
+      AND COALESCE(n."fechaNovedad", n."fechaHora", n."fechaCreacion") < ${bounds.end}
     AND (${grado} = '' OR g."nombre" = ${grado})
-    ORDER BY n."fechaNovedad" DESC NULLS LAST, n."fechaCreacion" DESC NULLS LAST
+    ORDER BY COALESCE(n."fechaNovedad", n."fechaHora", n."fechaCreacion") DESC
   `) as unknown as any[];
 
   res.json({

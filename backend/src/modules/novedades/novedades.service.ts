@@ -9,6 +9,17 @@ import {
 } from "./googleDrive.service";
 import { parseNovedadesSheet } from "./novedades.parser";
 
+const CANONICAL_NOVEDADES_FILE = "novedades_diarias";
+export const CANONICAL_NOVEDADES_DB_NAMES = [
+  "novedades_diarias",
+  "novedades_diarias.xlsx",
+  "novedades_diarias.xls",
+];
+
+function isCanonicalNovedadesFile(fileName: string): boolean {
+  return fileName.trim().toLowerCase().replace(/\.(xlsx|xls)$/, "") === CANONICAL_NOVEDADES_FILE;
+}
+
 export interface SyncResult {
   ok: boolean;
   driveConfigured: boolean;
@@ -61,7 +72,7 @@ async function doSyncNovedades(): Promise<SyncResult> {
       (f.mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
         f.mimeType === "application/vnd.google-apps.spreadsheet" ||
         f.name.toLowerCase().endsWith(".xlsx")) &&
-      f.name.toLowerCase().includes("novedad")
+      isCanonicalNovedadesFile(f.name)
   );
 
   for (const file of spreadsheets) {
@@ -147,6 +158,7 @@ export async function getNovedadesForStudent(codigoEstudiante: string): Promise<
   return (await sql`
     SELECT * FROM "Novedad"
     WHERE "codigoEstudiante" = ${codigoEstudiante}
+      AND LOWER("archivo") = ANY(${CANONICAL_NOVEDADES_DB_NAMES})
     ORDER BY "fechaNovedad" DESC NULLS LAST, "fechaCreacion" DESC NULLS LAST
   `) as unknown as any[];
 }
@@ -161,6 +173,7 @@ export async function getNovedadesStatus(): Promise<{ driveConfigured: boolean; 
   const archivos = (await sql`
     SELECT "archivo", COUNT(*)::int AS "_count_all", MAX("updatedAt") AS "_max_updated_at"
     FROM "Novedad"
+    WHERE LOWER("archivo") = ANY(${CANONICAL_NOVEDADES_DB_NAMES})
     GROUP BY "archivo"
   `) as unknown as GroupByRow[];
 
