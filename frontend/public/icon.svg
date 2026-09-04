@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Extracurriculares</title>
+  <desc id="desc">Icono de Extracurriculares</desc>
+  <rect width="512" height="512" rx="112" fill="#0f766e"/>
+  <rect x="80" y="80" width="352" height="352" rx="88" fill="#115e59"/>
+  <rect x="132" y="126" width="248" height="258" rx="42" fill="#ffffff"/>
+  <rect x="132" y="126" width="248" height="72" rx="42" fill="#f97316"/>
+  <rect x="132" y="164" width="248" height="34" fill="#f97316"/>
+  <rect x="184" y="100" width="28" height="76" rx="14" fill="#ffffff"/>
+  <rect x="300" y="100" width="28" height="76" rx="14" fill="#ffffff"/>
+  <circle cx="196" cy="246" r="18" fill="#0f766e"/>
+  <circle cx="256" cy="246" r="18" fill="#0f766e"/>
+  <circle cx="316" cy="246" r="18" fill="#0f766e"/>
+  <path d="M178 312l42 42 114-114" fill="none" stroke="#f97316" stroke-linecap="round" stroke-linejoin="round" stroke-width="24"/>
+</svg>
