@@ -1,287 +1,102 @@
-import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
 import { PaginationParams, PaginatedResult, paginatedResult } from "../../utils/pagination";
 import { StudentQuery } from "./student.types";
+import { getLiveStudentIndex, type LiveStudentInfo } from "../appsheet/appsheet.novedades";
 
-interface StudentGradeRow {
-  codigoEstudiante: string;
-  nombre: string;
-  apellido: string;
-  idGrado: number;
-  grupo: string | null;
-  correo: string | null;
-  fotoUrl: string | null;
-  estado: string;
-  createdAt: Date;
-  updatedAt: Date;
-  idGradoRel: number;
-  nombreGrado: string;
-  nivel: string | null;
+const DAY_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
+
+function normalize(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
 }
 
-interface StudentScheduleDisciplineRow {
-  codigoEstudiante: string;
-  id: string;
-  codigoDisciplina: string;
-  diaSemana: string;
-  disciplinaNombre: string;
-  disciplinaDescripcion: string | null;
-}
-
-const ACCENT_FROM = "áéíóúüñÁÉÍÓÚÜÑ";
-const ACCENT_TO = "aeiouunAEIOUUN";
-
-function normalizedExpr(expr: string): string {
-  return `LOWER(TRANSLATE(${expr}, '${ACCENT_FROM}', '${ACCENT_TO}'))`;
-}
-
-export async function getStudents(query: StudentQuery, pagination: PaginationParams): Promise<PaginatedResult<any>> {
-  const { search, grado, disciplina, inscrito } = query;
-
-  const conditions: string[] = [];
-  const params: any[] = [];
-
-  let paramIndex = 0;
-  const nextParam = (value: any): string => {
-    paramIndex += 1;
-    params.push(value);
-    return `$${paramIndex}`;
-  };
-
-  // Filtros base sobre Student
-  const studentConds: string[] = [];
-
-  if (search) {
-    const fullName = normalizedExpr(`COALESCE(s."nombre", '') || ' ' || COALESCE(s."apellido", '')`);
-    const code = normalizedExpr(`s."codigoEstudiante"`);
-    const tokens = search.trim().split(/\s+/).filter(Boolean);
-    const parts = tokens.map((token) => {
-      const p = nextParam(`%${token}%`);
-      return `(${fullName} LIKE ${p} OR ${code} LIKE ${p})`;
-    });
-    studentConds.push(`(${parts.join(" AND ")})`);
-  }
-
-  if (grado) {
-    // Valida el grado por nombre (mismo comportamiento que Prisma: solo filtra
-    // si el grado existe).
-    const gradoRow = await first<{ idGrado: number }>(
-      await sql`SELECT "idGrado" FROM "Grade" WHERE "nombre" = ${grado} LIMIT 1`
-        .then((r) => r as { idGrado: number }[])
-    );
-    if (gradoRow) {
-      studentConds.push(`s."idGrado" = ${nextParam(gradoRow.idGrado)}`);
-    }
-  }
-
-  const hasDisciplinaFiltro = disciplina && inscrito !== "false";
-  if (hasDisciplinaFiltro) {
-    const p = nextParam(disciplina);
-    studentConds.push(`EXISTS (SELECT 1 FROM "StudentSchedule" ss WHERE ss."codigoEstudiante" = s."codigoEstudiante" AND ss."codigoDisciplina" = ${p})`);
-  }
-
-  if (inscrito === "true" && !hasDisciplinaFiltro) {
-    studentConds.push(`EXISTS (SELECT 1 FROM "StudentSchedule" ss WHERE ss."codigoEstudiante" = s."codigoEstudiante")`);
-  } else if (inscrito === "false") {
-    studentConds.push(`NOT EXISTS (SELECT 1 FROM "StudentSchedule" ss WHERE ss."codigoEstudiante" = s."codigoEstudiante")`);
-  }
-
-  const whereStudent = studentConds.length > 0 ? `WHERE ${studentConds.join(" AND ")}` : "";
-
-  // Count
-  const countParams = [...params];
-  const countRows = await sql(
-    `SELECT COUNT(*)::int AS total FROM "Student" s ${whereStudent}`,
-    countParams
-  ) as unknown as Array<{ total: number }>;
-  const total = countRows[0]?.total ?? 0;
-
-  // Data (paginación)
-  const dataParams = [...params];
-  const offset = (pagination.page - 1) * pagination.limit;
-  const limitIdx = dataParams.length + 1;
-  const offsetIdx = dataParams.length + 2;
-  dataParams.push(pagination.limit, offset);
-
-  const students = await sql(
-    `SELECT
-       s."codigoEstudiante", s."nombre", s."apellido", s."idGrado", s."grupo",
-       s."correo", s."fotoUrl", s."estado", s."createdAt", s."updatedAt",
-       g."idGrado" AS "idGradoRel", g."nombre" AS "nombreGrado", g."nivel"
-     FROM "Student" s
-     LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
-     ${whereStudent}
-     ORDER BY s."apellido" ASC, s."nombre" ASC
-     LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
-    dataParams
-  ) as unknown as StudentGradeRow[];
-
-  // Reconstruye la forma del payload de Prisma (studentSchedules con discipline)
-  const studentCodes = students.map((s) => s.codigoEstudiante);
-  const schedules = studentCodes.length > 0
-    ? (await sql(
-        `SELECT ss."codigoEstudiante", ss."id", ss."codigoDisciplina", ss."diaSemana",
-                d."nombre" AS "disciplinaNombre", d."descripcion" AS "disciplinaDescripcion"
-         FROM "StudentSchedule" ss
-         LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ss."codigoDisciplina"
-         WHERE ss."codigoEstudiante" = ANY($1)
-         ORDER BY ss."diaSemana" ASC`,
-        [studentCodes]
-      ) as unknown as StudentScheduleDisciplineRow[])
-    : [];
-
-  const data = students.map((s) => ({
-    codigoEstudiante: s.codigoEstudiante,
-    nombre: s.nombre,
-    apellido: s.apellido,
-    idGrado: s.idGrado,
-    grupo: s.grupo,
-    fotoUrl: s.fotoUrl,
-    estado: s.estado,
-    createdAt: s.createdAt,
-    updatedAt: s.updatedAt,
-    grade: { idGrado: s.idGradoRel, nombre: s.nombreGrado, nivel: s.nivel },
-    studentSchedules: schedules
-      .filter((ss) => ss.codigoEstudiante === s.codigoEstudiante)
-      .map((ss) => ({
-        id: ss.id,
-        codigoDisciplina: ss.codigoDisciplina,
-        diaSemana: ss.diaSemana,
-        discipline: {
-          codigoDisciplina: ss.codigoDisciplina,
-          nombre: ss.disciplinaNombre,
-          descripcion: ss.disciplinaDescripcion,
-        },
-      })),
-  }));
-
-  return paginatedResult(data, total, pagination);
-}
-
-export async function getStudentByCode(codigo: string) {
-  const student = await first<StudentGradeRow>(await sql`
-    SELECT
-      s."codigoEstudiante", s."nombre", s."apellido", s."idGrado", s."grupo",
-      s."correo", s."fotoUrl", s."estado", s."createdAt", s."updatedAt",
-      g."idGrado" AS "idGradoRel", g."nombre" AS "nombreGrado", g."nivel"
-    FROM "Student" s
-    LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
-    WHERE s."codigoEstudiante" = ${codigo}
-    LIMIT 1
-  ` as unknown as StudentGradeRow[]);
-
-  if (!student) {
-    throw new AppError(404, "STUDENT_NOT_FOUND", "No se encontró el estudiante");
-  }
-
-  const schedules = (await sql`
-    SELECT ss."codigoEstudiante", ss."id", ss."codigoDisciplina", ss."diaSemana",
-           d."nombre" AS "disciplinaNombre", d."descripcion" AS "disciplinaDescripcion"
-    FROM "StudentSchedule" ss
-    LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ss."codigoDisciplina"
-    WHERE ss."codigoEstudiante" = ${codigo}
-    ORDER BY ss."diaSemana" ASC
-  `) as unknown as StudentScheduleDisciplineRow[];
+function toStudentPayload(student: LiveStudentInfo) {
+  const schedules = [...student.schedules]
+    .sort((a, b) => DAY_ORDER.indexOf(a.diaSemana) - DAY_ORDER.indexOf(b.diaSemana))
+    .map((schedule) => ({
+      id: `${student.codigoEstudiante}:${schedule.diaSemana}`,
+      codigoDisciplina: schedule.codigoDisciplina,
+      diaSemana: schedule.diaSemana,
+      discipline: {
+        codigoDisciplina: schedule.codigoDisciplina,
+        nombre: schedule.codigoDisciplina,
+        descripcion: null,
+      },
+    }));
 
   return {
     codigoEstudiante: student.codigoEstudiante,
     nombre: student.nombre,
     apellido: student.apellido,
-    idGrado: student.idGrado,
+    idGrado: 0,
     grupo: student.grupo,
     fotoUrl: student.fotoUrl,
-    estado: student.estado,
-    createdAt: student.createdAt,
-    updatedAt: student.updatedAt,
-    grade: { idGrado: student.idGradoRel, nombre: student.nombreGrado, nivel: student.nivel },
-    studentSchedules: schedules.map((ss) => ({
-      id: ss.id,
-      codigoDisciplina: ss.codigoDisciplina,
-      diaSemana: ss.diaSemana,
-      discipline: {
-        codigoDisciplina: ss.codigoDisciplina,
-        nombre: ss.disciplinaNombre,
-        descripcion: ss.disciplinaDescripcion,
-      },
-    })),
+    estado: "activo",
+    createdAt: null,
+    updatedAt: null,
+    grade: { idGrado: 0, nombre: student.grado, nivel: null },
+    studentSchedules: schedules,
   };
 }
 
-export async function getStudentProfile(codigo: string) {
-  const student = await first<StudentGradeRow>(await sql`
-    SELECT
-      s."codigoEstudiante", s."nombre", s."apellido", s."idGrado", s."grupo",
-      s."correo", s."fotoUrl", s."estado", s."createdAt", s."updatedAt",
-      g."idGrado" AS "idGradoRel", g."nombre" AS "nombreGrado", g."nivel"
-    FROM "Student" s
-    LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
-    WHERE s."codigoEstudiante" = ${codigo}
-    LIMIT 1
-  ` as unknown as StudentGradeRow[]);
+function matchesSearch(student: LiveStudentInfo, search: string): boolean {
+  const tokens = normalize(search).split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const haystack = normalize(`${student.codigoEstudiante} ${student.nombre} ${student.apellido}`);
+  return tokens.every((token) => haystack.includes(token));
+}
 
+export async function getStudents(query: StudentQuery, pagination: PaginationParams): Promise<PaginatedResult<any>> {
+  const { search, grado, inscrito } = query;
+  const disciplina = query.disciplina?.trim();
+  const students = [...(await getLiveStudentIndex()).values()];
+
+  const filtered = students
+    .filter((student) => !search || matchesSearch(student, search))
+    .filter((student) => !grado || student.grado === grado)
+    .filter((student) => {
+      if (inscrito === "true") return student.days.size > 0;
+      if (inscrito === "false") return student.days.size === 0;
+      return true;
+    })
+    .filter((student) => {
+      if (!disciplina) return true;
+      return student.schedules.some((schedule) => normalize(schedule.codigoDisciplina) === normalize(disciplina));
+    })
+    .sort((a, b) => `${a.apellido} ${a.nombre}`.localeCompare(`${b.apellido} ${b.nombre}`, "es"));
+
+  const offset = (pagination.page - 1) * pagination.limit;
+  const page = filtered.slice(offset, offset + pagination.limit).map(toStudentPayload);
+  return paginatedResult(page, filtered.length, pagination);
+}
+
+export async function getStudentByCode(codigo: string) {
+  const student = (await getLiveStudentIndex()).get(codigo);
   if (!student) {
-    throw new AppError(404, "STUDENT_NOT_FOUND", "No se encontró el estudiante");
+    throw new AppError(404, "STUDENT_NOT_FOUND", "No se encontro el estudiante en AppSheet");
+  }
+  return toStudentPayload(student);
+}
+
+export async function getStudentProfile(codigo: string) {
+  const student = (await getLiveStudentIndex()).get(codigo);
+  if (!student) {
+    throw new AppError(404, "STUDENT_NOT_FOUND", "No se encontro el estudiante en AppSheet");
   }
 
-  const schedules = (await sql`
-    SELECT ss."codigoEstudiante", ss."id", ss."codigoDisciplina", ss."diaSemana",
-           d."nombre" AS "disciplinaNombre", d."descripcion" AS "disciplinaDescripcion",
-           d."codigoDisciplina" AS "disciplinaCodigo"
-    FROM "StudentSchedule" ss
-    LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ss."codigoDisciplina"
-    WHERE ss."codigoEstudiante" = ${codigo}
-    ORDER BY ss."diaSemana" ASC
-  `) as unknown as Array<StudentScheduleDisciplineRow & { disciplinaCodigo: string }>;
-
-  // Enrich each student schedule with offer info (teacher + schedule times)
-  const extracurricular = await Promise.all(
-    schedules.map(async (ss) => {
-      const assignment = await first<any>(await sql`
-        SELECT
-          ea."idAsignacion",
-          t."nombre" AS "profesorNombre", t."apellido" AS "profesorApellido",
-          asch."id", sc."diaSemana" AS "schDia",
-          sc."horaInicio", sc."horaFin"
-        FROM "ExtracurricularAssignment" ea
-        LEFT JOIN "Teacher" t ON t."idProfesor" = ea."idProfesor"
-        LEFT JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
-        LEFT JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
-        WHERE ea."codigoDisciplina" = ${ss.codigoDisciplina}
-          AND ea."idGrado" = ${student.idGrado}
-        LIMIT 1
-      ` as unknown as any[]);
-
-      let offerInfo: { profesor: string; horaInicio: string | null; horaFin: string | null } | null = null;
-      if (assignment) {
-        const daySchedule = assignment.schDia === ss.diaSemana || assignment.horaInicio != null;
-        // Busca el schedule del día específico
-        const dayRows = (await sql`
-          SELECT sc."horaInicio", sc."horaFin"
-          FROM "AssignmentSchedule" asch
-          LEFT JOIN "Schedule" sc ON sc."idHorario" = asch."idHorario"
-          WHERE asch."idAsignacion" = ${assignment.idAsignacion}
-            AND sc."diaSemana" = ${ss.diaSemana}
-          LIMIT 1
-        `) as unknown as Array<{ horaInicio: string | null; horaFin: string | null }>;
-        if (dayRows.length > 0) {
-          offerInfo = {
-            profesor: `${assignment.profesorNombre} ${assignment.profesorApellido}`,
-            horaInicio: dayRows[0].horaInicio,
-            horaFin: dayRows[0].horaFin,
-          };
-        }
-      }
-
-      return {
-        dia: ss.diaSemana,
-        disciplina: {
-          codigo: ss.disciplinaCodigo,
-          nombre: ss.disciplinaNombre,
-        },
-        oferta: offerInfo,
-      };
-    })
-  );
+  const extracurricular = [...student.schedules]
+    .sort((a, b) => DAY_ORDER.indexOf(a.diaSemana) - DAY_ORDER.indexOf(b.diaSemana))
+    .map((schedule) => ({
+      dia: schedule.diaSemana,
+      disciplina: {
+        codigo: schedule.codigoDisciplina,
+        nombre: schedule.codigoDisciplina,
+      },
+      oferta: null,
+    }));
 
   return {
     student: {
@@ -289,8 +104,8 @@ export async function getStudentProfile(codigo: string) {
       nombre: student.nombre,
       apellido: student.apellido,
       grupo: student.grupo,
-      grade: { idGrado: student.idGradoRel, nombre: student.nombreGrado, nivel: student.nivel },
-      estado: student.estado,
+      grade: { idGrado: 0, nombre: student.grado, nivel: null },
+      estado: "activo",
       fotoUrl: student.fotoUrl,
     },
     extracurricular: extracurricular.length > 0 ? extracurricular : null,
