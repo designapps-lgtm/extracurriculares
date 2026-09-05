@@ -167,15 +167,15 @@ export function parseNovedadesSheet(buffer: Buffer, fileId: string): ParsedNoved
   const sheet = workbook.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "", raw: false });
 
-  return rowsToNovedades(rows, fileId);
+  return parseNovedadesRows(rows, fileId);
 }
 
 export function parseNovedadesJson(rawJson: string, fileId: string): ParsedNovedadRow[] {
   const json = JSON.parse(rawJson) as Record<string, unknown>[];
-  return rowsToNovedades(json, fileId);
+  return parseNovedadesRows(json, fileId);
 }
 
-function rowsToNovedades(rows: Record<string, unknown>[], fileId: string): ParsedNovedadRow[] {
+export function parseNovedadesRows(rows: Record<string, unknown>[], fileId: string): ParsedNovedadRow[] {
   const results: ParsedNovedadRow[] = [];
 
   rows.forEach((row, index) => {
