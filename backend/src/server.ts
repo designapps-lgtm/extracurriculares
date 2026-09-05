@@ -1,6 +1,5 @@
 import app from "./app";
 import { config } from "./config";
-import { syncNovedadesFromDrive } from "./modules/novedades/novedades.service";
 import { syncAppSheetStudents } from "./modules/appsheet/appsheet.students";
 import { syncDriveSources } from "./modules/driveSync/driveSync.service";
 
@@ -11,9 +10,6 @@ async function start() {
     console.log(`[Backend] Server running on port ${PORT}`);
   });
 
-  // AppSheet/Demograficos es la única fuente de Student y StudentSchedule.
-  // Ante un fallo se conserva el último snapshot válido; nunca se usa Drive
-  // como fallback para no reintroducir datos externos.
   const runStudentSync = async () => {
     if (!config.appsheetAppId || !config.appsheetAccessKey) {
       console.log("[AppSheet] Sync de estudiantes desactivado: faltan APPSHEET_APP_ID o APPSHEET_APPLICATION_ACCESS_KEY");
@@ -28,8 +24,6 @@ async function start() {
     }
   };
 
-  // Drive se conserva únicamente para oferta/horarios y novedades; no importa
-  // estudiantes ni inscripciones.
   const runDriveSync = async () => {
     if (!config.googleServiceAccountJson || !config.googleDriveFolderId) {
       return;
@@ -41,18 +35,11 @@ async function start() {
     } else {
       console.log(`[Drive] Oferta OK: ${offerResult.offerEntries} entradas, ${offerResult.files} archivos procesados`);
     }
-
-    const novedadesResult = await syncNovedadesFromDrive();
-    if (novedadesResult.errors.length > 0) {
-      console.error(`[Novedades] Sync con errores: ${novedadesResult.errors.join(" | ")}`);
-    } else {
-      console.log(`[Novedades] Sync OK: ${novedadesResult.files} archivos, ${novedadesResult.novedades} novedades`);
-    }
   };
 
   if (config.appsheetAppId && config.appsheetAccessKey) {
     setTimeout(() => { runStudentSync().catch((e) => console.error("[AppSheet] Error en sync inicial:", e.message)); }, 5000);
-    setInterval(() => { runStudentSync().catch((e) => console.error("[AppSheet] Error en sync periódico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
+    setInterval(() => { runStudentSync().catch((e) => console.error("[AppSheet] Error en sync periodico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
     console.log(`[AppSheet] Sync de estudiantes programado cada ${config.novedadesSyncMinutes} minutos`);
   } else {
     console.log("[AppSheet] Sync de estudiantes desactivado: faltan credenciales");
@@ -60,10 +47,10 @@ async function start() {
 
   if (config.googleServiceAccountJson && config.googleDriveFolderId) {
     setTimeout(() => { runDriveSync().catch((e) => console.error("[Drive] Error en sync inicial:", e.message)); }, 5000);
-    setInterval(() => { runDriveSync().catch((e) => console.error("[Drive] Error en sync periódico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
-    console.log(`[Drive] Oferta y novedades programadas cada ${config.novedadesSyncMinutes} minutos`);
+    setInterval(() => { runDriveSync().catch((e) => console.error("[Drive] Error en sync periodico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
+    console.log(`[Drive] Oferta programada cada ${config.novedadesSyncMinutes} minutos`);
   } else {
-    console.log("[Drive] Oferta y novedades desactivadas: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
+    console.log("[Drive] Oferta desactivada: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
   }
 }
 
