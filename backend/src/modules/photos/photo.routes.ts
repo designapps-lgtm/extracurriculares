@@ -4,7 +4,7 @@ import { asyncHandler, AppError } from "../../middlewares/errorHandler";
 import { sql } from "../../config/db";
 import { apiLimiter } from "../../middlewares/rateLimiter";
 import { getDriveToken, parseServiceAccount } from "../novedades/googleDrive.service";
-import { CANONICAL_NOVEDADES_DB_NAMES } from "../novedades/novedades.service";
+import { getLiveNovedades } from "../appsheet/appsheet.novedades";
 
 export const photoRouter = Router();
 
@@ -27,14 +27,8 @@ async function isKnownPhotoId(fileId: string): Promise<boolean> {
     return true;
   }
 
-  // Novedades guardan fotos como lista separada por comas en "fotoUrls".
-  const novedades = (await sql`
-    SELECT 1 FROM "Novedad"
-    WHERE LOWER("archivo") = ANY(${CANONICAL_NOVEDADES_DB_NAMES})
-      AND "fotoUrls" LIKE ${`%${fileId}%`}
-    LIMIT 1
-  `) as unknown as Array<{ "?column?": number }>;
-  return novedades.length > 0;
+  const novedades = await getLiveNovedades();
+  return novedades.some((novedad) => novedad.fotoUrls.includes(fileId));
 }
 
 photoRouter.get("/drive/:fileId", asyncHandler(async (req, res) => {
