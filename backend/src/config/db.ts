@@ -1,13 +1,12 @@
 import { neon } from "@neondatabase/serverless";
 import { Pool, type PoolClient } from "pg";
 
-// Cloudflare Workers se conecta a Neon por HTTP. El entorno Node de Docker usa
-// PostgreSQL directo cuando apunta al servicio local `postgres`, manteniendo
-// los datos de desarrollo aislados de la base externa.
-const connectionString = process.env.DATABASE_URL || "";
-
-if (!connectionString) {
-  throw new Error("DATABASE_URL es obligatorio");
+function databaseUrl(): string {
+  const connectionString = process.env.DATABASE_URL || "";
+  if (!connectionString) {
+    throw new Error("DATABASE_URL es obligatorio");
+  }
+  return connectionString;
 }
 
 function usesLocalPostgres(url: string): boolean {
@@ -63,27 +62,40 @@ function createLocalSql(executor: LocalQueryExecutor, pool: Pool): SqlClient {
   return query;
 }
 
-const localDatabase = usesLocalPostgres(connectionString);
-const localPool = localDatabase ? new Pool({ connectionString }) : null;
+let cachedSql: SqlClient | null = null;
+let localPool: Pool | null = null;
 
-// Ambas implementaciones ofrecen las firmas de tag SQL, consulta parametrizada
-// y transacciones que usa el resto de módulos.
-export const sql: SqlClient = localPool
-  ? createLocalSql(localPool, localPool)
-  : neon(connectionString) as unknown as SqlClient;
+function getSql(): SqlClient {
+  if (cachedSql) return cachedSql;
 
-// Devuelve la primera fila de un resultado, o null si el resultado está vacío.
+  const connectionString = databaseUrl();
+  if (usesLocalPostgres(connectionString)) {
+    localPool = new Pool({ connectionString });
+    cachedSql = createLocalSql(localPool, localPool);
+  } else {
+    cachedSql = neon(connectionString) as unknown as SqlClient;
+  }
+
+  return cachedSql;
+}
+
+export const sql = (async (input: SqlInput, ...values: unknown[]) => {
+  return getSql()(input as any, ...values);
+}) as SqlClient;
+
+sql.transaction = async <T>(callback: (tx: SqlClient) => Promise<T> | T): Promise<T> => {
+  return getSql().transaction(callback);
+};
+
+// Devuelve la primera fila de un resultado, o null si el resultado esta vacio.
 export async function first<T>(rows: T[]): Promise<T | null> {
   return rows.length > 0 ? rows[0] : null;
 }
 
-// Devuelve la primera fila, lanzando si no existe. Para lecturas que deben
-// garantizar presencia (findUnique de Prisma convertido).
+// Devuelve la primera fila, lanzando si no existe.
 export async function must<T>(rows: T[]): Promise<T> {
   if (rows.length === 0) {
-    const e: any = new Error(
-      "El registro solicitado no existe."
-    );
+    const e: any = new Error("El registro solicitado no existe.");
     e.clientCode = "NOT_FOUND";
     throw e;
   }
