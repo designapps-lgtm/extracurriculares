@@ -1,44 +1,20 @@
 import { Request, Response } from "express";
-import { sql } from "../../config/db";
 import {
-  CANONICAL_NOVEDADES_DB_NAMES,
-  getNovedadesForStudent,
-  syncNovedadesFromDrive,
-} from "./novedades.service";
-import { dayBounds, isOnDay, novedadDayName } from "./novedades.dates";
+  getLiveNovedades,
+  getLiveNovedadesForStudents,
+  getLiveStudentIndex,
+  type LiveNovedad,
+  type LiveStudentInfo,
+} from "../appsheet/appsheet.novedades";
+import { dayBounds, isOnDay, novedadDate, novedadDayName } from "./novedades.dates";
 
-async function refreshNovedades(): Promise<void> {
-  try {
-    await syncNovedadesFromDrive();
-  } catch (e: any) {
-    console.error("[Novedades] Error en refresh on-demand:", e?.message || e);
-  }
+function matchesExtracurricularDay(n: LiveNovedad, studentIndex: Map<string, LiveStudentInfo>): boolean {
+  const student = studentIndex.get(n.codigoEstudiante);
+  if (!student || student.days.size === 0) return false;
+  return student.days.has(novedadDayName(n));
 }
 
-// Días de extracurricular por estudiante (StudentSchedule.diaSemana).
-async function getStudentDays(codigos: string[]): Promise<Map<string, Set<string>>> {
-  const rows = (await sql`
-    SELECT "codigoEstudiante", "diaSemana"
-    FROM "StudentSchedule"
-    WHERE "codigoEstudiante" = ANY(${codigos})
-  `) as unknown as Array<{ codigoEstudiante: string; diaSemana: string }>;
-
-  const map = new Map<string, Set<string>>();
-  for (const r of rows) {
-    if (!map.has(r.codigoEstudiante)) map.set(r.codigoEstudiante, new Set());
-    map.get(r.codigoEstudiante)!.add(r.diaSemana);
-  }
-  return map;
-}
-
-// Una novedad solo se muestra si se hizo el mismo día que el estudiante tiene extracurricular.
-function matchesExtracurricularDay(n: any, daysByStudent: Map<string, Set<string>>): boolean {
-  const days = daysByStudent.get(n.codigoEstudiante);
-  if (!days || days.size === 0) return false;
-  return days.has(novedadDayName(n));
-}
-
-function isRelevantNovedad(n: any): boolean {
+function isRelevantNovedad(n: LiveNovedad): boolean {
   const text = [
     n.descripcion,
     n.seAusentaCon,
@@ -55,7 +31,7 @@ function isRelevantNovedad(n: any): boolean {
     /SALIDA|AUSEN|CAMBIO|DEPORTE/.test(text);
 }
 
-function serialize(n: any) {
+function serialize(n: LiveNovedad) {
   return {
     id: n.id,
     novedadId: n.novedadId,
@@ -81,17 +57,44 @@ function serialize(n: any) {
   };
 }
 
+function sortNewestFirst(a: LiveNovedad, b: LiveNovedad): number {
+  return (novedadDate(b)?.getTime() || 0) - (novedadDate(a)?.getTime() || 0);
+}
+
+function fallbackStudent(novedad: LiveNovedad): LiveStudentInfo {
+  const names = novedad.nombresEstudiantes.trim().split(/\s+/).filter(Boolean);
+  return {
+    codigoEstudiante: novedad.codigoEstudiante,
+    nombre: names[0] || "Estudiante",
+    apellido: names.slice(1).join(" "),
+    grupo: null,
+    grado: novedad.grados || "",
+    fotoUrl: null,
+    schedules: [],
+    days: new Set(),
+  };
+}
+
 export async function getNovedadesByCodigo(req: Request, res: Response): Promise<void> {
   const codigoEstudiante = String(req.params.codigoEstudiante || "");
-  await refreshNovedades();
-  const todos = await getNovedadesForStudent(codigoEstudiante);
-  const daysByStudent = await getStudentDays([codigoEstudiante]);
   const fechaParam = String(req.query.fecha || "").trim();
   const bounds = dayBounds(fechaParam || new Date().toISOString());
-  const filtered = bounds
-    ? todos.filter((n) => matchesExtracurricularDay(n, daysByStudent) && isOnDay(n, bounds))
-    : [];
-  const relevantes = filtered.filter(isRelevantNovedad);
+  if (!bounds) {
+    res.status(400).json({ success: false, error: { code: "INVALID_DATE", message: "La fecha no es valida" } });
+    return;
+  }
+
+  const [todos, studentIndex] = await Promise.all([
+    getLiveNovedadesForStudents([codigoEstudiante]),
+    getLiveStudentIndex(),
+  ]);
+
+  const relevantes = todos
+    .filter((n) => matchesExtracurricularDay(n, studentIndex))
+    .filter((n) => isOnDay(n, bounds))
+    .filter(isRelevantNovedad)
+    .sort(sortNewestFirst);
+
   res.json({ success: true, data: relevantes.map(serialize) });
 }
 
@@ -104,65 +107,71 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
     return;
   }
 
-  await refreshNovedades();
-
-  const rows = (await sql`
-    SELECT * FROM "Novedad"
-    WHERE "codigoEstudiante" = ANY(${codigos})
-      AND LOWER("archivo") = ANY(${CANONICAL_NOVEDADES_DB_NAMES})
-    ORDER BY "fechaNovedad" DESC NULLS LAST, "fechaCreacion" DESC NULLS LAST
-  `) as unknown as any[];
-
   const bounds = dayBounds(fechaParam || new Date().toISOString());
-  const daysByStudent = await getStudentDays(codigos);
-  const activas: Record<string, any[]> = {};
-  for (const r of rows) {
-    if (!matchesExtracurricularDay(r, daysByStudent)) continue;
-    if (!isRelevantNovedad(r)) continue;
-    if (!bounds || !isOnDay(r, bounds)) continue;
-    (activas[r.codigoEstudiante] = activas[r.codigoEstudiante] || []).push(serialize(r));
+  if (!bounds) {
+    res.status(400).json({ success: false, error: { code: "INVALID_DATE", message: "La fecha no es valida" } });
+    return;
   }
 
-  res.json({ success: true, data: codigos.map((c) => ({ codigoEstudiante: c, novedades: activas[c] || [] })) });
+  const [rows, studentIndex] = await Promise.all([
+    getLiveNovedadesForStudents(codigos),
+    getLiveStudentIndex(),
+  ]);
+
+  const activas: Record<string, LiveNovedad[]> = {};
+  for (const row of rows) {
+    if (!matchesExtracurricularDay(row, studentIndex)) continue;
+    if (!isRelevantNovedad(row)) continue;
+    if (!isOnDay(row, bounds)) continue;
+    (activas[row.codigoEstudiante] = activas[row.codigoEstudiante] || []).push(row);
+  }
+
+  res.json({
+    success: true,
+    data: codigos.map((codigo) => ({
+      codigoEstudiante: codigo,
+      novedades: (activas[codigo] || []).sort(sortNewestFirst).map(serialize),
+    })),
+  });
 }
 
 export async function getNovedadesDiarias(req: Request, res: Response): Promise<void> {
-  await refreshNovedades();
-
   const fechaParam = String(req.query.fecha || "").trim();
   const grado = String(req.query.grado || "").trim();
   const bounds = fechaParam ? dayBounds(fechaParam) : dayBounds(new Date().toISOString());
   if (!bounds) {
-    res.status(400).json({ success: false, error: { code: "INVALID_DATE", message: "La fecha no es válida" } });
+    res.status(400).json({ success: false, error: { code: "INVALID_DATE", message: "La fecha no es valida" } });
     return;
   }
 
-  const rows = (await sql`
-    SELECT n.*, s."nombre" AS "estudianteNombre", s."apellido" AS "estudianteApellido",
-           s."grupo" AS "estudianteGrupo", s."fotoUrl" AS "estudianteFotoUrl",
-           g."nombre" AS "estudianteGrado"
-    FROM "Novedad" n
-    LEFT JOIN "Student" s ON s."codigoEstudiante" = n."codigoEstudiante"
-    LEFT JOIN "Grade" g ON g."idGrado" = s."idGrado"
-    WHERE LOWER(n."archivo") = ANY(${CANONICAL_NOVEDADES_DB_NAMES})
-      AND COALESCE(n."fechaNovedad", n."fechaHora", n."fechaCreacion") >= ${bounds.start}
-      AND COALESCE(n."fechaNovedad", n."fechaHora", n."fechaCreacion") < ${bounds.end}
-    AND (${grado} = '' OR g."nombre" = ${grado})
-    ORDER BY COALESCE(n."fechaNovedad", n."fechaHora", n."fechaCreacion") DESC
-  `) as unknown as any[];
+  const [rows, studentIndex] = await Promise.all([
+    getLiveNovedades(),
+    getLiveStudentIndex(),
+  ]);
 
-  res.json({
-    success: true,
-    data: rows.map((row) => ({
-      estudiante: {
-        codigoEstudiante: row.codigoEstudiante,
-        nombre: row.estudianteNombre || "Estudiante",
-        apellido: row.estudianteApellido || "",
-        grupo: row.estudianteGrupo || null,
-        grado: row.estudianteGrado || row.grados || null,
-        fotoUrl: row.estudianteFotoUrl || null,
-      },
-      novedad: serialize(row),
-    })),
-  });
+  const data = rows
+    .filter((row) => isOnDay(row, bounds))
+    .filter((row) => {
+      if (!grado) return true;
+      const student = studentIndex.get(row.codigoEstudiante);
+      return student?.grado === grado || row.grados === grado;
+    })
+    .filter(isRelevantNovedad)
+    .sort(sortNewestFirst)
+    .map((row) => {
+      const student = studentIndex.get(row.codigoEstudiante) || fallbackStudent(row);
+      return {
+        estudiante: {
+          codigoEstudiante: row.codigoEstudiante,
+          nombre: student.nombre || "Estudiante",
+          apellido: student.apellido || "",
+          grupo: student.grupo || null,
+          grado: student.grado || row.grados || null,
+          fotoUrl: student.fotoUrl || null,
+        },
+        novedad: serialize(row),
+      };
+    });
+
+  res.json({ success: true, data });
 }
