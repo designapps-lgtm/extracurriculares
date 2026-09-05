@@ -31,14 +31,19 @@ export const config = {
   sessionDurationHours: parseInt(process.env.SESSION_DURATION_HOURS || "168", 10),
   googleServiceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON || null,
   googleDriveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID || null,
+  googleDriveOfferFileNames: (process.env.GOOGLE_DRIVE_OFFER_FILE_NAMES || "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean),
   googleDriveWebhookUrl: process.env.GOOGLE_DRIVE_WEBHOOK_URL || null,
   googleDriveWebhookToken: process.env.GOOGLE_DRIVE_WEBHOOK_TOKEN || null,
   appsheetWebhookToken: process.env.APPSHEET_WEBHOOK_TOKEN || null,
   appsheetAppId: process.env.APPSHEET_APP_ID || null,
   appsheetAccessKey: process.env.APPSHEET_APPLICATION_ACCESS_KEY || null,
   appsheetDemograficosTable: process.env.APPSHEET_DEMOGRAFICOS_TABLE || "Demograficos",
-  // Estudiantes e inscripciones siempre se sincronizan desde AppSheet/Demograficos.
-  // Google Drive sólo conserva la oferta y las novedades.
+  appsheetNovedadesTable: process.env.APPSHEET_NOVEDADES_TABLE || "Novedades_Diarias",
+  // Estudiantes, inscripciones y novedades diarias se leen desde AppSheet.
+  // Google Drive solo queda para oferta/horarios si se configura explicitamente.
   novedadesSyncMinutes: parseInt(process.env.NOVEDADES_SYNC_MINUTES || "10", 10),
   googleClientId: process.env.GOOGLE_CLIENT_ID || null,
   googleInstitutionDomain: process.env.GOOGLE_INSTITUTION_DOMAIN || "gi.edu.co",
