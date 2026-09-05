@@ -2,31 +2,30 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// En Cloudflare Workers, workerd fija process.env.NODE_ENV en "development" de
-// forma inmutable (no se puede cambiar). Como este Worker ES el de producción,
-// detectamos el runtime edge y usamos "production" directamente.
-//
-// OJO: no usar `typeof WebSocket !== "undefined"` para detectar Workers: desde
-// Node 22 WebSocket es un global nativo y el backend normal queda marcado como
-// edge, forzando NODE_ENV=production y rompiendo el arranque en desarrollo.
-// `caches` (CacheStorage) sí es exclusivo de Workers en este stack.
+// In Cloudflare Workers, workerd may expose NODE_ENV differently during module
+// validation. `caches` is a reliable signal for this runtime in this stack.
 const isWorkersRuntime = "caches" in globalThis;
 
 const nodeEnv = isWorkersRuntime ? "production" : process.env.NODE_ENV || "development";
 
-if (nodeEnv === "production" && !process.env.JWT_SECRET && !process.env.CLOUDFLARE_API_TOKEN) {
-  throw new Error("JWT_SECRET es obligatorio en producción");
+if (!process.env.JWT_SECRET && nodeEnv !== "production") {
+  console.warn("[config] JWT_SECRET no definido; usando secret de desarrollo");
 }
 
-if (!process.env.JWT_SECRET && nodeEnv !== "production") {
-  console.warn("[config] JWT_SECRET no definido — usando secret de desarrollo");
+function requireProductionSecret(name: string, value: string | undefined): string {
+  if (nodeEnv === "production" && !value) {
+    throw new Error(`${name} es obligatorio en produccion`);
+  }
+  return value || "dev-secret-change-in-production";
 }
 
 export const config = {
   port: parseInt(process.env.PORT || "3000", 10),
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
   nodeEnv,
-  jwtSecret: process.env.JWT_SECRET || "dev-secret-change-in-production",
+  get jwtSecret() {
+    return requireProductionSecret("JWT_SECRET", process.env.JWT_SECRET);
+  },
   accessTokenExpiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || "15m",
   sessionDurationHours: parseInt(process.env.SESSION_DURATION_HOURS || "168", 10),
   googleServiceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON || null,
