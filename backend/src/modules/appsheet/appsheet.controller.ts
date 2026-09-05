@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { config } from "../../config";
+import { syncAppSheetNovedades } from "./appsheet.novedades";
 import { syncAppSheetStudents } from "./appsheet.students";
 
 function isAuthorized(req: Request): boolean {
@@ -18,4 +19,13 @@ export async function syncStudents(req: Request, res: Response): Promise<void> {
   }
   const result = await syncAppSheetStudents();
   res.json({ success: result.ok, data: result });
+}
+
+export async function syncNovedades(req: Request, res: Response): Promise<void> {
+  if (!isAuthorized(req)) {
+    res.status(401).json({ success: false, error: { code: "INVALID_WEBHOOK", message: "Webhook inválido" } });
+    return;
+  }
+  const result = await syncAppSheetNovedades({ force: true });
+  res.status(result.ok ? 200 : 502).json({ success: result.ok, data: result });
 }

@@ -188,13 +188,25 @@ npx wrangler secret put APPSHEET_WEBHOOK_TOKEN
 > `GOOGLE_DRIVE_WEBHOOK_URL` debe apuntar al endpoint público del worker,
 > por ejemplo `https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive`.
 
-`APPSHEET_APP_ID` y `APPSHEET_DEMOGRAFICOS_TABLE` configuran la fuente de
-estudiantes. AppSheet tiene la tabla `Demograficos` conectada al archivo
-`DEMOGRAFICOS 2026-2027` de Google. La configuración de producción usa
-`STUDENTS_SYNC_SOURCE=appsheet`: el Worker consulta la API de AppSheet y no
-necesita acceso directo de su cuenta de servicio al archivo de Google. La
-variable `GOOGLE_DRIVE_STUDENTS_FILE_NAME` queda sólo como referencia y
-compatibilidad para el flujo directo de Drive.
+`APPSHEET_APP_ID`, `APPSHEET_DEMOGRAFICOS_TABLE` y
+`APPSHEET_NOVEDADES_TABLE` configuran las fuentes directas de AppSheet. Los
+estudiantes provienen de `Demograficos` y las novedades de la tabla
+`Novedades_Diarias` que se ve en AppSheet. La configuración de producción usa
+la API de AppSheet; Drive queda solamente para oferta y horarios.
+
+Para que una novedad llegue inmediatamente sin esperar el cron, crear una
+automatización de AppSheet sobre altas/actualizaciones de `Novedades_Diarias`
+que haga `POST` a:
+
+```text
+https://extracurriculares-api.gi-school.workers.dev/api/webhooks/appsheet/novedades/sync
+```
+
+La petición debe enviar el header `X-Webhook-Token` con el secreto configurado
+en `APPSHEET_WEBHOOK_TOKEN`. El endpoint consulta únicamente las filas del día
+actual en `America/Bogota`, vuelve a validar las fechas en el backend y reemplaza
+el cache diario de forma idempotente. Si el día no tiene novedades, el cache
+queda vacío; una respuesta inválida de AppSheet no elimina el último snapshot.
 
 Después del deploy y de setear los secretos, pegale una vez al bootstrap:
 

@@ -1,11 +1,20 @@
-# Integración Google Drive — Novedades diarias
+# Integración AppSheet — Novedades diarias
 
-Cómo se conectó el Google Drive del colegio (carpeta de AppSheet donde se cargan las
-novedades) con el backend, para que los profesores vean en su lista de asistencia qué
-estudiantes salen temprano, se ausentan, etc.
+Las novedades se consultan directamente mediante la API de AppSheet desde la
+tabla **`Novedades_Diarias`**. Google Drive ya no es la fuente autoritativa de
+novedades; se conserva para oferta y horarios y como fallback de desarrollo si
+AppSheet no está configurado.
 
-Flujo: **Google Drive (`.xlsx` de AppSheet) → Sync cada 10 min → tabla `Novedad` →
-endpoint del profesor → chip ámbar en la asistencia**.
+Flujo principal: **AppSheet (`Novedades_Diarias`, sólo el día actual de Colombia)
+→ webhook inmediato y cron de respaldo → cache diario PostgreSQL `Novedad` →
+endpoints → avisos en asistencia**.
+
+No se importa el histórico completo: cada sincronización reemplaza el cache con
+las novedades de hoy. Si hoy no existen filas, se eliminan las del día anterior.
+
+La integración antigua descargaba un `.xlsx` desde Drive cada 10 minutos. Ese
+flujo podía retrasarse respecto de AppSheet o leer un snapshot incompleto; por
+eso producción usa ahora la API de la tabla mostrada en AppSheet.
 
 ---
 

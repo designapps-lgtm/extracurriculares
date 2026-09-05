@@ -37,8 +37,9 @@ export const config = {
   appsheetAppId: process.env.APPSHEET_APP_ID || null,
   appsheetAccessKey: process.env.APPSHEET_APPLICATION_ACCESS_KEY || null,
   appsheetDemograficosTable: process.env.APPSHEET_DEMOGRAFICOS_TABLE || "Demograficos",
-  // Estudiantes e inscripciones siempre se sincronizan desde AppSheet/Demograficos.
-  // Google Drive sólo conserva la oferta y las novedades.
+  appsheetNovedadesTable: process.env.APPSHEET_NOVEDADES_TABLE || "Novedades_Diarias",
+  // Estudiantes, inscripciones y novedades se sincronizan directamente desde AppSheet.
+  // Google Drive se conserva únicamente para la oferta académica.
   novedadesSyncMinutes: parseInt(process.env.NOVEDADES_SYNC_MINUTES || "10", 10),
   googleClientId: process.env.GOOGLE_CLIENT_ID || null,
   googleInstitutionDomain: process.env.GOOGLE_INSTITUTION_DOMAIN || "gi.edu.co",

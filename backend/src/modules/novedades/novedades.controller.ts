@@ -3,13 +3,13 @@ import { sql } from "../../config/db";
 import {
   CANONICAL_NOVEDADES_DB_NAMES,
   getNovedadesForStudent,
-  syncNovedadesFromDrive,
 } from "./novedades.service";
+import { syncNovedadesFromConfiguredSource } from "./novedades.sync";
 import { dayBounds, isOnDay, novedadDayName } from "./novedades.dates";
 
 async function refreshNovedades(): Promise<void> {
   try {
-    await syncNovedadesFromDrive();
+    await syncNovedadesFromConfiguredSource();
   } catch (e: any) {
     console.error("[Novedades] Error en refresh on-demand:", e?.message || e);
   }

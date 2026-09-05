@@ -94,7 +94,6 @@ export async function getTeacherClasses(req: Request, res: Response) {
             INNER JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
             WHERE ss."codigoDisciplina" = ${g.discipline.codigoDisciplina}
               AND ss."diaSemana" = ${g.schedule.diaSemana}
-              AND st."estado" = 'activo'
               AND EXISTS (
                 SELECT 1
                 FROM "ExtracurricularAssignment" rosterAssignment
@@ -114,7 +113,6 @@ export async function getTeacherClasses(req: Request, res: Response) {
             WHERE stayAssignment."codigoDisciplina" = ${g.discipline.codigoDisciplina}
               AND stay."idHorario" = ${g.schedule.idHorario}
               AND stay."fecha" = ${todayStr}::date
-              AND st."estado" = 'activo'
               AND NOT EXISTS (
                 SELECT 1 FROM enrolled WHERE enrolled."codigoEstudiante" = stay."codigoEstudiante"
               )

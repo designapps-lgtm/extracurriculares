@@ -1,6 +1,6 @@
 import app from "./app";
 import { config } from "./config";
-import { syncNovedadesFromDrive } from "./modules/novedades/novedades.service";
+import { syncNovedadesFromConfiguredSource } from "./modules/novedades/novedades.sync";
 import { syncAppSheetStudents } from "./modules/appsheet/appsheet.students";
 import { syncDriveSources } from "./modules/driveSync/driveSync.service";
 
@@ -28,25 +28,25 @@ async function start() {
     }
   };
 
-  // Drive se conserva únicamente para oferta/horarios y novedades; no importa
-  // estudiantes ni inscripciones.
-  const runDriveSync = async () => {
-    if (!config.googleServiceAccountJson || !config.googleDriveFolderId) {
-      return;
+  const runNovedadesSync = async () => {
+    const result = await syncNovedadesFromConfiguredSource({ force: true });
+    if (result.errors.length > 0) {
+      console.error(`[Novedades:${result.source}] Sync con errores: ${result.errors.join(" | ")}`);
+    } else {
+      const warnings = result.warnings.length > 0 ? `; avisos: ${result.warnings.join(" | ")}` : "";
+      console.log(`[Novedades:${result.source}] Sync OK: ${result.novedades} novedades${warnings}`);
     }
+  };
+
+  // Drive se conserva únicamente para oferta y horarios.
+  const runDriveSync = async () => {
+    if (!config.googleServiceAccountJson || !config.googleDriveFolderId) return;
 
     const offerResult = await syncDriveSources();
     if (offerResult.errors.length > 0) {
       console.error(`[Drive] Sync de oferta con errores: ${offerResult.errors.join(" | ")}`);
     } else {
       console.log(`[Drive] Oferta OK: ${offerResult.offerEntries} entradas, ${offerResult.files} archivos procesados`);
-    }
-
-    const novedadesResult = await syncNovedadesFromDrive();
-    if (novedadesResult.errors.length > 0) {
-      console.error(`[Novedades] Sync con errores: ${novedadesResult.errors.join(" | ")}`);
-    } else {
-      console.log(`[Novedades] Sync OK: ${novedadesResult.files} archivos, ${novedadesResult.novedades} novedades`);
     }
   };
 
@@ -58,12 +58,24 @@ async function start() {
     console.log("[AppSheet] Sync de estudiantes desactivado: faltan credenciales");
   }
 
+  const novedadesConfigured = Boolean(
+    (config.appsheetAppId && config.appsheetAccessKey)
+      || (config.googleServiceAccountJson && config.googleDriveFolderId),
+  );
+  if (novedadesConfigured) {
+    setTimeout(() => { runNovedadesSync().catch((e) => console.error("[Novedades] Error en sync inicial:", e.message)); }, 5000);
+    setInterval(() => { runNovedadesSync().catch((e) => console.error("[Novedades] Error en sync periódico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
+    console.log(`[Novedades] Sync programado cada ${config.novedadesSyncMinutes} minutos`);
+  } else {
+    console.log("[Novedades] Sync desactivado: faltan credenciales de AppSheet y Drive");
+  }
+
   if (config.googleServiceAccountJson && config.googleDriveFolderId) {
     setTimeout(() => { runDriveSync().catch((e) => console.error("[Drive] Error en sync inicial:", e.message)); }, 5000);
     setInterval(() => { runDriveSync().catch((e) => console.error("[Drive] Error en sync periódico:", e.message)); }, config.novedadesSyncMinutes * 60 * 1000);
-    console.log(`[Drive] Oferta y novedades programadas cada ${config.novedadesSyncMinutes} minutos`);
+    console.log(`[Drive] Oferta programada cada ${config.novedadesSyncMinutes} minutos`);
   } else {
-    console.log("[Drive] Oferta y novedades desactivadas: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
+    console.log("[Drive] Oferta desactivada: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
   }
 }
 

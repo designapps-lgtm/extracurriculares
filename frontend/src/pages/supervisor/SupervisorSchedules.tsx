@@ -33,10 +33,14 @@ function diaDeFecha(fecha: string): string {
 }
 
 function hoyInput(): string {
-  const t = new Date();
-  const mm = String(t.getMonth() + 1).padStart(2, "0");
-  const dd = String(t.getDate()).padStart(2, "0");
-  return `${t.getFullYear()}-${mm}-${dd}`;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "0";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 function formatFecha(iso: string): string {
@@ -45,7 +49,7 @@ function formatFecha(iso: string): string {
 }
 
 function SessionRow({ session, onView }: { session: { id: string; fecha: string; estado: string; counts: { total: number; presente: number; ausente: number; justificado: number } }; onView: () => void }) {
-  const llamoLista = session.estado === "finalizada";
+  const llamoLista = session.estado === "en_curso" || session.estado === "finalizada";
   return (
     <li className="flex items-center justify-between gap-3 rounded-xl border border-surface-200 dark:border-surface-800 px-3 py-2.5 bg-white dark:bg-surface-950">
       <div className="min-w-0">

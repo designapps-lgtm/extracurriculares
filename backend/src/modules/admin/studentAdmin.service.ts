@@ -20,16 +20,22 @@ export async function getStudents(query: { search?: string; grado?: string; insc
   let idx = 0;
   const next = (v: any): string => { idx++; params.push(v); return `$${idx}`; };
 
-  if (search) {
+  const searchValue = typeof search === "string" ? search.trim() : "";
+  if (searchValue) {
     const fullName = normalizedExpr(`COALESCE(s."nombre", '') || ' ' || COALESCE(s."apellido", '')`);
     const code = normalizedExpr(`s."codigoEstudiante"`);
-    const tokens = search.trim().split(/\s+/).filter(Boolean);
+    const email = normalizedExpr(`COALESCE(s."correo", '')`);
+    const group = normalizedExpr(`COALESCE(s."grupo", '')`);
+    const tokens = searchValue.split(/\s+/).filter(Boolean);
     const parts = tokens.map((token) => {
       const p = next(`%${token}%`);
       const normalizedPattern = normalizedExpr(p);
-      return `(${fullName} LIKE ${normalizedPattern} OR ${code} LIKE ${normalizedPattern})`;
+      return `(${fullName} LIKE ${normalizedPattern}
+        OR ${code} LIKE ${normalizedPattern}
+        OR ${email} LIKE ${normalizedPattern}
+        OR ${group} LIKE ${normalizedPattern})`;
     });
-    conditions.push(`(${parts.join(" AND ")})`);
+    if (parts.length > 0) conditions.push(`(${parts.join(" AND ")})`);
   }
 
   if (grado) {

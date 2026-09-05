@@ -2,7 +2,7 @@ import "./env";
 import { httpServerHandler } from "cloudflare:node";
 import app from "../src/app";
 import { config } from "../src/config";
-import { syncNovedadesFromDrive } from "../src/modules/novedades/novedades.service";
+import { syncNovedadesFromConfiguredSource } from "../src/modules/novedades/novedades.sync";
 import { ensureDriveWatch, syncDriveSources } from "../src/modules/driveSync/driveSync.service";
 import { syncAppSheetStudents } from "../src/modules/appsheet/appsheet.students";
 
@@ -13,12 +13,12 @@ const expressHandler = httpServerHandler({ port: config.port });
 export default {
   ...expressHandler,
 
-  // Cron trigger definido en wrangler.toml. AppSheet/Demograficos es la única
-  // fuente de estudiantes e inscripciones; Drive sólo actualiza oferta/novedades.
+  // Cron trigger definido en wrangler.toml. AppSheet es la fuente de estudiantes,
+  // inscripciones y Novedades_Diarias; Drive sólo actualiza la oferta.
   async scheduled(_controller: unknown, _env: unknown, _ctx: unknown) {
     try {
       if (!config.appsheetAppId || !config.appsheetAccessKey) {
-        console.error("[AppSheet] Sync de estudiantes desactivado: faltan credenciales");
+        console.error("[AppSheet] Sincronización desactivada: faltan credenciales");
       } else {
         const students = await syncAppSheetStudents();
         if (students.errors.length > 0) {
@@ -28,9 +28,17 @@ export default {
         }
       }
 
+      const novedadesResult = await syncNovedadesFromConfiguredSource({ force: true });
+      if (novedadesResult.errors.length > 0) {
+        console.error(`[Novedades:${novedadesResult.source}] Sync con errores: ${novedadesResult.errors.join(" | ")}`);
+      } else {
+        const warnings = novedadesResult.warnings.length > 0 ? `; avisos: ${novedadesResult.warnings.join(" | ")}` : "";
+        console.log(`[Novedades:${novedadesResult.source}] Sync OK: ${novedadesResult.novedades} novedades${warnings}`);
+      }
+
       const driveConfigured = Boolean(config.googleServiceAccountJson && config.googleDriveFolderId);
       if (!driveConfigured) {
-        console.log("[Drive] Oferta y novedades desactivadas: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
+        console.log("[Drive] Oferta desactivada: faltan GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_DRIVE_FOLDER_ID");
         return;
       }
 
@@ -45,13 +53,6 @@ export default {
         console.error(`[Drive] Sync de oferta con errores: ${driveResult.errors.join(" | ")}`);
       } else {
         console.log(`[Drive] Oferta OK: ${driveResult.offerEntries} entradas, ${driveResult.files} archivos procesados`);
-      }
-
-      const novedadesResult = await syncNovedadesFromDrive();
-      if (novedadesResult.errors.length > 0) {
-        console.error(`[Novedades] Sync con errores: ${novedadesResult.errors.join(" | ")}`);
-      } else {
-        console.log(`[Novedades] Sync OK: ${novedadesResult.files} archivos, ${novedadesResult.novedades} novedades`);
       }
     } catch (e: any) {
       console.error("[Sync] Error en sync periódico:", e?.message || e);

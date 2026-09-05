@@ -32,7 +32,9 @@ class AppSheetRequestError extends Error {
 
 function extractRows(payload: unknown): AppSheetRow[] {
   if (Array.isArray(payload)) return payload as AppSheetRow[];
-  if (!payload || typeof payload !== "object") return [];
+  if (!payload || typeof payload !== "object") {
+    throw new AppSheetRequestError("AppSheet devolvió un formato de respuesta inesperado", false);
+  }
 
   const body = payload as Record<string, unknown>;
   const candidates = [body.Rows, body.rows, body.data, body.Data];
@@ -45,7 +47,7 @@ function extractRows(payload: unknown): AppSheetRow[] {
     }
   }
 
-  return [];
+  throw new AppSheetRequestError("AppSheet devolvió un formato de respuesta inesperado", false);
 }
 
 /** Lee todas las filas visibles de una tabla AppSheet con timeout y reintentos. */

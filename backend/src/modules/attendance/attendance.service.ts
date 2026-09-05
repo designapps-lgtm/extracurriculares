@@ -147,7 +147,6 @@ async function getRoster(session: AttendanceSessionRow): Promise<RosterResult> {
         WHERE ss."codigoDisciplina" = ${session.codigoDisciplina}
           AND ss."diaSemana" = ${session.diaSemana}
           AND st."idGrado" = ANY(${gradeIds})
-          AND st."estado" = 'activo'
         ORDER BY st."idGrado" ASC, st."apellido" ASC, st."nombre" ASC
       `) as unknown as Array<{
         codigoEstudiante: string;
@@ -170,7 +169,6 @@ async function getRoster(session: AttendanceSessionRow): Promise<RosterResult> {
     WHERE stayAssignment."codigoDisciplina" = ${session.codigoDisciplina}
       AND ss."idHorario" = ${session.idHorario}
       AND ss."fecha" = ${sessionDate(session)}::date
-      AND st."estado" = 'activo'
   `) as unknown as Array<{
     codigoEstudiante: string;
     nombre: string;
@@ -369,7 +367,7 @@ export async function saveAttendance(
 
   const roster = await getRoster(session);
   if (roster.students.length === 0) {
-    throw new AppError(409, "ROSTER_EMPTY", "No hay estudiantes activos en el roster de esta clase");
+    throw new AppError(409, "ROSTER_EMPTY", "No hay estudiantes en el roster de esta clase");
   }
   const allowedCodes = new Set(roster.students.map((student) => student.codigoEstudiante));
   const uniqueRecords = new Map<string, string>();

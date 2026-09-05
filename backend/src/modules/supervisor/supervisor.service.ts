@@ -552,7 +552,6 @@ export async function getSupervisorClasses(req: Request, res: Response) {
       INNER JOIN "Student" st
         ON st."codigoEstudiante" = ss."codigoEstudiante"
        AND st."idGrado" = lg."idGrado"
-      WHERE st."estado" = 'activo'
     ), extra_stays AS (
       SELECT DISTINCT stayAssignment."codigoDisciplina", stay."idHorario", stay."codigoEstudiante"
       FROM "SupervisorStay" stay
@@ -560,7 +559,6 @@ export async function getSupervisorClasses(req: Request, res: Response) {
         ON stayAssignment."idAsignacion" = stay."idAsignacion"
       INNER JOIN "Student" st ON st."codigoEstudiante" = stay."codigoEstudiante"
       WHERE stay."fecha" = ${todayStr}::date
-        AND st."estado" = 'activo'
         AND NOT EXISTS (
           SELECT 1
           FROM enrolled
@@ -799,12 +797,21 @@ export async function getSupervisorAssignmentHistory(req: Request, res: Response
             COUNT(a."id") FILTER (WHERE a."estado" = 'ausente')::int AS "ausente",
             COUNT(a."id") FILTER (WHERE a."estado" = 'justificado')::int AS "justificado"
      FROM "ClassSession" cs
+     INNER JOIN "ExtracurricularAssignment" sessionAssignment
+       ON sessionAssignment."idAsignacion" = cs."idAsignacion"
      LEFT JOIN "AttendanceRecord" a ON a."sessionId" = cs."id"
-     WHERE cs."idAsignacion" = $1
-       AND cs."fecha"::date = $2::date
+     ${CANONICAL_SESSION_JOIN}
+     WHERE sessionAssignment."codigoDisciplina" = $1
+       AND EXISTS (
+         SELECT 1
+         FROM "AssignmentSchedule" targetSchedule
+         WHERE targetSchedule."idAsignacion" = $2
+           AND targetSchedule."idHorario" = cs."idHorario"
+       )
+       AND cs."fecha"::date = $3::date
      GROUP BY cs."id"
-     ORDER BY cs."fecha" DESC`,
-    [asignacionId, todayColombiaDate()]
+     ORDER BY cs."fecha" DESC, cs."updatedAt" DESC`,
+    [assignment.codigoDisciplina, asignacionId, todayColombiaDate()]
   ) as unknown as any[];
 
   const schedules = assignmentsSchedules.map((sch) => ({
@@ -900,12 +907,16 @@ export async function getSupervisorScheduleHistory(req: Request, res: Response) 
             COUNT(a."id") FILTER (WHERE a."estado" = 'ausente')::int AS "ausente",
             COUNT(a."id") FILTER (WHERE a."estado" = 'justificado')::int AS "justificado"
      FROM "ClassSession" cs
+     INNER JOIN "ExtracurricularAssignment" sessionAssignment
+       ON sessionAssignment."idAsignacion" = cs."idAsignacion"
      LEFT JOIN "AttendanceRecord" a ON a."sessionId" = cs."id"
-     WHERE cs."idAsignacion" = $1 AND cs."idHorario" = $2
+     ${CANONICAL_SESSION_JOIN}
+     WHERE sessionAssignment."codigoDisciplina" = $1
+       AND cs."idHorario" = $2
        AND cs."fecha"::date = $3::date
      GROUP BY cs."id"
-     ORDER BY cs."fecha" DESC`,
-    [asignacionId, horarioId, todayColombiaDate()]
+     ORDER BY cs."fecha" DESC, cs."updatedAt" DESC`,
+    [assignment.codigoDisciplina, horarioId, todayColombiaDate()]
   ) as unknown as any[];
 
   res.json({

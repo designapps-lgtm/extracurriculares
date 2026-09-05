@@ -5,9 +5,10 @@ import {
   dayBounds,
   isOnDay,
   isActive,
+  novedadesForColombiaDay,
   novedadDayName,
 } from "./novedades.dates";
-import { parseNovedadesJson } from "./novedades.parser";
+import { parseNovedadesJson, parseNovedadesRows } from "./novedades.parser";
 
 // Helper: crear una fecha UTC explícita evitando ambigüedad de zona del runner.
 const utc = (y: number, m: number, d: number, h = 0, mi = 0) =>
@@ -29,6 +30,17 @@ describe("novedades.dates: día calendario de Colombia", () => {
     const novedad = { fechaNovedad: utc(2026, 9, 1, 5), fechaCreacion: null };
     expect(isOnDay(novedad, dayBounds("2026-09-02")!)).toBe(false);
     expect(isOnDay(novedad, dayBounds("2026-08-31")!)).toBe(false);
+  });
+
+  it("filtra el snapshot para conservar únicamente las novedades del día solicitado", () => {
+    const rows = [
+      { id: "anterior", fechaNovedad: utc(2026, 9, 1, 12) },
+      { id: "actual", fechaNovedad: null, fechaHora: utc(2026, 9, 2, 15) },
+      { id: "siguiente", fechaNovedad: utc(2026, 9, 3, 5) },
+      { id: "sin-fecha", fechaNovedad: null, fechaHora: null, fechaCreacion: null },
+    ];
+
+    expect(novedadesForColombiaDay(rows, utc(2026, 9, 2, 18)).map((row) => row.id)).toEqual(["actual"]);
   });
 
   it("colombiaDateKey de un instante a las 00:00Z del 1/09 es el 31/08 (Bogotá)", () => {
@@ -81,5 +93,34 @@ describe("novedades.parser: fechas se guardan como reloj de Bogotá", () => {
     const vieja = { fechaNovedad: new Date(hoy.getTime() - 24 * 3600_000), fechaCreacion: null };
     expect(isActive(futura)).toBe(true);
     expect(isActive(vieja)).toBe(false);
+  });
+});
+
+describe("novedades.parser: filas directas de AppSheet", () => {
+  it("mapea una fila de Novedades_Diarias y expande los códigos", () => {
+    const rows = parseNovedadesRows([
+      {
+        NovedadID_M: "NOV-APP-1",
+        ScanCode: "1001, 1002",
+        Fecha_Novedad: "4/09/2026",
+        "Tipo de Novedad": "Salida",
+      },
+    ], "Novedades_Diarias");
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.codigoEstudiante)).toEqual(["1001", "1002"]);
+    expect(rows[0].fechaNovedad?.toISOString()).toBe("2026-09-04T05:00:00.000Z");
+  });
+
+  it("descarta fechas numéricas fuera del rango escolar en lugar de crear años anómalos", () => {
+    const [row] = parseNovedadesRows([
+      {
+        NovedadID_M: "NOV-APP-2",
+        ScanCode: "1001",
+        Fecha_Novedad: "2251719",
+      },
+    ], "Novedades_Diarias");
+
+    expect(row.fechaNovedad).toBeNull();
   });
 });
