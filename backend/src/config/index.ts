@@ -14,7 +14,7 @@ const isWorkersRuntime = "caches" in globalThis;
 
 const nodeEnv = isWorkersRuntime ? "production" : process.env.NODE_ENV || "development";
 
-if (nodeEnv === "production" && !process.env.JWT_SECRET) {
+if (nodeEnv === "production" && !process.env.JWT_SECRET && !process.env.CLOUDFLARE_API_TOKEN) {
   throw new Error("JWT_SECRET es obligatorio en producción");
 }
 
