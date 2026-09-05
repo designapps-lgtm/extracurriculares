@@ -15,10 +15,6 @@ import {
 } from "../novedades/googleDrive.service";
 
 const STATE_KEY = "drive-watch";
-const OFFER_FILES = [
-  "Horario por sección extracurricular.xlsx",
-  "Horario por seccion extracurricular.xlsx",
-];
 
 type DriveWatchState = {
   pageToken: string;
@@ -87,7 +83,7 @@ async function findOfferFiles(files: DriveFile[]): Promise<DriveFile[]> {
   const targets = new Map<string, DriveFile>();
   for (const file of files) {
     const key = normalize(file.name);
-    if (OFFER_FILES.some((target) => normalize(target) === key)) {
+    if (config.googleDriveOfferFileNames.some((target) => normalize(target) === key)) {
       targets.set(key, file);
     }
   }
