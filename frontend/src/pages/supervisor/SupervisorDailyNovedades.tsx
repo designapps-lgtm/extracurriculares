@@ -18,6 +18,13 @@ function formatDate(value: string | null): string {
 
 type Nivel = "prescolar" | "primaria" | "secundaria";
 
+function mergeItems(current: DailyNovedad[], incoming: DailyNovedad[]): DailyNovedad[] {
+  const byId = new Map<string, DailyNovedad>();
+  for (const item of incoming) byId.set(item.novedad.id, item);
+  for (const item of current) if (!byId.has(item.novedad.id)) byId.set(item.novedad.id, item);
+  return [...byId.values()];
+}
+
 function nivelDeGrado(grado: string | null): Nivel | null {
   if (!grado) return null;
   const value = grado.trim().toUpperCase();
@@ -47,10 +54,10 @@ export default function SupervisorDailyNovedades({
   const [loading, setLoading] = useState(true);
   const notify = useNotify();
 
-  const load = (filters: { fecha?: string; grado?: string } = {}) => {
-    setLoading(true);
+  const load = (filters: { fecha?: string; grado?: string } = {}, options: { silent?: boolean } = {}) => {
+    if (!options.silent) setLoading(true);
     api.getNovedadesDiarias({ fecha: filters.fecha ?? fecha, grado: filters.grado ?? grado })
-      .then(setItems)
+      .then((data) => setItems((current) => options.silent && current.length > 0 ? mergeItems(current, data) : data))
       .catch((error: any) => notify.error(error.message || "No se pudieron cargar las novedades"))
       .finally(() => setLoading(false));
   };
@@ -61,7 +68,7 @@ export default function SupervisorDailyNovedades({
 
   useEffect(() => {
     load();
-    const interval = window.setInterval(() => load(), 15_000);
+    const interval = window.setInterval(() => load({}, { silent: true }), 15_000);
     return () => window.clearInterval(interval);
   }, [api, fecha, grado]);
 

@@ -5,6 +5,8 @@ import type {
   Assignment,
   AttendanceResponse,
   StudentNovedades,
+  AppReport,
+  ReportProblemInput,
 } from "../types";
 
 export interface TeacherUser {
@@ -78,4 +80,8 @@ export async function getNovedadesBatch(codigos: string[], fecha?: string): Prom
     fecha: fecha || "",
   });
   return res.data;
+}
+
+export async function teacherReportProblem(input: ReportProblemInput): Promise<AppReport> {
+  return (await api.post<ApiResponse<AppReport>>("/api/teacher/reports", input)).data;
 }

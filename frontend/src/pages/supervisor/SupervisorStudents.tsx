@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSupervisorFilters, getSupervisorStudents } from "../../services/supervisor";
 import { useNotify } from "../../components/common/Notify";
@@ -34,6 +34,7 @@ export default function SupervisorStudents() {
   const [loading, setLoading] = useState(true);
   const notify = useNotify();
   const navigate = useNavigate();
+  const latestRequest = useRef(0);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -41,9 +42,10 @@ export default function SupervisorStudents() {
   }, [search]);
 
   const load = (page = 1, overrides?: { search?: string; grado?: string; inscrito?: string }) => {
+    const requestNumber = ++latestRequest.current;
     setLoading(true);
     const params: Record<string, string> = { page: String(page), limit: "20" };
-    const searchValue = overrides?.search ?? debouncedSearch;
+    const searchValue = (overrides?.search ?? debouncedSearch).trim();
     const gradoValue = overrides?.grado ?? filterGrado;
     const inscritoValue = overrides?.inscrito ?? filterInscrito;
     if (searchValue) params.search = searchValue;
@@ -52,11 +54,17 @@ export default function SupervisorStudents() {
 
     getSupervisorStudents(params)
       .then((response) => {
+        if (requestNumber !== latestRequest.current) return;
         setStudents(response.data);
         setMeta(response.meta);
       })
-      .catch((error) => notify.error(error.message || "No se pudieron cargar los estudiantes"))
-      .finally(() => setLoading(false));
+      .catch((error) => {
+        if (requestNumber !== latestRequest.current) return;
+        notify.error(error.message || "No se pudieron cargar los estudiantes");
+      })
+      .finally(() => {
+        if (requestNumber === latestRequest.current) setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -86,7 +94,7 @@ export default function SupervisorStudents() {
             type="text"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por código, nombre o apellido..."
+            placeholder="Buscar por código, nombre, apellido, correo o grupo..."
             className="flex-1 min-w-[220px] px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
           <select
@@ -108,7 +116,7 @@ export default function SupervisorStudents() {
           </select>
           <button
             type="button"
-            onClick={() => load(1)}
+            onClick={() => load(1, { search })}
             disabled={loading}
             className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 disabled:opacity-50 transition-colors"
           >

@@ -63,7 +63,16 @@ export interface ParsedNovedadRow {
 
 function parseFlexibleDate(value: unknown): Date | null {
   if (value === null || value === undefined) return null;
-  if (value instanceof Date && !isNaN(value.getTime())) return value;
+
+  const plausibleDate = (date: Date): Date | null => {
+    if (isNaN(date.getTime())) return null;
+    const year = date.getUTCFullYear();
+    // Las novedades corresponden a datos escolares contemporáneos. Este límite
+    // evita que seriales o textos corruptos terminen como fechas tipo año 8202.
+    return year >= 2000 && year <= 2100 ? date : null;
+  };
+
+  if (value instanceof Date) return plausibleDate(value);
 
   const str = String(value).trim();
   if (!str) return null;
@@ -77,9 +86,9 @@ function parseFlexibleDate(value: unknown): Date | null {
     const serial = parseFloat(str);
     if (serial > 0 && serial < 80000) {
       const ms = Math.round((serial - 25569) * 86400 * 1000);
-      const d = new Date(ms);
-      if (!isNaN(d.getTime())) return toBogotaUtc(d);
+      return plausibleDate(toBogotaUtc(new Date(ms)));
     }
+    return null;
   }
 
   // AppSheet envía las fechas con formato mes/día/año (MM/DD/YYYY),
@@ -97,13 +106,12 @@ function parseFlexibleDate(value: unknown): Date | null {
       parseInt(min || "0", 10),
       parseInt(ss || "0", 10),
     ));
-    return toBogotaUtc(d);
+    return plausibleDate(toBogotaUtc(d));
   }
 
   // ISO con zona horaria explícita (Z/±HH:MM) ya es un instante absoluto → no ajustar.
   if (/[zZ]|[+-]\d{2}:\d{2}$/.test(str)) {
-    const iso = new Date(str);
-    return isNaN(iso.getTime()) ? null : iso;
+    return plausibleDate(new Date(str));
   }
 
   // ISO sin zona: p.ej. "2026-09-01" o "2026-09-01T14:30:00" → reloj de pared de Bogotá.
@@ -118,11 +126,10 @@ function parseFlexibleDate(value: unknown): Date | null {
       parseInt(min || "0", 10),
       parseInt(ss || "0", 10),
     ));
-    return toBogotaUtc(d);
+    return plausibleDate(toBogotaUtc(d));
   }
 
-  const fallback = new Date(str);
-  return isNaN(fallback.getTime()) ? null : fallback;
+  return plausibleDate(new Date(str));
 }
 
 function parseBoolean(value: unknown): boolean {

@@ -96,6 +96,15 @@ export function isOnDay(
   return novedadKey === startKey;
 }
 
+// Filtra un conjunto para conservar exclusivamente el día calendario de
+// Colombia que contiene `day`. Se usa como segunda validación tras AppSheet.
+export function novedadesForColombiaDay<
+  T extends { fechaNovedad?: Date | null; fechaHora?: Date | null; fechaCreacion?: Date | null },
+>(rows: T[], day: Date): T[] {
+  const bounds = dayBounds(day.toISOString());
+  return bounds ? rows.filter((row) => isOnDay(row, bounds)) : [];
+}
+
 // True si la novedad es de "hoy o después" (visión por defecto, sin fecha).
 export function isActive(n: { fechaNovedad?: Date | null; fechaHora?: Date | null; fechaCreacion?: Date | null }): boolean {
   const todayStart = todayColombiaStart();

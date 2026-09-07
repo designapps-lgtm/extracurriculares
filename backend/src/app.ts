@@ -33,6 +33,7 @@ import { adminNovedadesRouter } from "./modules/admin/novedadesAdmin.routes";
 import { adminOperationsRouter } from "./modules/admin/operationsAdmin.routes";
 import { driveSyncRouter } from "./modules/driveSync/driveSync.routes";
 import { appSheetSyncRouter } from "./modules/appsheet/appsheet.routes";
+import { adminReportRouter, reportRouter } from "./modules/reports/report.routes";
 
 // Teacher routes
 import { teacherAuthRouter } from "./modules/teacher/auth.routes";
@@ -123,6 +124,12 @@ app.use("/api/secretary/auth", secretaryAuthRouter);
 
 // Protected secretary routes
 app.use("/api/secretary", authenticateSecretary, requireActiveSecretary, secretaryDashboardRouter);
+
+// Reportes de problemas: cada rol crea desde su prefijo; el admin además lista y gestiona estados.
+app.use("/api/supervisor/reports", authenticateSupervisor, requireActiveSupervisor, reportRouter);
+app.use("/api/secretary/reports", authenticateSecretary, requireActiveSecretary, reportRouter);
+app.use("/api/teacher/reports", authenticateTeacher, requireActiveTeacher, reportRouter);
+app.use("/api/admin/reports", authenticate, requireAdmin, adminReportRouter);
 
 // Drive webhooks / manual sync bootstrap
 app.use("/api/webhooks", driveSyncRouter);

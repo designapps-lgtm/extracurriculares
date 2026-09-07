@@ -15,6 +15,7 @@ import AdminTeachers from "./pages/admin/AdminTeachers";
 import AdminAssignments from "./pages/admin/AdminAssignments";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminAttendanceCallStatus from "./pages/admin/AdminAttendanceCallStatus";
+import AdminReportes from "./pages/admin/AdminReportes";
 
 // Teacher
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
@@ -123,6 +124,7 @@ function App() {
         <Route path="secretaries" element={<AdminSecretaries />} />
         <Route path="assignments" element={<AdminAssignments />} />
         <Route path="admins" element={<AdminUsers />} />
+        <Route path="reportes" element={<AdminReportes />} />
       </Route>
 
       {/* Fallback */}
