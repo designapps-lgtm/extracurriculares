@@ -82,9 +82,11 @@ function parseFlexibleDate(value: unknown): Date | null {
     }
   }
 
-  const dmy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if (dmy) {
-    const [, dd, mm, yyyy, hh, min, ss] = dmy;
+  // AppSheet envía las fechas con formato mes/día/año (MM/DD/YYYY),
+  // p.ej. "09/07/2026" = 7 de septiembre de 2026. Se parsea en ese orden.
+  const mdy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (mdy) {
+    const [, mm, dd, yyyy, hh, min, ss] = mdy;
     // Date(year, ...) depende del huso horario del runtime; usar UTC evita
     // sumar dos veces las cinco horas cuando el proceso corre en Bogotá.
     const d = new Date(Date.UTC(
