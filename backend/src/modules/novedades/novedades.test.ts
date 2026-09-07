@@ -103,7 +103,7 @@ describe("novedades.parser: filas directas de AppSheet", () => {
       {
         NovedadID_M: "NOV-APP-1",
         ScanCode: "1001, 1002",
-        Fecha_Novedad: "4/09/2026",
+        Fecha_Novedad: "09/04/2026",
         "Tipo de Novedad": "Salida",
       },
     ], "Novedades_Diarias");
