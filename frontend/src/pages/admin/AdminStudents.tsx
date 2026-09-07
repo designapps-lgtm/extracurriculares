@@ -90,7 +90,6 @@ export default function AdminStudents() {
       idGrado: student.idGrado,
       grupo: student.grupo,
       correo: student.correo,
-      estado: student.estado,
     });
     const byDay: Record<string, string> = {};
     for (const sc of student.studentSchedules) {
@@ -194,9 +193,6 @@ export default function AdminStudents() {
                   </div>
                   <div className="flex items-center gap-2 mt-2.5 flex-wrap">
                     <span className="badge-neutral">{s.grade.nombre}</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.estado === "activo" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                      {s.estado}
-                    </span>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.studentSchedules.length > 0 ? "bg-blue-100 text-blue-800" : "bg-surface-100 text-surface-600"}`}>
                       {s.studentSchedules.length > 0 ? "Inscrito" : "No inscrito"}
                     </span>
@@ -224,7 +220,6 @@ export default function AdminStudents() {
                     <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Código</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Nombre</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Grado</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Estado</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Inscrito</th>
                     <th className="text-right px-4 py-3 text-xs font-medium text-surface-500 uppercase">Acciones</th>
                   </tr>
@@ -246,11 +241,6 @@ export default function AdminStudents() {
                       <td className="px-4 py-3 font-mono text-surface-600 dark:text-surface-400">{s.codigoEstudiante}</td>
                       <td className="px-4 py-3 font-medium text-surface-900 dark:text-surface-100">{s.nombre} {s.apellido}</td>
                       <td className="px-4 py-3"><span className="badge-neutral">{s.grade.nombre}</span></td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.estado === "activo" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                          {s.estado}
-                        </span>
-                      </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${s.studentSchedules.length > 0 ? "bg-blue-100 text-blue-800" : "bg-surface-100 text-surface-600"}`}>
                           {s.studentSchedules.length > 0 ? "Inscrito" : "No inscrito"}
@@ -329,18 +319,6 @@ export default function AdminStudents() {
                   className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-surface-500 mb-1">Estado</label>
-                <select
-                  value={editForm.estado || "activo"}
-                  onChange={(e) => setEditForm({ ...editForm, estado: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-                >
-                  <option value="activo">Activo</option>
-                  <option value="inactivo">Inactivo</option>
-                </select>
-              </div>
-
               <div>
                 <label className="block text-xs font-medium text-surface-500 mb-2">
                   Actividades (disciplina por día)

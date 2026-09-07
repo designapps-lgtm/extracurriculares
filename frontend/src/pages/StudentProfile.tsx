@@ -50,7 +50,6 @@ export default function StudentProfile() {
     apellido: "",
     grupo: "",
     correo: "",
-    estado: "activo",
     fotoUrl: "",
   });
 
@@ -61,7 +60,6 @@ export default function StudentProfile() {
       apellido: profile.student.apellido,
       grupo: profile.student.grupo || "",
       correo: profile.student.correo || "",
-      estado: profile.student.estado,
       fotoUrl: profile.student.fotoUrl || "",
     });
     setEditing(true);
@@ -76,7 +74,6 @@ export default function StudentProfile() {
         apellido: form.apellido,
         grupo: form.grupo || undefined,
         correo: form.correo || undefined,
-        estado: form.estado,
         fotoUrl: form.fotoUrl || undefined,
       });
       setEditing(false);
@@ -185,15 +182,6 @@ export default function StudentProfile() {
                 {student.grupo || student.grade.nombre} · {student.grade.nivel || "Secundaria"}
               </p>
               <div className="flex items-center gap-2 mt-3">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    student.estado === "activo"
-                      ? "bg-green-500/20 text-green-100"
-                      : "bg-red-500/20 text-red-100"
-                  }`}
-                >
-                  {student.estado}
-                </span>
                 {student.correo && (
                   <a
                     href={`mailto:${student.correo}`}
@@ -383,19 +371,6 @@ export default function StudentProfile() {
                   onChange={(e) => setForm({ ...form, correo: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-surface-500 mb-1">
-                  Estado
-                </label>
-                <select
-                  value={form.estado}
-                  onChange={(e) => setForm({ ...form, estado: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-                >
-                  <option value="activo">Activo</option>
-                  <option value="inactivo">Inactivo</option>
-                </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-surface-500 mb-1">

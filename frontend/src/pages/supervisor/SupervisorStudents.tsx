@@ -144,9 +144,6 @@ export default function SupervisorStudents() {
                     <span className="text-surface-300 dark:text-surface-600">›</span>
                   </div>
                   <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${student.estado === "activo" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                      {student.estado}
-                    </span>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${student.studentSchedules.length > 0 ? "bg-blue-100 text-blue-800" : "bg-surface-100 text-surface-600"}`}>
                       {student.studentSchedules.length > 0 ? "Inscrito" : "No inscrito"}
                     </span>
@@ -165,7 +162,6 @@ export default function SupervisorStudents() {
                     <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Código</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Nombre</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Grado</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Estado</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-surface-500 uppercase">Inscrito en</th>
                   </tr>
                 </thead>
@@ -179,11 +175,6 @@ export default function SupervisorStudents() {
                       <td className="px-4 py-3 font-mono text-surface-600 dark:text-surface-400">{student.codigoEstudiante}</td>
                       <td className="px-4 py-3 font-medium text-surface-900 dark:text-surface-100">{student.nombre} {student.apellido}</td>
                       <td className="px-4 py-3"><span className="badge-neutral">{student.grade.nombre}</span></td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${student.estado === "activo" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                          {student.estado}
-                        </span>
-                      </td>
                       <td className="px-4 py-3 text-surface-600 dark:text-surface-300 max-w-md">
                         {enrollmentLabel(student)}
                       </td>

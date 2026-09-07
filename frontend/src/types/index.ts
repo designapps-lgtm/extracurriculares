@@ -70,7 +70,6 @@ export interface Student {
   grupo: string | null;
   correo: string | null;
   fotoUrl: string | null;
-  estado: string;
   grade: Grade;
   studentSchedules: StudentSchedule[];
 }
@@ -83,7 +82,6 @@ export interface StudentProfile {
     grupo: string | null;
     grade: Grade;
     correo: string | null;
-    estado: string;
     fotoUrl: string | null;
   };
   extracurricular: {

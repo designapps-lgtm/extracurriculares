@@ -18,6 +18,7 @@ function toStudentPayload(student: LiveStudentInfo) {
     .sort((a, b) => DAY_ORDER.indexOf(a.diaSemana) - DAY_ORDER.indexOf(b.diaSemana))
     .map((schedule) => ({
       id: `${student.codigoEstudiante}:${schedule.diaSemana}`,
+      codigoEstudiante: student.codigoEstudiante,
       codigoDisciplina: schedule.codigoDisciplina,
       diaSemana: schedule.diaSemana,
       discipline: {
@@ -34,7 +35,6 @@ function toStudentPayload(student: LiveStudentInfo) {
     idGrado: 0,
     grupo: student.grupo,
     fotoUrl: student.fotoUrl,
-    estado: "activo",
     createdAt: null,
     updatedAt: null,
     grade: { idGrado: 0, nombre: student.grado, nivel: null },
@@ -105,7 +105,6 @@ export async function getStudentProfile(codigo: string) {
       apellido: student.apellido,
       grupo: student.grupo,
       grade: { idGrado: 0, nombre: student.grado, nivel: null },
-      estado: "activo",
       fotoUrl: student.fotoUrl,
     },
     extracurricular: extracurricular.length > 0 ? extracurricular : null,

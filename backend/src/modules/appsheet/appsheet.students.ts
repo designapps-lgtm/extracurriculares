@@ -58,13 +58,7 @@ function deriveMiddleName(firstName: string, lastName: string, fullName: string)
   return "";
 }
 
-function mapEstado(value: string): "activo" | "inactivo" | undefined {
-  const normalized = value.trim().toUpperCase();
-  if (["ACTIVE", "ACTIVO", "ACTIVA"].includes(normalized)) return "activo";
-  if (["INACTIVE", "INACTIVO", "INACTIVA"].includes(normalized)) return "inactivo";
-  return undefined;
-}
-
+/** Mapea únicamente los campos vigentes del Sheet; ACTIVE_INACTIVE se ignora. */
 export function mapAppSheetStudents(rows: AppSheetRow[]): MappedStudent[] {
   return rows
     .map((row, index): MappedStudent | null => {
@@ -90,7 +84,6 @@ export function mapAppSheetStudents(rows: AppSheetRow[]): MappedStudent[] {
       const gradeNombre = getCell(row, ["GRADE", "GRADO"]);
       const homeroom = getCell(row, ["HOMEROOM"]);
       const email = getCell(row, ["STUDENT_EMAIL", "STUDENTEMAIL"]);
-      const estadoValue = getCell(row, ["ACTIVE_INACTIVE", "ACTIVE INACTIVE", "ACTIVEINACTIVE", "ESTADO"]);
 
       const schedules = DAY_COLUMN_KEYS.flatMap((day) => {
         const disciplina = getCell(row, day.keys);
@@ -107,10 +100,8 @@ export function mapAppSheetStudents(rows: AppSheetRow[]): MappedStudent[] {
         correo: email || null,
         schedules,
         _excelRow: index + 2,
-        estado: estadoValue ? mapEstado(estadoValue) : undefined,
         sourceFirstName: firstName,
         sourceMiddleName: middleName,
-        sourceEstado: estadoValue,
       };
     })
     .filter((student): student is MappedStudent => student !== null);
@@ -151,7 +142,6 @@ function failedSync(
 
 function validateMappedStudents(rows: AppSheetRow[], students: MappedStudent[]): string[] {
   const errors: string[] = [];
-  const missingBarcode = rows.length - students.length;
   // AppSheet puede devolver filas vacías del rango usado en Google Sheets.
   // No deben invalidar el lote completo: sólo se descartan esas filas sin BARCODE.
   if (students.length === 0) {
@@ -168,7 +158,6 @@ function validateMappedStudents(rows: AppSheetRow[], students: MappedStudent[]):
     if (!student.sourceFirstName) missing.push("FIRST NAME");
     if (!student.apellido) missing.push("LAST NAME");
     if (!student.gradeNombre) missing.push("GRADE");
-    if (student.sourceEstado && !student.estado) missing.push("ACTIVE_INACTIVE válido");
     if (missing.length > 0) {
       errors.push(`${student.codigoEstudiante}: faltan ${missing.join(", ")}`);
     }
@@ -207,8 +196,8 @@ async function runAppSheetStudentsSync(): Promise<AppSheetStudentSyncResult> {
     result = await importStudentsBulk(students, false, {
       // Un snapshot AppSheet sin un indicador de completitud no permite saber
       // si una fila ausente fue eliminada o si la respuesta llegó truncada.
-      // Los estados explícitos del origen sí se actualizan; no desactivamos por
-      // ausencia hasta contar con una confirmación de snapshot completo.
+      // No se desactivan estudiantes por ausencia hasta contar con una
+      // confirmación de snapshot completo.
       deactivateAbsent: false,
     });
   } catch (error) {
