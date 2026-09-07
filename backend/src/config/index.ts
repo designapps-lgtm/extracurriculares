@@ -36,6 +36,8 @@ export const config = {
   appsheetAppId: process.env.APPSHEET_APP_ID || null,
   appsheetAccessKey: process.env.APPSHEET_APPLICATION_ACCESS_KEY || null,
   appsheetDemograficosTable: process.env.APPSHEET_DEMOGRAFICOS_TABLE || "Demograficos",
+  appsheetNovedadesAppId: process.env.APPSHEET_NOVEDADES_APP_ID || null,
+  appsheetNovedadesAccessKey: process.env.APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY || null,
   appsheetNovedadesTable: process.env.APPSHEET_NOVEDADES_TABLE || null,
   googleClientId: process.env.GOOGLE_CLIENT_ID || null,
   googleInstitutionDomain: process.env.GOOGLE_INSTITUTION_DOMAIN || "gi.edu.co",

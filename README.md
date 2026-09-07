@@ -162,7 +162,7 @@ El roster combina `EC_Inscripciones` y `EC_Permanencias`. Guardar asistencia sep
 
 ## Novedades
 
-No hay una tabla de novedades válida configurada actualmente. Por seguridad operativa, los endpoints devuelven listas vacías mientras `APPSHEET_NOVEDADES_TABLE` no esté definida. Consulte `GOOGLE_DRIVE_NOVEDADES.md` antes de habilitarla.
+Las novedades se cargan en una aplicación AppSheet separada (`Lector_QR`) y se consultan directamente desde la tabla `Novedades_Diarias`. El backend usa un App ID y una llave server-only distintos de los usados por la aplicación académica principal. La vista de novedades vuelve a consultar la fuente cada 15 segundos mientras permanece abierta; no se mantiene una copia local.
 
 ## Estructura relevante
 

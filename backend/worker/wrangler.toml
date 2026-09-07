@@ -16,5 +16,17 @@ SESSION_DURATION_HOURS = "168"
 GOOGLE_INSTITUTION_DOMAIN = "gi.edu.co"
 APPSHEET_APP_ID = "0a43ca9a-ff5b-47bf-8127-8f14f1150ff0"
 APPSHEET_DEMOGRAFICOS_TABLE = "Demograficos"
-# APPSHEET_NOVEDADES_TABLE se omite hasta identificar una tabla real.
+# Las novedades viven en la app AppSheet separada Lector_QR.
+APPSHEET_NOVEDADES_APP_ID = "6f5cc364-a2a4-4a1b-9603-873f54374310"
+APPSHEET_NOVEDADES_TABLE = "Novedades_Diarias"
+# APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY es un secreto independiente.
 # El rate limiting del Worker se configura en Cloudflare, no con MemoryStore de Express.
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true

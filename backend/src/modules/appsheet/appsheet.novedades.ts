@@ -42,8 +42,10 @@ export async function getLiveStudentIndex(): Promise<Map<string, LiveStudentInfo
 
 export async function getLiveNovedades(): Promise<LiveNovedad[]> {
   const table = config.appsheetNovedadesTable;
-  if (!table) return [];
-  const rows = await findAppSheetRows(table);
+  const appId = config.appsheetNovedadesAppId;
+  const accessKey = config.appsheetNovedadesAccessKey;
+  if (!table || !appId || !accessKey) return [];
+  const rows = await findAppSheetRows(table, undefined, { appId, accessKey });
   return parseNovedadesRows(rows as Record<string, unknown>[], `AppSheet:${table}`).map((row) => ({
     ...row,
     id: `${row.novedadId}:${row.codigoEstudiante}`,

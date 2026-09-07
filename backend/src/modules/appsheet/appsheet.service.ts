@@ -10,6 +10,11 @@ export interface AppSheetRow {
   [column: string]: unknown;
 }
 
+export interface AppSheetConnection {
+  appId: string;
+  accessKey: string;
+}
+
 export class AppSheetApiError extends Error {
   constructor(
     message: string,
@@ -25,10 +30,12 @@ export class AppSheetApiError extends Error {
   }
 }
 
-function requireConfig(): { appId: string; accessKey: string } {
-  if (!config.appsheetAppId || !config.appsheetAccessKey) {
+function requireConfig(connection?: AppSheetConnection): AppSheetConnection {
+  const appId = connection?.appId ?? config.appsheetAppId;
+  const accessKey = connection?.accessKey ?? config.appsheetAccessKey;
+  if (!appId || !accessKey) {
     throw new AppSheetApiError(
-      "AppSheet no está configurado: faltan APPSHEET_APP_ID o APPSHEET_APPLICATION_ACCESS_KEY",
+      "AppSheet no está configurado: faltan el App ID o la llave de acceso",
       503,
       "configuration",
       "Find",
@@ -36,7 +43,7 @@ function requireConfig(): { appId: string; accessKey: string } {
       null,
     );
   }
-  return { appId: config.appsheetAppId, accessKey: config.appsheetAccessKey };
+  return { appId, accessKey };
 }
 
 function wait(ms: number): Promise<void> {
@@ -73,8 +80,9 @@ async function executeAction(
   action: AppSheetAction,
   rows: AppSheetRow[],
   selector?: string,
+  connection?: AppSheetConnection,
 ): Promise<AppSheetRow[]> {
-  const { appId, accessKey } = requireConfig();
+  const { appId, accessKey } = requireConfig(connection);
   const endpoint = `${APPSHEET_API_BASE}/${encodeURIComponent(appId)}/tables/${encodeURIComponent(tableName)}/Action`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -151,11 +159,15 @@ async function executeAction(
 }
 
 /** Find es idempotente; reintenta únicamente errores temporales y 429. */
-export async function findAppSheetRows(tableName: string, selector?: string): Promise<AppSheetRow[]> {
+export async function findAppSheetRows(
+  tableName: string,
+  selector?: string,
+  connection?: AppSheetConnection,
+): Promise<AppSheetRow[]> {
   let lastError: AppSheetApiError | null = null;
   for (let attempt = 1; attempt <= FIND_MAX_ATTEMPTS; attempt += 1) {
     try {
-      return await executeAction(tableName, "Find", [], selector);
+      return await executeAction(tableName, "Find", [], selector, connection);
     } catch (error) {
       const apiError = error instanceof AppSheetApiError
         ? error
