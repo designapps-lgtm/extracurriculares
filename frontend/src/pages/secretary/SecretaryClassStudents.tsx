@@ -6,6 +6,7 @@ import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
 import { Avatar } from "../../components/common/Avatar";
+import { formatGradesRange } from "../../utils/formatGrades";
 
 export default function SecretaryClassStudents({ role = "secretary" }: { role?: RoleKind }) {
   const api = roleApis[role];
@@ -63,7 +64,7 @@ export default function SecretaryClassStudents({ role = "secretary" }: { role?: 
                 {data.assignment.discipline.codigoDisciplina}
                 <span className="ml-2 text-sm font-normal text-surface-500">{data.assignment.discipline.nombre}</span>
                 {data.assignment.grades.length > 0
-                  ? ` — Grados ${data.assignment.grades.map((g) => g.nombre).join(", ")}`
+                  ? ` — Grados ${formatGradesRange(data.assignment.grades)}`
                   : ""}
               </h1>
               <p className="text-xs text-surface-500">

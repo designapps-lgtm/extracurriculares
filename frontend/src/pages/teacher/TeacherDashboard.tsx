@@ -7,6 +7,7 @@ import type { TeacherClass } from "../../types";
 import Logo from "../../components/common/Logo";
 import { ReportProblemButton } from "../../components/common/ReportProblemModal";
 import { matchesSearchText } from "../../utils/search";
+import { formatGradesRange } from "../../utils/formatGrades";
 
 const DIAS_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 const DIAS_ES: Record<string, string> = {
@@ -221,7 +222,7 @@ export default function TeacherDashboard() {
                               </p>
                               <p className="text-sm text-surface-500 mt-0.5">
                                 {cls.grades && cls.grades.length > 0
-                                  ? `Grados ${cls.grades.map((g) => g.nombre).join(", ")}`
+                                  ? `Grados ${formatGradesRange(cls.grades)}`
                                   : `Grado ${cls.grade.nombre}`} · {cls.schedule.horaInicio && cls.schedule.horaFin ? `${cls.schedule.horaInicio} - ${cls.schedule.horaFin}` : "Todavía no se registró asistencia para este horario."}
                                 {cls.schedule.aula && ` · ${cls.schedule.aula}`}
                               </p>

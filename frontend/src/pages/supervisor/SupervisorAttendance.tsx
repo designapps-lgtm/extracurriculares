@@ -4,6 +4,7 @@ import { roleApis, type RoleKind } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import Logo from "../../components/common/Logo";
 import { Avatar } from "../../components/common/Avatar";
+import { formatGradesRange } from "../../utils/formatGrades";
 import type { AttendanceStudent as Student, Schedule, Assignment, Novedad } from "../../types";
 import { colombiaDateKey, todayColombiaDateKey } from "../../utils/colombiaDate";
 
@@ -125,7 +126,7 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
                 {assignment?.discipline?.codigoDisciplina}
                 <span className="ml-2 text-sm font-normal text-surface-500">{assignment?.discipline?.nombre}</span>
                 {assignment?.grades && assignment.grades.length > 0
-                  ? ` — Grados ${assignment.grades.map((g) => g.nombre).join(", ")}`
+                  ? ` — Grados ${formatGradesRange(assignment.grades)}`
                   : ` — ${assignment?.grade?.nombre}`}
               </h1>
               <p className="text-xs text-surface-500">
