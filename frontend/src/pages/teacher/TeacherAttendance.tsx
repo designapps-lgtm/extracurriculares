@@ -4,6 +4,7 @@ import { getAttendanceList, saveAttendance, getNovedadesBatch } from "../../serv
 import { useNotify } from "../../components/common/Notify";
 import Logo from "../../components/common/Logo";
 import { Avatar } from "../../components/common/Avatar";
+import { ReportProblemButton } from "../../components/common/ReportProblemModal";
 import type { AttendanceStudent as Student, Schedule, Assignment, Novedad } from "../../types";
 
 export default function TeacherAttendance() {
@@ -111,11 +112,14 @@ export default function TeacherAttendance() {
               </p>
             </div>
           </div>
-          <div className="text-right text-xs text-surface-500">
-            <p>{presentCount} presentes</p>
-            <p>{absentCount} ausentes</p>
-            {justifiedCount > 0 && <p>{justifiedCount} justificados</p>}
-            {pendingCount > 0 && <p className="text-amber-600">{pendingCount} pendientes</p>}
+          <div className="flex items-center gap-2 shrink-0">
+            <ReportProblemButton role="teacher" compact className="p-2 text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800" />
+            <div className="text-right text-xs text-surface-500">
+              <p>{presentCount} presentes</p>
+              <p>{absentCount} ausentes</p>
+              {justifiedCount > 0 && <p>{justifiedCount} justificados</p>}
+              {pendingCount > 0 && <p className="text-amber-600">{pendingCount} pendientes</p>}
+            </div>
           </div>
         </div>
       </header>

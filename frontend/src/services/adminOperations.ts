@@ -12,6 +12,9 @@ import type {
   SupervisorClassesResponse,
   AttendanceResponse,
   StudentNovedades,
+  AppReport,
+  ReportProblemInput,
+  ReportEstado,
 } from "../types";
 import type { DailyNovedad, RoleFilters } from "./roles";
 import type { SecretaryClassStudentsData } from "./secretary";
@@ -117,5 +120,19 @@ export async function adminSaveAttendance(
     `${base}/sessions/${sessionId}/attendance`,
     { records },
   );
+  return res.data;
+}
+
+export async function adminReportProblem(input: ReportProblemInput): Promise<AppReport> {
+  return (await api.post<ApiResponse<AppReport>>("/api/admin/reports", input)).data;
+}
+
+export async function getAdminReports(estado?: ReportEstado): Promise<AppReport[]> {
+  const res = await api.get<ApiResponse<AppReport[]>>("/api/admin/reports", { estado: estado || "" });
+  return res.data;
+}
+
+export async function adminUpdateReportEstado(id: string, estado: ReportEstado): Promise<AppReport> {
+  const res = await api.patch<ApiResponse<AppReport>>(`/api/admin/reports/${id}`, { estado });
   return res.data;
 }

@@ -2,6 +2,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getNovedadesBatch } from "../../services/teacher";
 import Logo from "../../components/common/Logo";
+import { ReportProblemButton } from "../../components/common/ReportProblemModal";
 import type { Novedad } from "../../types";
 import { todayColombiaDateKey } from "../../utils/colombiaDate";
 
@@ -69,7 +70,10 @@ export default function TeacherNovedad() {
               Asistencia Extracurriculares
             </button>
           </div>
-          {loading && <span className="text-xs text-surface-400">Cargando...</span>}
+          <div className="flex items-center gap-2 shrink-0">
+            <ReportProblemButton role="teacher" compact className="p-2 text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800" />
+            {loading && <span className="text-xs text-surface-400">Cargando...</span>}
+          </div>
         </div>
       </header>
 

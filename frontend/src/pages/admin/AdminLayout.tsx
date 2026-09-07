@@ -2,9 +2,14 @@ import { Outlet, Link, useLocation, Navigate, useNavigate } from "react-router-d
 import { useState, useEffect } from "react";
 import { getMe, logout } from "../../services/admin";
 import type { AdminUser } from "../../services/admin";
+import { getAdminReports } from "../../services/adminOperations";
 import Logo from "../../components/common/Logo";
+import { ReportProblemButton } from "../../components/common/ReportProblemModal";
 
-const NAV_GROUPS = [
+type NavItem = { path: string; label: string; icon: string; badge?: string };
+type NavGroup = { id: string; label: string; items: NavItem[] };
+
+const NAV_GROUPS: NavGroup[] = [
   {
     id: "overview",
     label: "Resumen",
@@ -40,11 +45,18 @@ const NAV_GROUPS = [
       { path: "/admin/admins", label: "Administradores", icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426-1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573 1.066c-.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94 1.543.826 2.37 2.37 2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" },
     ],
   },
+  {
+    id: "soporte",
+    label: "Soporte",
+    items: [
+      { path: "/admin/reportes", label: "Reportes de problemas", badge: "reportes", icon: "M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0118 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3l1.5 1.5 3-3.75" },
+    ],
+  },
 ];
 
-type SidebarNavProps = { openGroups: Record<string, boolean>; toggleGroup: (id: string) => void; close?: () => void };
+type SidebarNavProps = { openGroups: Record<string, boolean>; toggleGroup: (id: string) => void; close?: () => void; reportesCount?: number };
 
-function SidebarNav({ openGroups, toggleGroup, close }: SidebarNavProps) {
+function SidebarNav({ openGroups, toggleGroup, close, reportesCount = 0 }: SidebarNavProps) {
   const location = useLocation();
   return (
     <div className="space-y-3">
@@ -60,9 +72,11 @@ function SidebarNav({ openGroups, toggleGroup, close }: SidebarNavProps) {
             {(open || active) && <div className="space-y-1">
               {group.items.map((item) => {
                 const isActive = location.pathname.startsWith(item.path);
+                const badge = item.badge === "reportes" ? reportesCount : 0;
                 return <Link key={item.path} to={item.path} onClick={close} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive ? "bg-brand-600 text-white" : "text-surface-300 hover:bg-surface-800 hover:text-white"}`}>
                   <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d={item.icon} /></svg>
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {badge > 0 && <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-terracotta-600 text-white text-[11px] font-semibold">{badge}</span>}
                 </Link>;
               })}
             </div>}
@@ -79,10 +93,30 @@ export default function AdminLayout() {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ overview: true, operations: true, people: false, configuration: false });
+  const [reportesCount, setReportesCount] = useState(0);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ overview: true, operations: true, people: false, configuration: false, soporte: false });
 
   useEffect(() => {
     getMe().then(setAdmin).catch(() => setAdmin(null)).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const loadReportes = () => {
+      getAdminReports("nuevo")
+        .then((reports) => {
+          if (active) setReportesCount(reports.length);
+        })
+        .catch(() => {
+          if (active) setReportesCount(0);
+        });
+    };
+    loadReportes();
+    window.addEventListener("reportes:actualizados", loadReportes);
+    return () => {
+      active = false;
+      window.removeEventListener("reportes:actualizados", loadReportes);
+    };
   }, []);
 
   useEffect(() => {
@@ -102,13 +136,13 @@ export default function AdminLayout() {
     <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex">
       <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-surface-900 dark:bg-surface-950 text-surface-100 shrink-0">
         <div className="px-6 py-5 border-b border-surface-800"><Link to="/admin/dashboard" className="inline-flex items-center gap-2"><Logo chip alt="Extracurriculares" className="h-8 w-auto" /><span className="font-display font-bold text-lg text-white">Panel de administración de Extracurriculares</span></Link></div>
-        <nav className="flex-1 px-3 py-4 overflow-y-auto"><SidebarNav openGroups={openGroups} toggleGroup={toggleGroup} /></nav>
-        <div className="px-3 py-4 border-t border-surface-800"><div className="px-3 mb-3"><p className="text-sm font-medium text-white">{admin.nombre} {admin.apellido}</p><p className="text-xs text-surface-400 truncate">{admin.email}</p></div><button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>Cerrar sesión</button></div>
+        <nav className="flex-1 px-3 py-4 overflow-y-auto"><SidebarNav openGroups={openGroups} toggleGroup={toggleGroup} reportesCount={reportesCount} /></nav>
+        <div className="px-3 py-4 border-t border-surface-800"><div className="px-3 mb-3"><p className="text-sm font-medium text-white">{admin.nombre} {admin.apellido}</p><p className="text-xs text-surface-400 truncate">{admin.email}</p></div><ReportProblemButton role="admin" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950" /><button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>Cerrar sesión</button></div>
       </aside>
 
       <div className="lg:hidden fixed top-0 inset-x-0 z-50 bg-surface-900 text-white pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] py-3 flex items-center gap-3"><button onClick={() => setSidebarOpen(!sidebarOpen)} aria-label={sidebarOpen ? "Cerrar menú" : "Abrir menú"} className="shrink-0 p-2.5 -ml-2.5 rounded-lg hover:bg-surface-800"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d={sidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} /></svg></button><Link to="/admin/dashboard" className="min-w-0 flex-1 font-display font-bold inline-flex items-center gap-2"><Logo chip alt="Extracurriculares" className="h-7 w-auto shrink-0" /><span className="truncate">Administración Extracurriculares</span></Link></div>
       {sidebarOpen && <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setSidebarOpen(false)} />}
-      {sidebarOpen && <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-surface-900 text-surface-100 flex flex-col"><div className="px-6 py-5 border-b border-surface-800 pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] flex items-start justify-between gap-3"><span className="min-w-0 inline-flex items-start gap-2"><Logo chip alt="Extracurriculares" className="h-8 w-auto shrink-0" /><span className="break-words font-display font-bold text-lg text-white">Panel de administración de Extracurriculares</span></span><button onClick={() => setSidebarOpen(false)} className="text-surface-400 hover:text-white p-1.5 rounded-lg hover:bg-surface-800" aria-label="Cerrar menú"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button></div><nav className="flex-1 px-3 py-4 overflow-y-auto"><SidebarNav openGroups={openGroups} toggleGroup={toggleGroup} close={() => setSidebarOpen(false)} /></nav><div className="px-3 py-4 border-t border-surface-800"><button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 013-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>Cerrar sesión</button></div></aside>}
+      {sidebarOpen && <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-surface-900 text-surface-100 flex flex-col"><div className="px-6 py-5 border-b border-surface-800 pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] flex items-start justify-between gap-3"><span className="min-w-0 inline-flex items-start gap-2"><Logo chip alt="Extracurriculares" className="h-8 w-auto shrink-0" /><span className="break-words font-display font-bold text-lg text-white">Panel de administración de Extracurriculares</span></span><button onClick={() => setSidebarOpen(false)} className="text-surface-400 hover:text-white p-1.5 rounded-lg hover:bg-surface-800" aria-label="Cerrar menú"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button></div><nav className="flex-1 px-3 py-4 overflow-y-auto"><SidebarNav openGroups={openGroups} toggleGroup={toggleGroup} close={() => setSidebarOpen(false)} reportesCount={reportesCount} /></nav><div className="px-3 py-4 border-t border-surface-800"><div className="px-3 mb-3"><p className="text-sm font-medium text-white">{admin.nombre} {admin.apellido}</p><p className="text-xs text-surface-400 truncate">{admin.email}</p></div><ReportProblemButton role="admin" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950" /><button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 013-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>Cerrar sesión</button></div></aside>}
 
       <main className="flex-1 min-w-0 lg:ml-0 pt-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] lg:pt-0"><div className="min-h-[100dvh]"><div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"><Outlet /></div></div></main>
     </div>

@@ -407,3 +407,26 @@ export interface SupervisorSessionDetail {
     estado: string;
   }[];
 }
+
+// Reportes de problemas ("Reportar problema")
+export type ReportCategoria = "problema" | "sugerencia" | "otro";
+export type ReportEstado = "nuevo" | "en_progreso" | "resuelto";
+
+export interface AppReport {
+  id: string;
+  categoria: ReportCategoria;
+  descripcion: string;
+  pagina: string;
+  usuarioId: string;
+  tipoUsuario: string;
+  correo: string;
+  estado: ReportEstado;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface ReportProblemInput {
+  categoria: ReportCategoria;
+  descripcion: string;
+  pagina: string;
+}

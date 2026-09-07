@@ -5,6 +5,7 @@ import { logout } from "../../services/auth";
 import { useNotify } from "../../components/common/Notify";
 import type { TeacherClass } from "../../types";
 import Logo from "../../components/common/Logo";
+import { ReportProblemButton } from "../../components/common/ReportProblemModal";
 import { matchesSearchText } from "../../utils/search";
 
 const DIAS_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
@@ -116,6 +117,7 @@ export default function TeacherDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <ReportProblemButton role="teacher" compact className="p-2 text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800" />
             <button
               onClick={() => setShowAll((s) => !s)}
               className="px-3 py-2 text-sm font-medium text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg"

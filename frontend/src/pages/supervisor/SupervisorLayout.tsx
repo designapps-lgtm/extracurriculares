@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { roleApis, type RoleKind, type RoleUser } from "../../services/roles";
 import { logout } from "../../services/auth";
 import Logo from "../../components/common/Logo";
+import { ReportProblemButton } from "../../components/common/ReportProblemModal";
 
 export interface PageProps {
   role?: RoleKind;
@@ -100,6 +101,10 @@ export default function SupervisorLayout({ role = "supervisor" }: PageProps) {
             <p className="text-sm font-medium text-white">{user.nombre} {user.apellido}</p>
             <p className="text-xs text-surface-400 truncate">{user.correo}</p>
           </div>
+          <ReportProblemButton
+            role={role}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950"
+          />
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950"
@@ -176,6 +181,10 @@ export default function SupervisorLayout({ role = "supervisor" }: PageProps) {
               <p className="text-sm font-medium text-white">{user.nombre} {user.apellido}</p>
               <p className="text-xs text-surface-400 truncate">{user.correo}</p>
             </div>
+            <ReportProblemButton
+              role={role}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950"
+            />
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-surface-300 hover:bg-surface-800 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950"

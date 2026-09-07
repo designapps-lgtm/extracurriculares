@@ -15,6 +15,8 @@ import type {
   Student,
   StudentProfile,
   StudentNovedades,
+  AppReport,
+  ReportProblemInput,
 } from "../types";
 
 export async function supervisorLogout(): Promise<void> {
@@ -178,4 +180,8 @@ export async function getSupervisorNovedadesDiarias(params?: { fecha?: string; g
     fecha: params?.fecha || "",
     grado: params?.grado || "",
   })).data;
+}
+
+export async function supervisorReportProblem(input: ReportProblemInput): Promise<AppReport> {
+  return (await api.post<ApiResponse<AppReport>>("/api/supervisor/reports", input)).data;
 }

@@ -15,6 +15,8 @@ import type {
   Student,
   StudentProfile,
   StudentNovedades,
+  AppReport,
+  ReportProblemInput,
 } from "../types";
 
 export interface Secretary {
@@ -169,4 +171,8 @@ export async function getSecretaryStudents(params?: Record<string, string>) {
 
 export async function getSecretaryStudentProfile(codigo: string) {
   return api.get<ApiResponse<StudentProfile>>(`/api/secretary/students/${encodeURIComponent(codigo)}/profile`);
+}
+
+export async function secretaryReportProblem(input: ReportProblemInput): Promise<AppReport> {
+  return (await api.post<ApiResponse<AppReport>>("/api/secretary/reports", input)).data;
 }

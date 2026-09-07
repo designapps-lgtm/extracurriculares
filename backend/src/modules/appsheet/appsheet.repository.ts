@@ -20,6 +20,7 @@ export const APPSHEET_TABLES = {
   transfers: "EC_Traslados",
   teacherSchedules: "Profesores_Horarios",
   users: "Usuarios_Roles",
+  reports: "EC_Reportes_Problemas",
 } as const;
 
 export type AppSheetTableName = (typeof APPSHEET_TABLES)[keyof typeof APPSHEET_TABLES];
