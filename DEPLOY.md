@@ -22,31 +22,46 @@ El backend de producción es únicamente el Worker. No se debe habilitar otro se
 
 ## 2. Configuración de Cloudflare
 
+> Por qué se "borraban" las variables: `wrangler deploy` SINCRONIZA el bloque
+> `[vars]` de `backend/worker/wrangler.toml` con Cloudflare. Toda variable de
+> texto creada a mano en el dashboard que no esté en ese archivo SE ELIMINA en
+> cada deploy. Los secretos (`wrangler secret put`) viven aparte y sobreviven,
+> pero SOLO si se cargaron como secretos: si pegás un secreto en el dashboard
+> como variable de texto, el próximo deploy también lo borra.
+>
+> Regla: vars de texto → siempre en `wrangler.toml`. Secretos → siempre con
+> `wrangler secret put`. Nunca al revés, nunca solo en el dashboard.
+
 ### Variables no secretas
 
-Se versionan en `backend/worker/wrangler.toml`:
+Se versionan en `backend/worker/wrangler.toml` y se suben solas con cada deploy:
 
 - `NODE_ENV`
 - `PORT`
-- `FRONTEND_URL`
+- `FRONTEND_URL` (sin barra final)
 - `ACCESS_TOKEN_EXPIRES_IN`
 - `SESSION_DURATION_HOURS`
 - `GOOGLE_INSTITUTION_DOMAIN`
 - `APPSHEET_APP_ID`
 - `APPSHEET_DEMOGRAFICOS_TABLE`
+- `APPSHEET_NOVEDADES_APP_ID`
+- `APPSHEET_NOVEDADES_TABLE`
+- `GOOGLE_DRIVE_FOLDER_ID` (vacía = watch de Drive apagado)
+- `GOOGLE_DRIVE_WEBHOOK_URL` (vacía = watch de Drive apagado)
 
 `FRONTEND_URL` debe coincidir con el sitio de Vercel permitido. Si cambia la URL del Worker, también debe actualizarse el destino de `/api/:path*` en `frontend/vercel.json`.
 
 ### Secretos obligatorios
 
-No se guardan en Git ni se pasan al frontend:
+No se guardan en Git ni se pasan al frontend. Cargarlos una vez (persisten entre deploys):
 
 ```bash
 cd backend/worker
 npx wrangler login
-npx wrangler secret put JWT_SECRET --name extracurriculares-api
-npx wrangler secret put GOOGLE_CLIENT_ID --name extracurriculares-api
-npx wrangler secret put APPSHEET_APPLICATION_ACCESS_KEY --name extracurriculares-api
+npx wrangler secret put JWT_SECRET
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put APPSHEET_APPLICATION_ACCESS_KEY
+npx wrangler secret put APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY
 ```
 
 Wrangler solicitará cada valor de forma interactiva. Para comprobar únicamente los nombres configurados:
@@ -55,16 +70,14 @@ Wrangler solicitará cada valor de forma interactiva. Para comprobar únicamente
 npx wrangler secret list --name extracurriculares-api
 ```
 
-Secretos opcionales, sólo si se habilita el watch de Drive:
+Secretos opcionales, sólo si se habilita el watch de Drive
+(`GOOGLE_DRIVE_FOLDER_ID` con valor real en `wrangler.toml`):
 
 ```text
 GOOGLE_SERVICE_ACCOUNT_JSON
-GOOGLE_DRIVE_FOLDER_ID
-GOOGLE_DRIVE_WEBHOOK_URL
 GOOGLE_DRIVE_WEBHOOK_TOKEN
+APPSHEET_WEBHOOK_TOKEN
 ```
-
-`APPSHEET_NOVEDADES_TABLE` no debe configurarse hasta identificar una tabla real y confirmar sus columnas. La API devuelve novedades vacías mientras esté ausente.
 
 ## 3. Rotación obligatoria de la llave AppSheet
 
@@ -135,12 +148,14 @@ También debe probarse una escritura reversible en `EC_Asistencias` y `Profesore
 
 ## 6. Despliegue del Worker
 
-Publicar es un cambio de producción. Ejecútelo sólo después de revisar el dry-run y los esquemas pendientes:
+Publicar es un cambio de producción. Ejecútelo sólo después de revisar el dry-run y los esquemas pendientes. Usar SIEMPRE el deploy verificado (comprueba que las 12 vars estén en `wrangler.toml` y que los 4 secretos existan en Cloudflare ANTES de subir; si falta algo, aborta sin publicar):
 
 ```bash
 cd backend/worker
-npx wrangler deploy --name extracurriculares-api
+npm run deploy:safe
 ```
+
+`wrangler deploy` a secas sigue disponible, pero no verifica nada: si olvidó cargar un secreto, el Worker sale roto a producción.
 
 Cloudflare conserva versiones del Worker. Si los smoke tests detectan una regresión, use el historial de despliegues del dashboard para volver inmediatamente a la versión anterior mientras se investiga.
 

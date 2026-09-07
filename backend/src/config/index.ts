@@ -21,7 +21,8 @@ function requireProductionSecret(name: string, value: string | undefined): strin
 
 export const config = {
   port: parseInt(process.env.PORT || "3000", 10),
-  frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
+  // Sin barra final: el header Origin nunca la trae y la comparación debe ser exacta.
+  frontendUrl: (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, ""),
   nodeEnv,
   get jwtSecret() {
     return requireProductionSecret("JWT_SECRET", process.env.JWT_SECRET);

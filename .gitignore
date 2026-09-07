@@ -8,3 +8,4 @@ dist/
 *.tsbuildinfo
 /correos_profes.xlsx
 /Profesores para app.xlsx
+/backend/worker/.secrets.production

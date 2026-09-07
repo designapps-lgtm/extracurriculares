@@ -4,13 +4,23 @@ compatibility_date = "2026-08-04"
 compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
 workers_dev = true
 
-# Secretos server-only (configurar con `wrangler secret put`):
-# JWT_SECRET, GOOGLE_CLIENT_ID, APPSHEET_APPLICATION_ACCESS_KEY y, si se usan,
-# GOOGLE_SERVICE_ACCOUNT_JSON / GOOGLE_DRIVE_FOLDER_ID / GOOGLE_DRIVE_WEBHOOK_TOKEN.
+# REGLA DE ORO: `wrangler deploy` SINCRONIZA este bloque [vars] con Cloudflare.
+# Cualquier variable de texto creada a mano en el dashboard que NO esté aquí
+# SE BORRA en cada deploy. Por eso TODA var no secreta vive en este archivo.
+#
+# Los SECRETOS (ver lista abajo) viven aparte y NO se borran con el deploy,
+# pero SOLO si se cargan con `wrangler secret put`. Si pegás un secreto en el
+# dashboard como "variable de texto", el próximo deploy lo elimina.
+#
+# Secretos server-only (cargar con `wrangler secret put <NOMBRE>`):
+# OBLIGATORIOS: JWT_SECRET, GOOGLE_CLIENT_ID,
+#   APPSHEET_APPLICATION_ACCESS_KEY, APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY
+# OPCIONALES (solo si se habilita el watch de Drive / webhooks):
+#   GOOGLE_SERVICE_ACCOUNT_JSON, GOOGLE_DRIVE_WEBHOOK_TOKEN, APPSHEET_WEBHOOK_TOKEN
 [vars]
 NODE_ENV = "production"
 PORT = "3000"
-FRONTEND_URL = "https://extracurriculares-mu.vercel.app/"
+FRONTEND_URL = "https://extracurriculares-mu.vercel.app"
 ACCESS_TOKEN_EXPIRES_IN = "15m"
 SESSION_DURATION_HOURS = "168"
 GOOGLE_INSTITUTION_DOMAIN = "gi.edu.co"
@@ -19,7 +29,12 @@ APPSHEET_DEMOGRAFICOS_TABLE = "Demograficos"
 # Las novedades viven en la app AppSheet separada Lector_QR.
 APPSHEET_NOVEDADES_APP_ID = "6f5cc364-a2a4-4a1b-9603-873f54374310"
 APPSHEET_NOVEDADES_TABLE = "Novedades_Diarias"
-# APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY es un secreto independiente.
+# APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY es un secreto independiente
+# (wrangler secret put), NO va en este bloque.
+# Watch de Drive (apagado mientras estén vacías; el código las trata como null).
+# Cuando lo habilites, poné los valores reales AQUÍ, nunca solo en el dashboard.
+GOOGLE_DRIVE_FOLDER_ID = ""
+GOOGLE_DRIVE_WEBHOOK_URL = ""
 # El rate limiting del Worker se configura en Cloudflare, no con MemoryStore de Express.
 
 [triggers]

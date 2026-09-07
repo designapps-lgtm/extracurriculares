@@ -1,0 +1,15 @@
+# Copiar a `.dev.vars` para `wrangler dev` local. NUNCA commitear el `.dev.vars`
+# real: está en .gitignore. Los valores de producción viven en Cloudflare
+# (vars en wrangler.toml, secretos con `wrangler secret put`), no aquí.
+FRONTEND_URL=http://localhost:5173
+JWT_SECRET=dev-only-secret-change-me
+ACCESS_TOKEN_EXPIRES_IN=15m
+SESSION_DURATION_HOURS=168
+GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+GOOGLE_INSTITUTION_DOMAIN=gi.edu.co
+APPSHEET_APP_ID=xxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+APPSHEET_APPLICATION_ACCESS_KEY=dev-key
+APPSHEET_DEMOGRAFICOS_TABLE=Demograficos
+APPSHEET_NOVEDADES_APP_ID=xxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY=dev-key
+APPSHEET_NOVEDADES_TABLE=Novedades_Diarias
