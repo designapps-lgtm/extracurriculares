@@ -1,5 +1,4 @@
 import { config } from "../../config";
-import { importStudentsBulk } from "../../import/excel/studentImporter";
 import { normalizeStudentName, type MappedStudent } from "../../import/excel/excelMapper";
 import { findAppSheetRows, type AppSheetRow } from "./appsheet.service";
 
@@ -191,39 +190,23 @@ async function runAppSheetStudentsSync(): Promise<AppSheetStudentSyncResult> {
     return failedSync(validationErrors.slice(0, 20), rows.length, students.length, rows.length - students.length);
   }
 
-  let result;
-  try {
-    result = await importStudentsBulk(students, false, {
-      // Un snapshot AppSheet sin un indicador de completitud no permite saber
-      // si una fila ausente fue eliminada o si la respuesta llegó truncada.
-      // No se desactivan estudiantes por ausencia hasta contar con una
-      // confirmación de snapshot completo.
-      deactivateAbsent: false,
-    });
-  } catch (error) {
-    return failedSync(
-      [`Error de base de datos durante la importación: ${error instanceof Error ? error.message : String(error)}`],
-      rows.length,
-      students.length,
-      0,
-    );
-  }
-
+  // AppSheet/Sheets es ahora la fuente final; este endpoint únicamente valida
+  // que el snapshot sea legible y consistente, sin replicarlo a otro sistema.
   return {
-    ok: result.errors === 0,
+    ok: true,
     table: DEMOGRAFICOS_TABLE,
     received: rows.length,
     mapped: students.length,
     middleNames: students.filter((student) => Boolean(student.sourceMiddleName)).length,
-    rejected: 0,
-    processed: result.processed,
-    created: result.created,
-    updated: result.updated,
-    errors: result.errorDetails.slice(0, 10).map((e) => `${e.codigo}: ${e.error}`),
+    rejected: rows.length - students.length,
+    processed: students.length,
+    created: 0,
+    updated: 0,
+    errors: [],
   };
 }
 
-/** Evita que un webhook y el cron ejecuten dos importaciones simultáneas. */
+/** Evita que dos webhooks ejecuten la misma validación simultáneamente. */
 export function syncAppSheetStudents(): Promise<AppSheetStudentSyncResult> {
   if (runningSync) return runningSync;
 

@@ -1,112 +1,63 @@
 import { AppError } from "../../middlewares/errorHandler";
-import { PaginationParams, PaginatedResult, paginatedResult } from "../../utils/pagination";
-import { StudentQuery } from "./student.types";
-import { getLiveStudentIndex, type LiveStudentInfo } from "../appsheet/appsheet.novedades";
-
-const DAY_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
-
-function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
-}
-
-function toStudentPayload(student: LiveStudentInfo) {
-  const schedules = [...student.schedules]
-    .sort((a, b) => DAY_ORDER.indexOf(a.diaSemana) - DAY_ORDER.indexOf(b.diaSemana))
-    .map((schedule) => ({
-      id: `${student.codigoEstudiante}:${schedule.diaSemana}`,
-      codigoEstudiante: student.codigoEstudiante,
-      codigoDisciplina: schedule.codigoDisciplina,
-      diaSemana: schedule.diaSemana,
-      discipline: {
-        codigoDisciplina: schedule.codigoDisciplina,
-        nombre: schedule.codigoDisciplina,
-        descripcion: null,
-      },
-    }));
-
-  return {
-    codigoEstudiante: student.codigoEstudiante,
-    nombre: student.nombre,
-    apellido: student.apellido,
-    idGrado: 0,
-    grupo: student.grupo,
-    fotoUrl: student.fotoUrl,
-    createdAt: null,
-    updatedAt: null,
-    grade: { idGrado: 0, nombre: student.grado, nivel: null },
-    studentSchedules: schedules,
-  };
-}
-
-function matchesSearch(student: LiveStudentInfo, search: string): boolean {
-  const tokens = normalize(search).split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return true;
-  const haystack = normalize(`${student.codigoEstudiante} ${student.nombre} ${student.apellido}`);
-  return tokens.every((token) => haystack.includes(token));
-}
+import { type PaginatedResult, type PaginationParams, paginatedResult } from "../../utils/pagination";
+import { loadCoreData, matchesTokens, pageSlice, studentPayload } from "../appsheet/appsheet.views";
+import type { StudentQuery } from "./student.types";
 
 export async function getStudents(query: StudentQuery, pagination: PaginationParams): Promise<PaginatedResult<any>> {
-  const { search, grado, inscrito } = query;
-  const disciplina = query.disciplina?.trim();
-  const students = [...(await getLiveStudentIndex()).values()];
-
-  const filtered = students
-    .filter((student) => !search || matchesSearch(student, search))
-    .filter((student) => !grado || student.grado === grado)
+  const data = await loadCoreData();
+  const rows = data.students
+    .filter((student) => matchesTokens([student.code, student.firstName, student.lastName], query.search))
+    .filter((student) => !query.grado || student.gradeName === query.grado || data.gradeById.get(student.gradeId)?.name === query.grado)
     .filter((student) => {
-      if (inscrito === "true") return student.days.size > 0;
-      if (inscrito === "false") return student.days.size === 0;
+      const enrollments = data.enrollments.filter((row) => row.studentCode === student.code);
+      if (query.inscrito === "true" && enrollments.length === 0) return false;
+      if (query.inscrito === "false" && enrollments.length > 0) return false;
+      if (query.disciplina && !enrollments.some((row) => row.disciplineCode === query.disciplina)) return false;
       return true;
     })
-    .filter((student) => {
-      if (!disciplina) return true;
-      return student.schedules.some((schedule) => normalize(schedule.codigoDisciplina) === normalize(disciplina));
-    })
-    .sort((a, b) => `${a.apellido} ${a.nombre}`.localeCompare(`${b.apellido} ${b.nombre}`, "es"));
-
-  const offset = (pagination.page - 1) * pagination.limit;
-  const page = filtered.slice(offset, offset + pagination.limit).map(toStudentPayload);
-  return paginatedResult(page, filtered.length, pagination);
+    .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "es"));
+  return paginatedResult(pageSlice(rows, pagination.page, pagination.limit).map((row) => studentPayload(row, data)), rows.length, pagination);
 }
 
 export async function getStudentByCode(codigo: string) {
-  const student = (await getLiveStudentIndex()).get(codigo);
-  if (!student) {
-    throw new AppError(404, "STUDENT_NOT_FOUND", "No se encontro el estudiante en AppSheet");
-  }
-  return toStudentPayload(student);
+  const data = await loadCoreData();
+  const student = data.studentByCode.get(codigo);
+  if (!student) throw new AppError(404, "STUDENT_NOT_FOUND", "No se encontró el estudiante");
+  return studentPayload(student, data);
 }
 
 export async function getStudentProfile(codigo: string) {
-  const student = (await getLiveStudentIndex()).get(codigo);
-  if (!student) {
-    throw new AppError(404, "STUDENT_NOT_FOUND", "No se encontro el estudiante en AppSheet");
-  }
-
-  const extracurricular = [...student.schedules]
-    .sort((a, b) => DAY_ORDER.indexOf(a.diaSemana) - DAY_ORDER.indexOf(b.diaSemana))
-    .map((schedule) => ({
-      dia: schedule.diaSemana,
-      disciplina: {
-        codigo: schedule.codigoDisciplina,
-        nombre: schedule.codigoDisciplina,
-      },
-      oferta: null,
-    }));
-
+  const data = await loadCoreData();
+  const student = data.studentByCode.get(codigo);
+  if (!student) throw new AppError(404, "STUDENT_NOT_FOUND", "No se encontró el estudiante");
+  const extracurricular = data.enrollments
+    .filter((row) => row.studentCode === codigo)
+    .map((enrollment) => {
+      const assignment = data.assignments.find((row) => row.disciplineCode === enrollment.disciplineCode && row.gradeId === student.gradeId && row.scheduleIds.some((id) => data.scheduleById.get(id)?.day === enrollment.day));
+      const schedule = assignment?.scheduleIds.map((id) => data.scheduleById.get(id)).find((row) => row?.day === enrollment.day);
+      const teacher = assignment ? data.userById.get(assignment.teacherId) : undefined;
+      return {
+        dia: enrollment.day,
+        disciplina: { codigo: enrollment.disciplineCode, nombre: enrollment.disciplineCode },
+        oferta: assignment ? {
+          profesor: [teacher?.firstName, teacher?.lastName].filter(Boolean).join(" "),
+          horaInicio: schedule?.startTime ?? null,
+          horaFin: schedule?.endTime ?? null,
+        } : null,
+      };
+    });
   return {
     student: {
-      codigoEstudiante: student.codigoEstudiante,
-      nombre: student.nombre,
-      apellido: student.apellido,
-      grupo: student.grupo,
-      grade: { idGrado: 0, nombre: student.grado, nivel: null },
-      fotoUrl: student.fotoUrl,
+      codigoEstudiante: student.code,
+      nombre: student.firstName,
+      apellido: student.lastName,
+      grupo: student.group,
+      correo: student.email,
+      fotoUrl: student.photoUrl,
+      grade: data.gradeById.has(student.gradeId)
+        ? { idGrado: student.gradeId, nombre: data.gradeById.get(student.gradeId)!.name, nivel: data.gradeById.get(student.gradeId)!.level }
+        : { idGrado: student.gradeId, nombre: student.gradeName, nivel: null },
     },
-    extracurricular: extracurricular.length > 0 ? extracurricular : null,
+    extracurricular: extracurricular.length ? extracurricular : null,
   };
 }

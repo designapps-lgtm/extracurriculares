@@ -1,14 +1,20 @@
-import { Router, Request, Response } from "express";
-import { sql } from "../../config/db";
+import { Router, type Request, type Response } from "express";
+import { getUsers } from "../appsheet/appsheet.domain";
+import { AppSheetApiError } from "../appsheet/appsheet.service";
 
 const router = Router();
 
 router.get("/health", async (_req: Request, res: Response) => {
   try {
-    await sql`SELECT 1`;
-    res.json({ status: "ok", database: "connected" });
-  } catch {
-    res.status(503).json({ status: "error", database: "disconnected" });
+    const users = await getUsers({ fresh: true });
+    res.json({ status: "ok", appsheet: "connected", database: "not_used", checks: { usuariosRoles: users.length } });
+  } catch (error) {
+    const timeout = error instanceof AppSheetApiError && error.timedOut;
+    res.status(503).json({
+      status: "error",
+      appsheet: timeout ? "timeout" : "disconnected",
+      database: "not_used",
+    });
   }
 });
 

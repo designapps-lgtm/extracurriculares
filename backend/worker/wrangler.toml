@@ -2,18 +2,11 @@ name = "extracurriculares-api"
 main = "./worker.ts"
 compatibility_date = "2026-08-04"
 compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
-
-# URL gratuita de prueba: <nombre>.workers.dev
 workers_dev = true
 
-# Cron: corre el sync de Google Drive. Ajustalo si querés otra frecuencia.
-# Formato Cloudflare: "*/10 * * * *" = cada 10 minutos.
-[triggers]
-crons = ["*/10 * * * *"]
-
-# Variables de entorno no secretas.
-# Las secretas (DATABASE_URL, JWT_SECRET, GOOGLE_*, WEBHOOK token) NO van acá:
-# se setean con `wrangler secret put <NOMBRE>` para que no queden en el repo.
+# Secretos server-only (configurar con `wrangler secret put`):
+# JWT_SECRET, GOOGLE_CLIENT_ID, APPSHEET_APPLICATION_ACCESS_KEY y, si se usan,
+# GOOGLE_SERVICE_ACCOUNT_JSON / GOOGLE_DRIVE_FOLDER_ID / GOOGLE_DRIVE_WEBHOOK_TOKEN.
 [vars]
 NODE_ENV = "production"
 PORT = "3000"
@@ -21,18 +14,7 @@ FRONTEND_URL = "https://extracurriculares-mu.vercel.app/"
 ACCESS_TOKEN_EXPIRES_IN = "15m"
 SESSION_DURATION_HOURS = "168"
 GOOGLE_INSTITUTION_DOMAIN = "gi.edu.co"
-NOVEDADES_SYNC_MINUTES = "10"
-GOOGLE_DRIVE_WEBHOOK_URL = "https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive"
-GOOGLE_DRIVE_OFFER_FILE_NAMES = ""
 APPSHEET_APP_ID = "0a43ca9a-ff5b-47bf-8127-8f14f1150ff0"
 APPSHEET_DEMOGRAFICOS_TABLE = "Demograficos"
-APPSHEET_NOVEDADES_TABLE = "Novedades_Diarias"
-GOOGLE_DRIVE_STUDENTS_FILE_NAME = "DEMOGRAFICOS 2026-2027"
-STUDENTS_SYNC_SOURCE = "appsheet"
-# Rate limiting a nivel de app (además del de Cloudflare). El limiter in-memory
-# de Express se activa cuando estas vars existen. AUTH_RATE_LIMIT: intentos de
-# login/google/logout por ventana de 15 min. API_RATE_LIMIT: requests generales.
-# En Workers edge no persiste entre instancias, pero con la config de Workers +
-# un solo punto de entrada alcanza para frenar fuerza bruta y abuso.
-AUTH_RATE_LIMIT = "30"
-API_RATE_LIMIT = "300"
+# APPSHEET_NOVEDADES_TABLE se omite hasta identificar una tabla real.
+# El rate limiting del Worker se configura en Cloudflare, no con MemoryStore de Express.

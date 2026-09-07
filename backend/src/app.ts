@@ -51,7 +51,7 @@ import { authenticateSecretary, requireActiveSecretary } from "./middlewares/sec
 
 const app = express();
 
-// Detrás de un reverse proxy (Render) el IP real del cliente viene en
+// Detrás de Cloudflare u otro reverse proxy, la IP real del cliente viene en
 // X-Forwarded-For. Sin "trust proxy", req.ip es siempre el proxy → el rate
 // limiter cuenta a todos los usuarios como una sola IP y bloquea la app entera.
 if (config.nodeEnv === "production") {

@@ -1,48 +1,21 @@
-import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
-import { PaginationParams, PaginatedResult, paginatedResult } from "../../utils/pagination";
-import { ScheduleQuery } from "./schedule.types";
+import { type PaginatedResult, type PaginationParams, paginatedResult } from "../../utils/pagination";
+import { loadCoreData, pageSlice, schedulePayload } from "../appsheet/appsheet.views";
+import type { ScheduleQuery } from "./schedule.types";
+
+const DAY_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 
 export async function getSchedules(query: ScheduleQuery, pagination: PaginationParams): Promise<PaginatedResult<any>> {
-  const conditions: string[] = [];
-  const params: any[] = [];
-
-  if (query.dia) {
-    params.push(`%${query.dia}%`);
-    conditions.push(`"diaSemana" ILIKE $1`);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-  const countRows = await sql(
-    `SELECT COUNT(*)::int AS total FROM "Schedule" ${where}`,
-    params
-  ) as unknown as Array<{ total: number }>;
-  const total = countRows[0]?.total ?? 0;
-
-  const offset = (pagination.page - 1) * pagination.limit;
-  const dataParams = [...params, pagination.limit, offset];
-  const lim = params.length + 1;
-  const off = params.length + 2;
-
-  const data = await sql(
-    `SELECT * FROM "Schedule" ${where}
-     ORDER BY "diaSemana" ASC, "horaInicio" ASC
-     LIMIT $${lim} OFFSET $${off}`,
-    dataParams
-  );
-
-  return paginatedResult(data as any[], total, pagination);
+  const data = await loadCoreData();
+  const rows = data.schedules
+    .filter((row) => !query.dia || row.day.includes(query.dia.toUpperCase()))
+    .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day) || (a.startTime ?? "").localeCompare(b.startTime ?? ""));
+  return paginatedResult(pageSlice(rows, pagination.page, pagination.limit).map(schedulePayload), rows.length, pagination);
 }
 
 export async function getScheduleById(id: string) {
-  const schedule = await first<any>(
-    await sql`SELECT * FROM "Schedule" WHERE "idHorario" = ${id} LIMIT 1` as unknown as any[]
-  );
-
-  if (!schedule) {
-    throw new AppError(404, "SCHEDULE_NOT_FOUND", "No se encontró el horario");
-  }
-
-  return schedule;
+  const data = await loadCoreData();
+  const schedule = data.scheduleById.get(id);
+  if (!schedule) throw new AppError(404, "SCHEDULE_NOT_FOUND", "No se encontró el horario");
+  return schedulePayload(schedule);
 }

@@ -1,6 +1,5 @@
-import bcrypt from "bcryptjs";
-import { sql, first } from "../../config/db";
 import { AppError } from "../../middlewares/errorHandler";
+import { getUserById } from "../appsheet/appsheet.domain";
 
 export interface AdminSessionData {
   id: string;
@@ -8,69 +7,31 @@ export interface AdminSessionData {
   nombre: string;
   apellido: string;
   estado: string;
+  createdAt?: string | null;
 }
 
-export async function login(email: string, password: string): Promise<AdminSessionData> {
-  if (!email || !password) {
-    throw new AppError(400, "VALIDATION_ERROR", "Email y contraseña son requeridos");
-  }
-
-  const rows = await sql`SELECT * FROM "AdminUser" WHERE "email" = ${email} LIMIT 1`;
-  const admin = rows[0] ?? null;
-
-  if (!admin) {
-    throw new AppError(401, "INVALID_CREDENTIALS", "Credenciales inválidas");
-  }
-
-  if (admin.estado !== "activo") {
-    throw new AppError(403, "ACCOUNT_DISABLED", "Cuenta deshabilitada");
-  }
-
-  const valid = await bcrypt.compare(password, admin.passwordHash);
-  if (!valid) {
-    throw new AppError(401, "INVALID_CREDENTIALS", "Credenciales inválidas");
-  }
-
-  return { id: admin.id, email: admin.email, nombre: admin.nombre, apellido: admin.apellido, estado: admin.estado };
+export async function login(_email: string, _password: string): Promise<AdminSessionData> {
+  throw new AppError(410, "PASSWORD_LOGIN_DISABLED", "El acceso con contraseña fue retirado. Use Iniciar sesión con Google.");
 }
 
 export async function getAdminById(adminId: string): Promise<AdminSessionData> {
-  const admin = await first<AdminSessionData>(await sql`SELECT "id", "email", "nombre", "apellido", "estado" FROM "AdminUser" WHERE "id" = ${adminId} LIMIT 1` as unknown as AdminSessionData[]);
-
-  if (!admin || admin.estado !== "activo") {
-    throw new AppError(403, "FORBIDDEN", "Acceso denegado");
-  }
-
-  return admin;
+  const admin = await getUserById(adminId, "admin");
+  if (!admin || !admin.active) throw new AppError(403, "FORBIDDEN", "Acceso denegado");
+  return {
+    id: admin.id,
+    email: admin.email,
+    nombre: admin.firstName,
+    apellido: admin.lastName,
+    estado: admin.status,
+    createdAt: admin.createdAt,
+  };
 }
 
-export async function bootstrap(data: {
+export async function bootstrap(_data: {
   email: string;
   password: string;
   nombre?: string;
   apellido?: string;
 }): Promise<AdminSessionData> {
-  const { email, password, nombre, apellido } = data;
-
-  if (!email || !password) {
-    throw new AppError(400, "VALIDATION_ERROR", "Email y contraseña son requeridos");
-  }
-
-  if (password.length < 6) {
-    throw new AppError(400, "VALIDATION_ERROR", "La contraseña debe tener al menos 6 caracteres");
-  }
-
-  const countRows = await sql`SELECT COUNT(*)::int AS total FROM "AdminUser"`;
-  const adminCount = countRows[0]?.total ?? 0;
-  if (adminCount > 0) {
-    throw new AppError(403, "BOOTSTRAP_UNAVAILABLE", "Ya existe un administrador. Use el panel para gestionar.");
-  }
-
-  const hash = await bcrypt.hash(password, 12);
-  const createdRows = await sql`
-    INSERT INTO "AdminUser" ("id", "email", "passwordHash", "nombre", "apellido", "estado", "createdAt", "updatedAt")
-    VALUES (gen_random_uuid(), ${email}, ${hash}, ${nombre || email.split("@")[0]}, ${apellido || ""}, 'activo', now(), now())
-    RETURNING "id", "email", "nombre", "apellido", "estado"
-  ` as unknown as AdminSessionData[];
-  return createdRows[0];
+  throw new AppError(410, "BOOTSTRAP_DISABLED", "El bootstrap con contraseña fue retirado. Administre Usuarios_Roles y use Google.");
 }

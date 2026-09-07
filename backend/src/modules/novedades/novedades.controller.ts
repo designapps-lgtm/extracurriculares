@@ -6,6 +6,7 @@ import {
   type LiveNovedad,
   type LiveStudentInfo,
 } from "../appsheet/appsheet.novedades";
+import { todayColombia } from "../../utils/colombiaTime";
 import { dayBounds, isOnDay, novedadDate, novedadDayName } from "./novedades.dates";
 
 function matchesExtracurricularDay(n: LiveNovedad, studentIndex: Map<string, LiveStudentInfo>): boolean {
@@ -138,7 +139,7 @@ export async function getNovedadesBatch(req: Request, res: Response): Promise<vo
 export async function getNovedadesDiarias(req: Request, res: Response): Promise<void> {
   const fechaParam = String(req.query.fecha || "").trim();
   const grado = String(req.query.grado || "").trim();
-  const bounds = fechaParam ? dayBounds(fechaParam) : dayBounds(new Date().toISOString());
+  const bounds = fechaParam ? dayBounds(fechaParam) : dayBounds(todayColombia());
   if (!bounds) {
     res.status(400).json({ success: false, error: { code: "INVALID_DATE", message: "La fecha no es valida" } });
     return;

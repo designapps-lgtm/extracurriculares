@@ -1,5 +1,5 @@
 import { config } from "../../config";
-import { mapAppSheetStudents } from "./appsheet.students";
+import { loadCoreData } from "./appsheet.views";
 import { findAppSheetRows } from "./appsheet.service";
 import { parseNovedadesRows, type ParsedNovedadRow } from "../novedades/novedades.parser";
 
@@ -20,38 +20,38 @@ export interface LiveNovedad extends ParsedNovedadRow {
 }
 
 export async function getLiveStudentIndex(): Promise<Map<string, LiveStudentInfo>> {
-  const rows = await findAppSheetRows(config.appsheetDemograficosTable);
-  const students = mapAppSheetStudents(rows);
-  const byCode = new Map<string, LiveStudentInfo>();
-
-  for (const student of students) {
-    byCode.set(student.codigoEstudiante, {
-      codigoEstudiante: student.codigoEstudiante,
-      nombre: student.nombre,
-      apellido: student.apellido,
-      grupo: student.grupo,
-      grado: student.gradeNombre,
-      fotoUrl: null,
-      schedules: student.schedules,
-      days: new Set(student.schedules.map((schedule) => schedule.diaSemana)),
+  const data = await loadCoreData();
+  const result = new Map<string, LiveStudentInfo>();
+  for (const student of data.students) {
+    const schedules = data.enrollments
+      .filter((row) => row.studentCode === student.code)
+      .map((row) => ({ diaSemana: row.day, codigoDisciplina: row.disciplineCode }));
+    result.set(student.code, {
+      codigoEstudiante: student.code,
+      nombre: student.firstName,
+      apellido: student.lastName,
+      grupo: student.group,
+      grado: data.gradeById.get(student.gradeId)?.name ?? student.gradeName,
+      fotoUrl: student.photoUrl,
+      schedules,
+      days: new Set(schedules.map((row) => row.diaSemana)),
     });
   }
-
-  return byCode;
+  return result;
 }
 
 export async function getLiveNovedades(): Promise<LiveNovedad[]> {
   const table = config.appsheetNovedadesTable;
+  if (!table) return [];
   const rows = await findAppSheetRows(table);
-  return parseNovedadesRows(rows as Record<string, unknown>[], `AppSheet:${table}`)
-    .map((row) => ({
-      ...row,
-      id: `${row.novedadId}:${row.codigoEstudiante}`,
-      archivo: table,
-    }));
+  return parseNovedadesRows(rows as Record<string, unknown>[], `AppSheet:${table}`).map((row) => ({
+    ...row,
+    id: `${row.novedadId}:${row.codigoEstudiante}`,
+    archivo: table,
+  }));
 }
 
 export async function getLiveNovedadesForStudents(codigos: string[]): Promise<LiveNovedad[]> {
   const wanted = new Set(codigos);
-  return (await getLiveNovedades()).filter((novedad) => wanted.has(novedad.codigoEstudiante));
+  return (await getLiveNovedades()).filter((row) => wanted.has(row.codigoEstudiante));
 }
