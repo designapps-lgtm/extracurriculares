@@ -42,6 +42,20 @@ vi.mock("./appsheet.repository", () => {
     cell,
     textCell,
     nullableTextCell: (row: Record<string, unknown>, ...names: string[]) => textCell(row, ...names) || null,
+    photoUrlCell: (row: Record<string, unknown>, ...names: string[]) => {
+      const value = textCell(row, ...names);
+      if (!value) return null;
+      const trimmed = value.trim();
+      if (trimmed.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(trimmed) as { Url?: string };
+          return parsed.Url?.trim() || null;
+        } catch {
+          return null;
+        }
+      }
+      return trimmed;
+    },
     numberCell: (row: Record<string, unknown>, ...names: string[]) => Number(textCell(row, ...names)) || 0,
     yesNoCell: (row: Record<string, unknown>, ...names: string[]) => ["y", "yes", "si", "sí", "true", "1"].includes(textCell(row, ...names).toLowerCase()),
     normalizeSearch: (value: string) => value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim(),

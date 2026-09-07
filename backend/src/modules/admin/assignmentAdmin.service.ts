@@ -66,9 +66,10 @@ function teacherScheduleRow(input: {
   primary: boolean;
   status: string;
   createdAt?: string | null;
+  preserveCreatedAt?: boolean;
 }): AppSheetRow {
   const timestamp = nowIso();
-  return {
+  const row: AppSheetRow = {
     HorarioID: `${input.assignmentId}__${input.schedule.id}`,
     UsuarioID: input.teacher.id,
     CorreoProfesor: input.teacher.email,
@@ -85,9 +86,12 @@ function teacherScheduleRow(input: {
     PuedeGestionarAsistencia: input.teacher.permissions.canManageAttendance ? "Y" : "N",
     PuedeGestionarHorarios: input.teacher.permissions.canManageSchedules ? "Y" : "N",
     PuedeAdministrarUsuarios: input.teacher.permissions.canAdministerUsers ? "Y" : "N",
-    CreatedAt: input.createdAt ?? timestamp,
     UpdatedAt: timestamp,
   };
+  // En Edit, AppSheet rechaza el CreatedAt guardado tal cual (formato inconsistente);
+  // omitirlo lo preserva. Solo se manda en el Add inicial.
+  if (!input.preserveCreatedAt) row.CreatedAt = input.createdAt ?? timestamp;
+  return row;
 }
 
 async function addAssignmentRows(input: {
@@ -187,6 +191,7 @@ export async function updateAssignment(id: string, input: { esPrincipal?: boolea
       primary,
       status,
       createdAt: current.createdAt,
+      preserveCreatedAt: true,
     })));
   }
   const additions = schedules.filter((row) => !existingBySchedule.has(row.id));

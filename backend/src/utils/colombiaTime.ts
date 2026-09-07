@@ -30,6 +30,22 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+// AppSheet devuelve las fechas en "MM/DD/YYYY HH:mm:ss" en el Find, pero al
+// hacer Edit recha esos mismos valores si se reenvían tal cual (los re-interpreta
+// y falla). Convertimos a formato ISO local (sin Z) que AppSheet acepta como input.
+export function appSheetDateTimeToIso(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/.exec(text);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}T${iso[4]}:${iso[5]}:${iso[6]}`;
+  const slash = /^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T]?(\d{2})?:?(\d{2})?:?(\d{2})?/.exec(text);
+  if (slash) {
+    const [, month, day, year, hh = "00", mm = "00", ss = "00"] = slash;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:${ss.padStart(2, "0")}`;
+  }
+  return null;
+}
+
 export function normalizeDateOnly(value: unknown): string | null {
   const text = String(value ?? "").trim();
   if (!text) return null;

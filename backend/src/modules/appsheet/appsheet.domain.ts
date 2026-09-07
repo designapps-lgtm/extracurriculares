@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { nowIso, normalizeDateOnly, normalizeDayName } from "../../utils/colombiaTime";
+import { appSheetDateTimeToIso, nowIso, normalizeDateOnly, normalizeDayName } from "../../utils/colombiaTime";
 import {
   APPSHEET_TABLES,
   addRows,
@@ -11,6 +11,7 @@ import {
   normalizeSearch,
   nullableTextCell,
   numberCell,
+  photoUrlCell,
   textCell,
   yesNoCell,
 } from "./appsheet.repository";
@@ -141,7 +142,7 @@ function mapUser(row: AppSheetRow): AppUser | null {
     email,
     firstName: textCell(row, "Nombre"),
     lastName: textCell(row, "Apellido"),
-    photoUrl: nullableTextCell(row, "FotoUrl"),
+    photoUrl: photoUrlCell(row, "FotoUrl"),
     status,
     active: isActiveValue(status),
     permissions: {
@@ -191,10 +192,11 @@ function userWriteRow(input: {
   status?: string;
   permissions?: Partial<UserPermissions>;
   createdAt?: string;
+  preserveCreatedAt?: boolean;
 }): AppSheetRow {
   const permissions = { ...permissionDefaults(input.role), ...input.permissions };
   const timestamp = nowIso();
-  return {
+  const row: AppSheetRow = {
     UsuarioID: input.id,
     TipoUsuario: input.role,
     CodigoUsuario: input.code ?? "",
@@ -208,9 +210,12 @@ function userWriteRow(input: {
     PuedeGestionarAsistencia: permissions.canManageAttendance ? "Y" : "N",
     PuedeGestionarHorarios: permissions.canManageSchedules ? "Y" : "N",
     PuedeAdministrarUsuarios: permissions.canAdministerUsers ? "Y" : "N",
-    CreatedAt: input.createdAt ?? timestamp,
     UpdatedAt: timestamp,
   };
+  // En Edit, AppSheet rechaza valores DateTime que ya estaban guardados (formato
+  // inconsistente); omitirlo hace que AppSheet lo preserve tal cual está.
+  if (!input.preserveCreatedAt) row.CreatedAt = appSheetDateTimeToIso(input.createdAt) ?? timestamp;
+  return row;
 }
 
 export async function createUser(input: Omit<Parameters<typeof userWriteRow>[0], "id"> & { id?: string }): Promise<AppUser> {
@@ -248,6 +253,7 @@ export async function updateUser(id: string, changes: Partial<{
     status: changes.status ?? current.status,
     permissions: { ...current.permissions, ...changes.permissions },
     createdAt: current.createdAt ?? undefined,
+    preserveCreatedAt: true,
   })]);
   const updated = await getUserById(id, current.role, { fresh: true });
   if (!updated) throw new Error("AppSheet no devolvió el usuario actualizado");
@@ -293,7 +299,7 @@ export async function getStudents(options: { fresh?: boolean } = {}): Promise<Ap
     gradeName: textCell(row, "NombreGrado"),
     group: nullableTextCell(row, "Grupo"),
     email: nullableTextCell(row, "Correo"),
-    photoUrl: nullableTextCell(row, "FotoUrl"),
+    photoUrl: photoUrlCell(row, "FotoUrl"),
     sourceStatus: nullableTextCell(row, "EstadoOrigen"),
     createdAt: nullableTextCell(row, "CreatedAt"),
     updatedAt: nullableTextCell(row, "UpdatedAt"),
@@ -304,6 +310,7 @@ export async function updateStudentRow(code: string, changes: Partial<AppStudent
   const current = (await getStudents({ fresh: true })).find((student) => student.code === code);
   if (!current) throw Object.assign(new Error("Estudiante no encontrado"), { clientCode: "NOT_FOUND" });
   const next = { ...current, ...changes };
+  // En Edit, omitir CreatedAt: AppSheet rechaza el guardado tal cual y lo preserva si faltó.
   await editRows(APPSHEET_TABLES.students, [{
     CodigoEstudiante: code,
     Nombre: next.firstName,
@@ -314,7 +321,6 @@ export async function updateStudentRow(code: string, changes: Partial<AppStudent
     Correo: next.email ?? "",
     FotoUrl: next.photoUrl ?? "",
     EstadoOrigen: next.sourceStatus ?? "",
-    CreatedAt: next.createdAt ?? nowIso(),
     UpdatedAt: nowIso(),
   }]);
 }
@@ -482,9 +488,11 @@ export async function upsertAttendanceRows(input: {
       RegistradoPorTipo: input.callerType,
       RegistradoPorID: input.callerId,
       Observacion: record.observation ?? current?.observation ?? "",
-      CreatedAt: current?.createdAt ?? timestamp,
       UpdatedAt: timestamp,
     };
+    // En Edit, AppSheet rechaza el CreatedAt guardado tal cual (formato inconsistente);
+    // omitirlo lo preserva. Solo se manda en el Add inicial.
+    if (!current) row.CreatedAt = timestamp;
     if (current) edits.push(row);
     else additions.push(row);
   }

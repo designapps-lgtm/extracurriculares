@@ -94,6 +94,27 @@ export function nullableTextCell(row: AppSheetRow, ...names: string[]): string |
   return value || null;
 }
 
+/**
+ * AppSheet serializa columnas de tipo Image/File como JSON crudo:
+ *   {"Url":"https://...","LinkText":"https://..."}
+ * Este helper extrae la URL real y la devuelve, o si el valor ya es una URL
+ * plana (formato legado) la deja tal cual. Devuelve null cuando está vacío.
+ */
+export function photoUrlCell(row: AppSheetRow, ...names: string[]): string | null {
+  const value = textCell(row, ...names);
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed) as { Url?: string };
+      return parsed.Url?.trim() || null;
+    } catch {
+      return null;
+    }
+  }
+  return trimmed;
+}
+
 export function numberCell(row: AppSheetRow, ...names: string[]): number {
   const value = Number(textCell(row, ...names));
   return Number.isFinite(value) ? value : 0;
