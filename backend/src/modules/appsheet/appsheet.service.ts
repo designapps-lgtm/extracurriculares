@@ -56,9 +56,7 @@ function isRetryableStatus(status: number): boolean {
 
 function extractRows(payload: unknown): AppSheetRow[] {
   if (Array.isArray(payload)) return payload as AppSheetRow[];
-  if (!payload || typeof payload !== "object") {
-    throw new AppSheetRequestError("AppSheet devolvió un formato de respuesta inesperado", false);
-  }
+  if (!payload || typeof payload !== "object") return [];
 
   const body = payload as Record<string, unknown>;
   const candidates = [body.Rows, body.rows, body.data, body.Data];

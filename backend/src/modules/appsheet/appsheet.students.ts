@@ -139,15 +139,8 @@ function failedSync(
   };
 }
 
-interface StudentValidationResult {
-  validStudents: MappedStudent[];
-  errors: string[];
-  rejected: number;
-}
-
-function validateMappedStudents(rows: AppSheetRow[], students: MappedStudent[]): StudentValidationResult {
+function validateMappedStudents(rows: AppSheetRow[], students: MappedStudent[]): string[] {
   const errors: string[] = [];
-  const missingBarcode = rows.length - students.length;
   // AppSheet puede devolver filas vacías del rango usado en Google Sheets.
   // No deben invalidar el lote completo: sólo se descartan esas filas sin BARCODE.
   if (students.length === 0) {
@@ -157,40 +150,22 @@ function validateMappedStudents(rows: AppSheetRow[], students: MappedStudent[]):
   const seen = new Set<string>();
   const duplicates = new Set<string>();
   for (const student of students) {
-    barcodeCounts.set(student.codigoEstudiante, (barcodeCounts.get(student.codigoEstudiante) || 0) + 1);
-  }
+    if (seen.has(student.codigoEstudiante)) duplicates.add(student.codigoEstudiante);
+    seen.add(student.codigoEstudiante);
 
-  const duplicateCodes = new Set(
-    [...barcodeCounts.entries()]
-      .filter(([, count]) => count > 1)
-      .map(([codigo]) => codigo),
-  );
-  if (duplicateCodes.size > 0) {
-    errors.push(`BARCODE duplicado(s): ${[...duplicateCodes].slice(0, 10).join(", ")}`);
-  }
-
-  const validStudents = students.filter((student) => {
     const missing: string[] = [];
     if (!student.sourceFirstName) missing.push("FIRST NAME");
     if (!student.apellido) missing.push("LAST NAME");
     if (!student.gradeNombre) missing.push("GRADE");
     if (missing.length > 0) {
       errors.push(`${student.codigoEstudiante}: faltan ${missing.join(", ")}`);
-      return false;
     }
-    if (duplicateCodes.has(student.codigoEstudiante)) return false;
-    return true;
-  });
-
-  if (validStudents.length === 0) {
-    errors.push("AppSheet no devolvió ninguna fila válida con BARCODE y datos obligatorios");
   }
 
-  return {
-    validStudents,
-    errors,
-    rejected: rows.length - validStudents.length,
-  };
+  if (duplicates.size > 0) {
+    errors.push(`BARCODE duplicado(s): ${[...duplicates].slice(0, 10).join(", ")}`);
+  }
+  return errors;
 }
 
 let runningSync: Promise<AppSheetStudentSyncResult> | null = null;
@@ -210,45 +185,24 @@ async function runAppSheetStudentsSync(): Promise<AppSheetStudentSyncResult> {
   }
 
   const students = mapAppSheetStudents(rows);
-  const validation = validateMappedStudents(rows, students);
-  if (validation.validStudents.length === 0) {
-    return failedSync(
-      validation.errors.slice(0, 20),
-      rows.length,
-      students.length,
-      validation.rejected,
-    );
+  const validationErrors = validateMappedStudents(rows, students);
+  if (validationErrors.length > 0) {
+    return failedSync(validationErrors.slice(0, 20), rows.length, students.length, rows.length - students.length);
   }
 
-  let result;
-  try {
-    result = await importStudentsBulk(students, false, {
-      // Un snapshot AppSheet sin un indicador de completitud no permite saber
-      // si una fila ausente fue eliminada o si la respuesta llegó truncada.
-      // Los estados explícitos del origen sí se actualizan; no desactivamos por
-      // ausencia hasta contar con una confirmación de snapshot completo.
-      deactivateAbsent: false,
-    });
-  } catch (error) {
-    return failedSync(
-      [`Error de base de datos durante la importación: ${error instanceof Error ? error.message : String(error)}`],
-      rows.length,
-      students.length,
-      0,
-    );
-  }
-
+  // AppSheet/Sheets es ahora la fuente final; este endpoint únicamente valida
+  // que el snapshot sea legible y consistente, sin replicarlo a otro sistema.
   return {
-    ok: result.errors === 0,
+    ok: true,
     table: DEMOGRAFICOS_TABLE,
     received: rows.length,
     mapped: students.length,
     middleNames: students.filter((student) => Boolean(student.sourceMiddleName)).length,
-    rejected: 0,
-    processed: result.processed,
-    created: result.created,
-    updated: result.updated,
-    errors: result.errorDetails.slice(0, 10).map((e) => `${e.codigo}: ${e.error}`),
+    rejected: rows.length - students.length,
+    processed: students.length,
+    created: 0,
+    updated: 0,
+    errors: [],
   };
 }
 
