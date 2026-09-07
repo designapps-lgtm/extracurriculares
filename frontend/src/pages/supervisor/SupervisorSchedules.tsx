@@ -27,9 +27,8 @@ const NO_ATTENDANCE_MESSAGE = "Todavía no se registró asistencia para este hor
 
 function diaDeFecha(fecha: string): string {
   const d = new Date(`${fecha}T12:00:00Z`);
-  return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "America/Bogota" })
-    .format(d)
-    .toUpperCase();
+  const dias = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+  return dias[d.getUTCDay()];
 }
 
 function hoyInput(): string {

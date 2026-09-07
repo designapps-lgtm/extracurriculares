@@ -1,12 +1,9 @@
-import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
-import { config } from "../config";
-import { sql } from "../config/db";
+import type { NextFunction, Request, Response } from "express";
+import { verifyAccessToken, type AccessClaims } from "../modules/auth/session";
 import { ADMIN_ACCESS_COOKIE } from "../utils/authCookies";
 
-export interface AuthPayload {
+export interface AuthPayload extends AccessClaims {
   adminId: string;
-  email: string;
 }
 
 declare global {
@@ -23,39 +20,25 @@ export function extractBearerToken(req: Request): string | null {
   return header.slice(7).trim() || null;
 }
 
-export function authenticate(req: Request, res: Response, next: NextFunction) {
+export function authenticate(req: Request, res: Response, next: NextFunction): void {
   const token = extractBearerToken(req) || req.cookies?.[ADMIN_ACCESS_COOKIE] || null;
   if (!token) {
     res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "No autenticado" } });
     return;
   }
-
   try {
-    const payload = jwt.verify(token, config.jwtSecret) as AuthPayload;
-    req.admin = payload;
+    const claims = verifyAccessToken(token, "admin");
+    req.admin = { ...claims, adminId: claims.userId };
     next();
   } catch {
     res.status(401).json({ success: false, error: { code: "INVALID_TOKEN", message: "Token inválido o expirado" } });
   }
 }
 
-export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!req.admin) {
-    res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "No autenticado" } });
-    return;
-  }
-
-  const admin = (await sql`
-    SELECT "id", "estado"
-    FROM "AdminUser"
-    WHERE "id" = ${req.admin.adminId}
-    LIMIT 1
-  `) as unknown as Array<{ id: string; estado: string }>;
-
-  if (admin.length === 0 || admin[0].estado !== "activo") {
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (!req.admin || req.admin.role !== "admin") {
     res.status(403).json({ success: false, error: { code: "FORBIDDEN", message: "Acceso denegado" } });
     return;
   }
-
   next();
 }

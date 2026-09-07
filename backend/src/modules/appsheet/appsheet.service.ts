@@ -1,18 +1,49 @@
 import { config } from "../../config";
 
 const APPSHEET_API_BASE = "https://www.appsheet.com/api/v2/apps";
-const REQUEST_TIMEOUT_MS = 30_000;
-const MAX_ATTEMPTS = 3;
+const REQUEST_TIMEOUT_MS = 20_000;
+const FIND_MAX_ATTEMPTS = 3;
+
+export type AppSheetAction = "Find" | "Add" | "Edit" | "Delete";
 
 export interface AppSheetRow {
   [column: string]: unknown;
 }
 
-function requireConfig(): { appId: string; accessKey: string } {
-  if (!config.appsheetAppId || !config.appsheetAccessKey) {
-    throw new Error("AppSheet no está configurado: faltan APPSHEET_APP_ID o APPSHEET_APPLICATION_ACCESS_KEY");
+export interface AppSheetConnection {
+  appId: string;
+  accessKey: string;
+}
+
+export class AppSheetApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly table: string,
+    readonly action: AppSheetAction,
+    readonly endpoint: string,
+    readonly responseBody: string | null,
+    readonly timedOut = false,
+  ) {
+    super(message);
+    this.name = "AppSheetApiError";
   }
-  return { appId: config.appsheetAppId, accessKey: config.appsheetAccessKey };
+}
+
+function requireConfig(connection?: AppSheetConnection): AppSheetConnection {
+  const appId = connection?.appId ?? config.appsheetAppId;
+  const accessKey = connection?.accessKey ?? config.appsheetAccessKey;
+  if (!appId || !accessKey) {
+    throw new AppSheetApiError(
+      "AppSheet no está configurado: faltan el App ID o la llave de acceso",
+      503,
+      "configuration",
+      "Find",
+      APPSHEET_API_BASE,
+      null,
+    );
+  }
+  return { appId, accessKey };
 }
 
 function wait(ms: number): Promise<void> {
@@ -21,13 +52,6 @@ function wait(ms: number): Promise<void> {
 
 function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 425 || status === 429 || status >= 500;
-}
-
-class AppSheetRequestError extends Error {
-  constructor(message: string, readonly retryable: boolean) {
-    super(message);
-    this.name = "AppSheetRequestError";
-  }
 }
 
 function extractRows(payload: unknown): AppSheetRow[] {
@@ -46,69 +70,127 @@ function extractRows(payload: unknown): AppSheetRow[] {
       if (Array.isArray(nested.rows)) return nested.rows as AppSheetRow[];
     }
   }
-
-  throw new AppSheetRequestError("AppSheet devolvió un formato de respuesta inesperado", false);
+  return [];
 }
 
-/** Lee todas las filas visibles de una tabla AppSheet con timeout y reintentos. */
-export async function findAppSheetRows(tableName: string, selector?: string): Promise<AppSheetRow[]> {
-  const { appId, accessKey } = requireConfig();
-  const url = `${APPSHEET_API_BASE}/${encodeURIComponent(appId)}/tables/${encodeURIComponent(tableName)}/Action`;
-  let lastError: Error | null = null;
+function safeDetail(detail: string): string {
+  return detail.replace(/[\r\n\t]+/g, " ").slice(0, 500);
+}
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+async function executeAction(
+  tableName: string,
+  action: AppSheetAction,
+  rows: AppSheetRow[],
+  selector?: string,
+  connection?: AppSheetConnection,
+): Promise<AppSheetRow[]> {
+  const { appId, accessKey } = requireConfig(connection);
+  const endpoint = `${APPSHEET_API_BASE}/${encodeURIComponent(appId)}/tables/${encodeURIComponent(tableName)}/Action`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "ApplicationAccessKey": accessKey,
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ApplicationAccessKey: accessKey,
+      },
+      body: JSON.stringify({
+        Action: action,
+        Properties: {
+          Locale: "es-CO",
+          Timezone: "America/Bogota",
+          ...(selector ? { Selector: selector } : {}),
         },
-        body: JSON.stringify({
-          Action: "Find",
-          Properties: {
-            Locale: "es-CO",
-            Timezone: "America/Bogota",
-            ...(selector ? { Selector: selector } : {}),
-          },
-          Rows: [],
-        }),
-        signal: controller.signal,
-      });
+        Rows: rows,
+      }),
+      signal: controller.signal,
+    });
 
-      const detail = await response.text();
-      if (!response.ok) {
-        throw new AppSheetRequestError(
-          `AppSheet API ${response.status}: ${detail.slice(0, 500)}`,
-          isRetryableStatus(response.status),
-        );
-      }
+    const detail = await response.text();
+    if (!response.ok) {
+      throw new AppSheetApiError(
+        `AppSheet ${action} en ${tableName} falló con HTTP ${response.status}: ${safeDetail(detail)}`,
+        response.status,
+        tableName,
+        action,
+        endpoint,
+        safeDetail(detail),
+      );
+    }
 
-      let payload: unknown;
-      try {
-        payload = detail ? JSON.parse(detail) : [];
-      } catch {
-        throw new AppSheetRequestError("AppSheet devolvió una respuesta JSON inválida", false);
-      }
+    if (!detail) return [];
+    try {
+      return extractRows(JSON.parse(detail));
+    } catch {
+      throw new AppSheetApiError(
+        `AppSheet ${action} en ${tableName} devolvió JSON inválido`,
+        502,
+        tableName,
+        action,
+        endpoint,
+        safeDetail(detail),
+      );
+    }
+  } catch (error) {
+    if (error instanceof AppSheetApiError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new AppSheetApiError(
+        `Tiempo de espera agotado al ejecutar ${action} en AppSheet (${tableName})`,
+        504,
+        tableName,
+        action,
+        endpoint,
+        null,
+        true,
+      );
+    }
+    throw new AppSheetApiError(
+      `No se pudo conectar con AppSheet para ${action} en ${tableName}: ${error instanceof Error ? error.message : String(error)}`,
+      502,
+      tableName,
+      action,
+      endpoint,
+      null,
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
-      return extractRows(payload);
+/** Find es idempotente; reintenta únicamente errores temporales y 429. */
+export async function findAppSheetRows(
+  tableName: string,
+  selector?: string,
+  connection?: AppSheetConnection,
+): Promise<AppSheetRow[]> {
+  let lastError: AppSheetApiError | null = null;
+  for (let attempt = 1; attempt <= FIND_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await executeAction(tableName, "Find", [], selector, connection);
     } catch (error) {
-      if (error instanceof AppSheetRequestError && !error.retryable) {
-        throw error;
-      }
-      lastError = error instanceof Error
-        ? (error.name === "AbortError" ? new Error("Tiempo de espera agotado al consultar AppSheet") : error)
-        : new Error(String(error));
-      if (attempt === MAX_ATTEMPTS) throw lastError;
-      await wait(attempt * 1000);
-    } finally {
-      clearTimeout(timeout);
+      const apiError = error instanceof AppSheetApiError
+        ? error
+        : new AppSheetApiError(String(error), 502, tableName, "Find", APPSHEET_API_BASE, null);
+      lastError = apiError;
+      if (!isRetryableStatus(apiError.status) || attempt === FIND_MAX_ATTEMPTS) throw apiError;
+      await wait(attempt * 500);
     }
   }
+  throw lastError ?? new AppSheetApiError("No se pudo consultar AppSheet", 502, tableName, "Find", APPSHEET_API_BASE, null);
+}
 
-  throw lastError || new Error("No se pudo consultar AppSheet");
+/** Las mutaciones no se reintentan para evitar escrituras duplicadas. */
+export function addAppSheetRows(tableName: string, rows: AppSheetRow[]): Promise<AppSheetRow[]> {
+  return rows.length === 0 ? Promise.resolve([]) : executeAction(tableName, "Add", rows);
+}
+
+export function editAppSheetRows(tableName: string, rows: AppSheetRow[]): Promise<AppSheetRow[]> {
+  return rows.length === 0 ? Promise.resolve([]) : executeAction(tableName, "Edit", rows);
+}
+
+export function deleteAppSheetRows(tableName: string, rows: AppSheetRow[]): Promise<AppSheetRow[]> {
+  return rows.length === 0 ? Promise.resolve([]) : executeAction(tableName, "Delete", rows);
 }

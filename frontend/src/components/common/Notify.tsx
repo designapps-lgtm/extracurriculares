@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, createContext, useContext } from "react";
+import { useState, useCallback, useMemo, useEffect, createContext, useContext } from "react";
 
 interface Notification {
   id: number;
@@ -55,6 +55,12 @@ export function NotifyProvider({ children }: { children: React.ReactNode }) {
     }, 4000);
   }, []);
 
+  // Callbacks estables: evitan que el value del context cambie en cada render
+  // (causaba cascadas de re-render en todos los consumidores de useNotify).
+  const success = useCallback((message: string) => addToast("success", message), [addToast]);
+  const error = useCallback((message: string) => addToast("error", message), [addToast]);
+  const info = useCallback((message: string) => addToast("info", message), [addToast]);
+
   const confirm = useCallback(
     (title: string, message: string, options?: { confirmLabel?: string; variant?: "danger" | "default" }) =>
       new Promise<boolean>((resolve) => {
@@ -85,6 +91,11 @@ export function NotifyProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const contextValue = useMemo<NotifyContextValue>(
+    () => ({ success, error, info, confirm, prompt }),
+    [success, error, info, confirm, prompt],
+  );
+
   const resolveConfirm = (result: boolean) => {
     confirmState?.resolve(result);
     setConfirmState(null);
@@ -96,7 +107,7 @@ export function NotifyProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <NotifyContext.Provider value={{ success: (m) => addToast("success", m), error: (m) => addToast("error", m), info: (m) => addToast("info", m), confirm, prompt }}>
+    <NotifyContext.Provider value={contextValue}>
       {children}
 
       {/* Toast container */}

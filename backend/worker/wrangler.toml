@@ -2,36 +2,46 @@ name = "extracurriculares-api"
 main = "./worker.ts"
 compatibility_date = "2026-08-04"
 compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
-
-# URL gratuita de prueba: <nombre>.workers.dev
 workers_dev = true
 
-# Cron: corre el sync de Google Drive. Ajustalo si querés otra frecuencia.
-# Formato Cloudflare: "*/10 * * * *" = cada 10 minutos.
-[triggers]
-crons = ["*/10 * * * *"]
-
-# Variables de entorno no secretas.
-# Las secretas (DATABASE_URL, JWT_SECRET, GOOGLE_*, WEBHOOK token) NO van acá:
-# se setean con `wrangler secret put <NOMBRE>` para que no queden en el repo.
+# REGLA DE ORO: `wrangler deploy` SINCRONIZA este bloque [vars] con Cloudflare.
+# Cualquier variable de texto creada a mano en el dashboard que NO esté aquí
+# SE BORRA en cada deploy. Por eso TODA var no secreta vive en este archivo.
+#
+# Los SECRETOS (ver lista abajo) viven aparte y NO se borran con el deploy,
+# pero SOLO si se cargan con `wrangler secret put`. Si pegás un secreto en el
+# dashboard como "variable de texto", el próximo deploy lo elimina.
+#
+# Secretos server-only (cargar con `wrangler secret put <NOMBRE>`):
+# OBLIGATORIOS: JWT_SECRET, GOOGLE_CLIENT_ID,
+#   APPSHEET_APPLICATION_ACCESS_KEY, APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY
+# OPCIONALES (solo si se habilita el watch de Drive / webhooks):
+#   GOOGLE_SERVICE_ACCOUNT_JSON, GOOGLE_DRIVE_WEBHOOK_TOKEN, APPSHEET_WEBHOOK_TOKEN
 [vars]
 NODE_ENV = "production"
 PORT = "3000"
-FRONTEND_URL = "https://extracurriculares-mu.vercel.app/"
+FRONTEND_URL = "https://extracurriculares-mu.vercel.app"
 ACCESS_TOKEN_EXPIRES_IN = "15m"
 SESSION_DURATION_HOURS = "168"
 GOOGLE_INSTITUTION_DOMAIN = "gi.edu.co"
-NOVEDADES_SYNC_MINUTES = "10"
-GOOGLE_DRIVE_WEBHOOK_URL = "https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive"
 APPSHEET_APP_ID = "0a43ca9a-ff5b-47bf-8127-8f14f1150ff0"
 APPSHEET_DEMOGRAFICOS_TABLE = "Demograficos"
+# Las novedades viven en la app AppSheet separada Lector_QR.
+APPSHEET_NOVEDADES_APP_ID = "6f5cc364-a2a4-4a1b-9603-873f54374310"
 APPSHEET_NOVEDADES_TABLE = "Novedades_Diarias"
-GOOGLE_DRIVE_STUDENTS_FILE_NAME = "DEMOGRAFICOS 2026-2027"
-STUDENTS_SYNC_SOURCE = "appsheet"
-# Rate limiting a nivel de app (además del de Cloudflare). El limiter in-memory
-# de Express se activa cuando estas vars existen. AUTH_RATE_LIMIT: intentos de
-# login/google/logout por ventana de 15 min. API_RATE_LIMIT: requests generales.
-# En Workers edge no persiste entre instancias, pero con la config de Workers +
-# un solo punto de entrada alcanza para frenar fuerza bruta y abuso.
-AUTH_RATE_LIMIT = "30"
-API_RATE_LIMIT = "300"
+# APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY es un secreto independiente
+# (wrangler secret put), NO va en este bloque.
+# Watch de Drive (apagado mientras estén vacías; el código las trata como null).
+# Cuando lo habilites, poné los valores reales AQUÍ, nunca solo en el dashboard.
+GOOGLE_DRIVE_FOLDER_ID = ""
+GOOGLE_DRIVE_WEBHOOK_URL = ""
+# El rate limiting del Worker se configura en Cloudflare, no con MemoryStore de Express.
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true

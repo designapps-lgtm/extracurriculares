@@ -59,7 +59,11 @@ export default function SupervisorDailyNovedades({
     api.getFilters().then((data) => setGrados(data.grados)).catch(() => notify.error("No se pudieron cargar los grados"));
   }, [api, notify]);
 
-  useEffect(() => { load(); }, [api]);
+  useEffect(() => {
+    load();
+    const interval = window.setInterval(() => load(), 15_000);
+    return () => window.clearInterval(interval);
+  }, [api, fecha, grado]);
 
   const itemsPorNivel = useMemo(() => {
     if (niveles.length === 0) return items;

@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "deploy:safe": "node scripts/predeploy.mjs && wrangler deploy",
     "deploy:dry-run": "wrangler deploy --dry-run",
+    "secret:check": "node scripts/predeploy.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

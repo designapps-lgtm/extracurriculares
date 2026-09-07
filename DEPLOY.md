@@ -1,269 +1,221 @@
-# Despliegue a Producción — Extracurriculares
+# Despliegue a producción — Extracurriculares
 
-Arquitectura elegida: **Vercel** (frontend) + **Cloudflare Workers** (backend) + **Neon** (PostgreSQL).
+Arquitectura oficial: **Vercel** para el frontend, **Cloudflare Workers** para la API Express y **AppSheet/Google Sheets** como fuente de verdad.
 
-Auth por **cookies httpOnly con `SameSite=None; Secure`**. El frontend y el backend
-son sitios distintos (Vercel + Workers), así que `vercel.json` proxia `/api/*` hacia
-el worker: el navegador habla SIEMPRE con el mismo dominio y las cookies son
-first-party. Los tokens NUNCA viven en el cliente (ni localStorage ni headers).
-
-> ⚠️ Render quedó **deshabilitado**: no usar. El backend solo corre en Cloudflare.
-
----
-
-## 1. Preparar lo que ya está hecho (confirmado)
-
-- [x] Backend compila: `npm run build` → `dist/` (0 errores TS tras `prisma generate`)
-- [x] Frontend compila: `npm run build` → `dist/` (0 errores TS)
-- [x] Auth backend refactorizada a tokens Bearer (middlewares + refresh en body)
-- [x] Auth frontend refactorizada a localStorage (api.ts + logins + logout)
-- [x] `render.yaml` (BluePrint Render, rootDir `backend`)
-- [x] `frontend/vercel.json` (rewrites SPA + cleanUrls)
-- [x] Excel `Extracurriculares_base.xlsx` con hoja "Base" (verificada)
-- [x] `frontend/src/services/tokenStorage.ts` (almacenamiento por rol)
-
----
-
-## 2. Base de datos (Neon)
-
-### 2.1 Crear el proyecto Neon
-1. Ir a https://neon.tech → crear proyecto (región cercana).
-2. Copiar la cadena `DATABASE_URL` (formato pool o directo):
-   `postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`
-
-### 2.2 Crear el schema (desde tu máquina)
-Desde `backend/` con la env apuntando a Neon:
-
-```bash
-cd backend
-DATABASE_URL="postgresql://USER:PASS@HOST/neondb?sslmode=require" npx prisma db push
-```
-
-> No hay migraciones (`prisma/migrations` vacío), por eso usamos `db push` para
-> crear las tablas. En el futuro conviene `prisma migrate dev` y comitear migraciones.
->
-> Para el registro de llamadas, después de sincronizar el schema hay que ejecutar
-> también el SQL de backfill antes de desplegar el backend nuevo:
->
-> ```bash
-> cd backend
-> psql "postgresql://USER:PASS@HOST/neondb?sslmode=require" -f prisma/AttendanceCallStatus.sql
-> ```
->
-> El script es idempotente: crea las columnas/índices si faltan y marca sesiones
-> históricas en curso o finalizadas como `historico`, sin atribuirlas a un usuario.
-
----
-
-## 3. Backend (Cloudflare Workers)
-
-### 3.1 Variables de entorno
-Las **no secretas** van en `backend/worker/wrangler.toml` → `[vars]` (`NODE_ENV`,
-`PORT`, `FRONTEND_URL`, `GOOGLE_DRIVE_FOLDER_ID`). Las **secretas** (DB, JWT,
-Google) NO van en el repo; se setean una sola vez con wrangler:
-
-```bash
-cd backend/worker
-npx wrangler login
-
-npx wrangler secret put DATABASE_URL
-npx wrangler secret put JWT_SECRET
-npx wrangler secret put GOOGLE_CLIENT_ID
-npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
-```
-
-### 3.2 Build
-```bash
-cd backend/worker
-npm run build     # typecheck + wrangler deploy --dry-run
-```
-
-### 3.3 Deploy
-```bash
-cd backend/worker
-npx wrangler deploy   # → https://extracurriculares-api.<tu-sub>.workers.dev
-```
-
-> **Rate limiting**: desactivado por defecto. Si alguna vez se corre en Node fuera
-> de Workers, el limitador de Express solo se activa definiendo `AUTH_RATE_LIMIT`
-> y/o `API_RATE_LIMIT` en el entorno; sin esas vars es no-op. En Workers, el rate
-> limiting lo maneja Cloudflare en el edge.
-
----
-
-## 4. Frontend (Vercel)
-
-### 4.1 Variables de entorno
-| Variable | Valor |
-|----------|-------|
-| `VITE_API_URL` | **Ya no se usa en producción.** El frontend llama a `/api/*` por el mismo dominio y `vercel.json` proxya hacia el backend de Cloudflare Workers (para que las cookies sean first-party y funcionen en móvil). Solo hace falta para desarrollo local (docker usa `http://localhost:3000`). |
-
-> `vercel.json` contiene el rewrite `/api/* → https://extracurriculares-api.gi-school.workers.dev/api/*`.
-> Si cambia el worker, actualizar esa URL. Sin el proxy, los navegadores
-> móviles bloquean las cookies `SameSite=None` (third-party) y la sesión se pierde.
-
-### 4.2 Deploy
-- Vercel auto-detecta Vite. Configura el **Root Directory** a `frontend/`.
-- Build command: `npm run build` · Output: `dist`
-- `vercel.json` maneja los rewrites SPA (rutas `/admin/*` en refresh directo).
-  **No usar `cleanUrls: true`**: rompe el catch-all rewrite y las rutas anidadas
-  devuelven 404 al recargar la página.
-
----
-
-## 5. Cargar datos + seed (después del deploy de la API)
-
-Desde `backend/`, apuntando con `DATABASE_URL` a Neon:
-
-```bash
-# 1. Validar dónde no hay profesores: primero el seed de admin
-DATABASE_URL="..." SEED_ADMIN_EMAIL="admin@tu.colegio.edu" SEED_ADMIN_PASSWORD="password" npx ts-node prisma/seed.ts
-
-# 2. Importar estudiantes + grados + disciplinas (crea la Base)
-cd backend
-DATABASE_URL="..." EXCEL_PATH="/ruta/a/Extracurriculares_base.xlsx" npx ts-node src/import/cli/importStudents.ts
-
-# 3. Importar la oferta (profesores, horarios, asignaciones) — dry-run primero
-DATABASE_URL="..." npx ts-node src/import/cli/importOffer.ts --dry-run
-DATABASE_URL="..." npx ts-node src/import/cli/importOffer.ts
-```
-
-> El orden importa: `importStudents` crea grados/disciplinas que `importOffer` necesita.
-> `importOffer` tiene `--dry-run` para validar antes de escribir.
-
----
-
-## 5.5 Backend en Cloudflare Workers (BACKEND OFFICIAL — Render deshabilitado)
-
-> ✅ **Estado: producción.** El backend vive en `extracurriculares-api.gi-school.workers.dev`
-> y es el ÚNICO backend. Render fue deshabilitado (el rewrite del frontend ya apunta al worker).
-> Limitación conocida: plan Free = 10ms de CPU por request; si bcrypt (login admin)
-> o el parseo de xlsx exceden el límite en runtime, migrar al plan pagado (~$5/mes).
-
-### Archivos creados
-| Archivo | Qué es |
-|---------|--------|
-| `backend/worker/worker.ts` | Entrypoint Workers: `fetch` (envuelve Express con `httpServerHandler`) + `scheduled` (cron de novedades) |
-| `backend/worker/env.ts` | Puebla `process.env` desde los bindings de Workers (se importa primero) |
-| `backend/worker/wrangler.toml` | Config de deploy: cron `*/10 * * * *`, compat flags, variables |
-| `backend/worker/package.json` | Wrangler + dependencias de build del worker |
-| `backend/worker/tsconfig.json` | Typecheck del worker (usa `types: ["node"]`) |
-
-### Cambios en `src/`
-| Archivo | Cambio |
-|---------|--------|
-| `src/config/prisma.ts` | Usa `Pool` + `PrismaNeon` (adapter serverless de Neon) para correr en edge. Sigue funcionando en Node/Render. |
-| `prisma/schema.prisma` | Agregado `previewFeatures = ["driverAdapters"]` + `prisma generate` |
-| `src/utils/tokens.ts` | `import crypto from "node:crypto"` (compat tipos) |
-
-### Por qué NO se usa `server.ts`
-`server.ts` llama `app.listen()` + `setInterval` (sync de novedades). En Workers:
-- No hay proceso continuo: `setInterval` no corre.
-- El cron lo maneja Cloudflare con el trigger `scheduled`.
-
-Por eso `worker.ts` importa `app.ts` directamente y define su propio `scheduled`.
-
-### Variables de entorno
-Las **no secretas** van en `wrangler.toml` → `[vars]`. Las **secretas** (DB, JWT, Google)
-NO van en el repo; se setean con wrangler:
-
-```bash
-cd backend/worker
-npx wrangler login
-
-# Secretos (uno por línea; wrangler pide el valor)
-npx wrangler secret put DATABASE_URL
-npx wrangler secret put JWT_SECRET
-npx wrangler secret put GOOGLE_CLIENT_ID
-npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
-npx wrangler secret put GOOGLE_DRIVE_FOLDER_ID
-npx wrangler secret put GOOGLE_DRIVE_WEBHOOK_TOKEN
-npx wrangler secret put APPSHEET_APPLICATION_ACCESS_KEY
-npx wrangler secret put APPSHEET_WEBHOOK_TOKEN
-```
-
-> `GOOGLE_DRIVE_FOLDER_ID` está en `[vars]` como placeholder vacío; si preferís
-> como secreto, quitalo de `[vars]` y dale `wrangler secret put`.
->
-> `GOOGLE_DRIVE_WEBHOOK_URL` debe apuntar al endpoint público del worker,
-> por ejemplo `https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive`.
-
-`APPSHEET_APP_ID`, `APPSHEET_DEMOGRAFICOS_TABLE` y
-`APPSHEET_NOVEDADES_TABLE` configuran las fuentes directas de AppSheet. Los
-estudiantes provienen de `Demograficos` y las novedades de la tabla
-`Novedades_Diarias` que se ve en AppSheet. La configuración de producción usa
-la API de AppSheet; Drive queda solamente para oferta y horarios.
-
-Para que una novedad llegue inmediatamente sin esperar el cron, crear una
-automatización de AppSheet sobre altas/actualizaciones de `Novedades_Diarias`
-que haga `POST` a:
+La URL vigente del Worker es:
 
 ```text
-https://extracurriculares-api.gi-school.workers.dev/api/webhooks/appsheet/novedades/sync
+https://extracurriculares-api.gi-school.workers.dev
 ```
 
-La petición debe enviar el header `X-Webhook-Token` con el secreto configurado
-en `APPSHEET_WEBHOOK_TOKEN`. El endpoint consulta únicamente las filas del día
-actual en `America/Bogota`, vuelve a validar las fechas en el backend y reemplaza
-el cache diario de forma idempotente. Si el día no tiene novedades, el cache
-queda vacío; una respuesta inválida de AppSheet no elimina el último snapshot.
+El frontend no llama esa URL directamente desde el navegador. `frontend/vercel.json` reescribe `/api/*` al Worker para mantener las cookies como first-party.
 
-Después del deploy y de setear los secretos, pegale una vez al bootstrap:
+## 1. Requisitos
 
-```bash
-curl -X POST \
-  -H "X-Goog-Channel-Token: $GOOGLE_DRIVE_WEBHOOK_TOKEN" \
-  https://extracurriculares-api.gi-school.workers.dev/api/webhooks/google-drive/bootstrap
-```
+- Node.js 20 o superior.
+- Sesión de Wrangler autorizada para la cuenta correcta de Cloudflare.
+- Acceso administrativo a la aplicación de AppSheet.
+- Cliente OAuth web de Google con los orígenes del frontend autorizados.
+- Árbol de trabajo revisado y validaciones locales en verde.
 
-### Probar en local
+El backend de producción es únicamente el Worker. No se debe habilitar otro servidor en paralelo con el mismo frontend.
+
+## 2. Configuración de Cloudflare
+
+> Por qué se "borraban" las variables: `wrangler deploy` SINCRONIZA el bloque
+> `[vars]` de `backend/worker/wrangler.toml` con Cloudflare. Toda variable de
+> texto creada a mano en el dashboard que no esté en ese archivo SE ELIMINA en
+> cada deploy. Los secretos (`wrangler secret put`) viven aparte y sobreviven,
+> pero SOLO si se cargaron como secretos: si pegás un secreto en el dashboard
+> como variable de texto, el próximo deploy también lo borra.
+>
+> Regla: vars de texto → siempre en `wrangler.toml`. Secretos → siempre con
+> `wrangler secret put`. Nunca al revés, nunca solo en el dashboard.
+
+### Variables no secretas
+
+Se versionan en `backend/worker/wrangler.toml` y se suben solas con cada deploy:
+
+- `NODE_ENV`
+- `PORT`
+- `FRONTEND_URL` (sin barra final)
+- `ACCESS_TOKEN_EXPIRES_IN`
+- `SESSION_DURATION_HOURS`
+- `GOOGLE_INSTITUTION_DOMAIN`
+- `APPSHEET_APP_ID`
+- `APPSHEET_DEMOGRAFICOS_TABLE`
+- `APPSHEET_NOVEDADES_APP_ID`
+- `APPSHEET_NOVEDADES_TABLE`
+- `GOOGLE_DRIVE_FOLDER_ID` (vacía = watch de Drive apagado)
+- `GOOGLE_DRIVE_WEBHOOK_URL` (vacía = watch de Drive apagado)
+
+`FRONTEND_URL` debe coincidir con el sitio de Vercel permitido. Si cambia la URL del Worker, también debe actualizarse el destino de `/api/:path*` en `frontend/vercel.json`.
+
+### Secretos obligatorios
+
+No se guardan en Git ni se pasan al frontend. Cargarlos una vez (persisten entre deploys):
+
 ```bash
 cd backend/worker
-npx wrangler login          # una sola vez
-npx wrangler dev            # http://localhost:8787
+npx wrangler login
+npx wrangler secret put JWT_SECRET
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put APPSHEET_APPLICATION_ACCESS_KEY
+npx wrangler secret put APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY
 ```
 
-### Deploy
+Wrangler solicitará cada valor de forma interactiva. Para comprobar únicamente los nombres configurados:
+
+```bash
+npx wrangler secret list --name extracurriculares-api
+```
+
+Secretos opcionales, sólo si se habilita el watch de Drive
+(`GOOGLE_DRIVE_FOLDER_ID` con valor real en `wrangler.toml`):
+
+```text
+GOOGLE_SERVICE_ACCOUNT_JSON
+GOOGLE_DRIVE_WEBHOOK_TOKEN
+APPSHEET_WEBHOOK_TOKEN
+```
+
+## 3. Rotación obligatoria de la llave AppSheet
+
+La llave que se compartió fuera del almacén de secretos debe considerarse comprometida:
+
+1. Genere/revoque la llave desde la administración de AppSheet.
+2. Cargue la nueva llave con `wrangler secret put APPSHEET_APPLICATION_ACCESS_KEY`.
+3. Despliegue una nueva versión del Worker.
+4. Verifique `/api/health` y un login real.
+5. Confirme que la llave anterior ya no funciona.
+
+Nunca pegue la llave en comandos versionados, archivos del frontend, issues o logs.
+
+## 4. Validación previa
+
+Desde la raíz del repositorio:
+
+```bash
+cd backend
+npm ci
+npm test
+npm run build
+
+cd ../frontend
+npm ci
+npm run build
+
+cd ../backend/worker
+npm ci
+npm run typecheck
+npm run deploy:dry-run
+
+cd ../..
+git diff --check
+```
+
+El dry-run debe completar el bundle sin publicar cambios.
+
+Antes de desplegar, revise además:
+
+- que `wrangler secret list` muestre `JWT_SECRET`, `GOOGLE_CLIENT_ID` y `APPSHEET_APPLICATION_ACCESS_KEY`;
+- que no haya secretos en el diff;
+- que `APPSHEET_APP_ID` apunte a la aplicación esperada;
+- que las tablas requeridas respondan a lecturas controladas;
+- que cualquier escritura de prueba use datos identificables y pueda revertirse.
+
+## 5. Validación de esquemas AppSheet
+
+Antes de habilitar mutaciones administrativas o de supervisión en producción, confirme en **AppSheet → Data → Columns**:
+
+### `EC_Auditoria`
+
+```text
+AuditoriaID, UsuarioID, TipoUsuario, Accion, Entidad, EntidadID,
+Detalles, CreatedAt
+```
+
+### `EC_Permanencias`
+
+```text
+PermanenciaID, AsignacionID, HorarioID, CodigoEstudiante, Fecha,
+SupervisorID, CreatedAt
+```
+
+También debe probarse una escritura reversible en `EC_Asistencias` y `Profesores_Horarios`. Si AppSheet rechaza una mutación por columnas requeridas, detenga las pruebas y obtenga el esquema exacto; no adivine campos adicionales.
+
+`EC_Traslados` permanece sin escritura ni endpoint activo hasta conocer sus columnas.
+
+## 6. Despliegue del Worker
+
+Publicar es un cambio de producción. Ejecútelo sólo después de revisar el dry-run y los esquemas pendientes. Usar SIEMPRE el deploy verificado (comprueba que las 12 vars estén en `wrangler.toml` y que los 4 secretos existan en Cloudflare ANTES de subir; si falta algo, aborta sin publicar):
+
 ```bash
 cd backend/worker
-npx wrangler deploy         # → https://extracurriculares-api.<tu-sub>.workers.dev
+npm run deploy:safe
 ```
 
-Después de deployar, actualizá el rewrite del frontend en `frontend/vercel.json`
-de `/api/*` → la URL de tu Worker (en vez de Render).
+`wrangler deploy` a secas sigue disponible, pero no verifica nada: si olvidó cargar un secreto, el Worker sale roto a producción.
 
-### ⚠️ Limitaciones conocidas (leer antes de producción)
-1. **Plan Free = 10ms de CPU por request.** Express + Prisma + bcrypt pueden
-   superar ese límite (especialmente bcrypt en login de admin y parseo de xlsx).
-   Si en runtime se quedan en "timeout insuficiente de CPU", hay que migrar al
-   plan pagado (~$5/mes, 50ms) o quitar código pesado.
-2. **Transacciones en edge**: el sync de novedades usa `prisma.$transaction`. En
-   Workers las conexiones WebSocket viven solo dentro de la request; verificar en
-   runtime que el cron `scheduled` complete las transacciones. Puede requerir
-   ajustar a queries no transaccionales o a `PrismaNeonHttp`.
-3. **Cold starts**: la primera request tras enfriarse puede tardar unos segundos
-   (arranca Express completo).
+Cloudflare conserva versiones del Worker. Si los smoke tests detectan una regresión, use el historial de despliegues del dashboard para volver inmediatamente a la versión anterior mientras se investiga.
 
----
+El handler `scheduled` actual es un no-op: AppSheet se consulta en vivo y no existe una réplica que deba sincronizarse por cron.
 
-## 6. Verificación final
+## 7. Smoke tests
 
-1. Login admin en `<vercel>/admin/login` → dashboard.
-2. Buscar estudiante por código.
-3. Login profesor en `<vercel>/teacher/login` con un correo del `import:students`.
-4. Iniciar una clase y registrar asistencia.
-5. Refrescar la página a mitad de sesión (verificar que el token Bearer mantiene la sesión).
+### Estado y manejo de token inválido
 
----
+```bash
+curl --fail-with-body \
+  https://extracurriculares-api.gi-school.workers.dev/api/health
 
-## Notas de seguridad / limitaciones (auth por cookies)
+curl -i -X POST \
+  -H 'Content-Type: application/json' \
+  --data '{"credential":"invalid-test-token"}' \
+  https://extracurriculares-api.gi-school.workers.dev/api/auth/google
+```
 
-- Las cookies son `httpOnly` (inalcanzables desde JS) → no vulnerables a XSS.
-  La sesión se mantiene con refresh tokens rotativos con detección de reuso.
-- `SameSite=None` requiere HTTPS (`secure: true` se activa con `NODE_ENV=production`).
-- Las mutaciones usan `Content-Type: application/json`, lo que exige preflight CORS;
-  el origin debe ser el del frontend permitido, mitigando CSRF en gran parte.
-- Si en el futuro frontend y backend comparten un solo dominio, se puede volver a
-  `SameSite=Lax`/`Strict` (más robusto frente al bloqueo de cookies de terceros).
-- No hay migraciones de Prisma comiteadas. Al primer cambio de schema en prod,
-  generar migraciones y correr `prisma migrate deploy` en vez de `db push`.
+Resultados esperados:
+
+- `/api/health`: HTTP 200, `status: "ok"` y `appsheet: "connected"`.
+- token falso: HTTP 401 con código `INVALID_GOOGLE_TOKEN`, sin detalles internos.
+
+### Flujo autenticado en navegador
+
+1. Abrir el frontend de Vercel y entrar con una cuenta institucional registrada.
+2. Confirmar que `GET /api/auth/me` conserva la sesión tras recargar.
+3. Probar `/api/teacher/classes` con un profesor activo.
+4. Abrir una clase, comprobar el roster y guardar una asistencia controlada.
+5. Verificar paneles de supervisor, secretaría y administración según permisos.
+6. Confirmar en DevTools que los tokens están sólo en cookies `httpOnly`, no en almacenamiento web.
+
+### Observabilidad mínima
+
+En errores de AppSheet, revise los logs del Worker buscando estado HTTP, tabla, acción y timeout. No copie encabezados de autenticación ni cuerpos que contengan datos personales a canales públicos.
+
+## 8. Frontend en Vercel
+
+Configuración esperada:
+
+- Root Directory: `frontend/`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+
+`VITE_GOOGLE_CLIENT_ID` es configuración pública del cliente OAuth. Ningún secreto server-only debe usar prefijo `VITE_`.
+
+El rewrite crítico está en `frontend/vercel.json`:
+
+```text
+/api/:path* → https://extracurriculares-api.gi-school.workers.dev/api/:path*
+```
+
+Después de cambiar ese archivo, despliegue Vercel y repita login, refresh y logout desde el dominio final.
+
+## 9. Seguridad operativa
+
+- Access y refresh JWT se firman con `JWT_SECRET` y se envían en cookies `httpOnly`, `Secure` y `SameSite=Lax` en producción.
+- Login, refresh y `/api/auth/me` revalidan usuario, rol y estado contra `Usuarios_Roles`.
+- Las mutaciones de AppSheet no tienen reintentos automáticos.
+- Configure rate limiting de producción en Cloudflare; un contador en memoria de Express no es compartido entre instancias.
+- Los webhooks de Drive deben validar `X-Goog-Channel-Token`, canal y recurso.
+- No elimine fuentes o proyectos remotos anteriores como parte del despliegue. Cualquier borrado irreversible requiere una aprobación separada y una copia verificada.

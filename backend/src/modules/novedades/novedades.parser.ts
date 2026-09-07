@@ -91,9 +91,11 @@ function parseFlexibleDate(value: unknown): Date | null {
     return null;
   }
 
-  const dmy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if (dmy) {
-    const [, dd, mm, yyyy, hh, min, ss] = dmy;
+  // AppSheet envía las fechas con formato mes/día/año (MM/DD/YYYY),
+  // p.ej. "09/07/2026" = 7 de septiembre de 2026. Se parsea en ese orden.
+  const mdy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (mdy) {
+    const [, mm, dd, yyyy, hh, min, ss] = mdy;
     // Date(year, ...) depende del huso horario del runtime; usar UTC evita
     // sumar dos veces las cinco horas cuando el proceso corre en Bogotá.
     const d = new Date(Date.UTC(
@@ -174,19 +176,15 @@ export function parseNovedadesSheet(buffer: Buffer, fileId: string): ParsedNoved
   const sheet = workbook.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "", raw: false });
 
-  return rowsToNovedades(rows, fileId);
+  return parseNovedadesRows(rows, fileId);
 }
 
 export function parseNovedadesJson(rawJson: string, fileId: string): ParsedNovedadRow[] {
   const json = JSON.parse(rawJson) as Record<string, unknown>[];
-  return rowsToNovedades(json, fileId);
+  return parseNovedadesRows(json, fileId);
 }
 
-export function parseNovedadesRows(rows: Record<string, unknown>[], sourceId: string): ParsedNovedadRow[] {
-  return rowsToNovedades(rows, sourceId);
-}
-
-function rowsToNovedades(rows: Record<string, unknown>[], fileId: string): ParsedNovedadRow[] {
+export function parseNovedadesRows(rows: Record<string, unknown>[], fileId: string): ParsedNovedadRow[] {
   const results: ParsedNovedadRow[] = [];
 
   rows.forEach((row, index) => {

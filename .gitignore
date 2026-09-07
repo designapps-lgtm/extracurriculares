@@ -5,8 +5,8 @@ dist/
 .wrangler/
 *.log
 .DS_Store
-postgres_data/
 *.tsbuildinfo
 /backend/worker/worker-configuration.d.ts
 /correos_profes.xlsx
 /Profesores para app.xlsx
+/backend/worker/.secrets.production

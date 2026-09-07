@@ -1,154 +1,80 @@
 import { config } from "../../config";
-import { CANONICAL_NOVEDADES_DB_NAMES } from "../novedades/novedades.service";
-import { colombiaDateKey, novedadesForColombiaDay } from "../novedades/novedades.dates";
-import { parseNovedadesRows } from "../novedades/novedades.parser";
-import { persistNovedades } from "../novedades/novedades.repository";
-import { findAppSheetRows, type AppSheetRow } from "./appsheet.service";
+import { loadCoreData } from "./appsheet.views";
+import { findAppSheetRows } from "./appsheet.service";
+import { parseNovedadesRows, type ParsedNovedadRow } from "../novedades/novedades.parser";
 
-const SYNC_MIN_INTERVAL_MS = 30_000;
-
-export interface AppSheetNovedadesSyncResult {
-  ok: boolean;
-  source: "appsheet";
-  table: string;
-  day: string;
-  received: number;
-  sourceRowsMapped: number;
-  rejected: number;
-  outOfDay: number;
-  novedades: number;
-  skipped: boolean;
-  warnings: string[];
-  errors: string[];
+export interface LiveStudentInfo {
+  codigoEstudiante: string;
+  nombre: string;
+  apellido: string;
+  grupo: string | null;
+  grado: string;
+  fotoUrl: string | null;
+  schedules: Array<{ diaSemana: string; codigoDisciplina: string }>;
+  days: Set<string>;
 }
 
-let runningSync: Promise<AppSheetNovedadesSyncResult> | null = null;
-let lastSuccessfulSyncAt = 0;
-let lastSuccessfulCount = 0;
-
-function dailySelector(table: string): string {
-  // AppSheet evalúa TODAY() usando la zona America/Bogota enviada por el cliente.
-  // Se consultan las tres columnas de fecha porque varias filas históricas no
-  // tienen Fecha_Novedad y usan FechaHora o Fecha_Creacion como respaldo.
-  return `Filter(${table}, OR(AND(ISNOTBLANK([Fecha_Novedad]), DATE([Fecha_Novedad]) = TODAY()), AND(ISNOTBLANK([FechaHora]), DATE([FechaHora]) = TODAY()), AND(ISNOTBLANK([Fecha_Creacion]), DATE([Fecha_Creacion]) = TODAY())))`;
+export interface LiveNovedad extends ParsedNovedadRow {
+  id: string;
+  archivo: string;
 }
 
-function failedResult(
-  table: string,
-  day: string,
-  errors: string[],
-  received = 0,
-): AppSheetNovedadesSyncResult {
-  return {
-    ok: false,
-    source: "appsheet",
-    table,
-    day,
-    received,
-    sourceRowsMapped: 0,
-    rejected: received,
-    outOfDay: 0,
-    novedades: 0,
-    skipped: false,
-    warnings: [],
-    errors,
-  };
+export async function getLiveStudentIndex(): Promise<Map<string, LiveStudentInfo>> {
+  const data = await loadCoreData();
+  const result = new Map<string, LiveStudentInfo>();
+  for (const student of data.students) {
+    const schedules = data.enrollments
+      .filter((row) => row.studentCode === student.code)
+      .map((row) => ({ diaSemana: row.day, codigoDisciplina: row.disciplineCode }));
+    result.set(student.code, {
+      codigoEstudiante: student.code,
+      nombre: student.firstName,
+      apellido: student.lastName,
+      grupo: student.group,
+      grado: data.gradeById.get(student.gradeId)?.name ?? student.gradeName,
+      fotoUrl: student.photoUrl,
+      schedules,
+      days: new Set(schedules.map((row) => row.diaSemana)),
+    });
+  }
+  return result;
 }
 
-async function runSync(): Promise<AppSheetNovedadesSyncResult> {
+const NOVEDADES_CACHE_MS = 15_000;
+type NovedadesCacheEntry = { expiresAt: number; promise: Promise<LiveNovedad[]> };
+const novedadesCache = new Map<string, NovedadesCacheEntry>();
+
+export function clearNovedadesCache(): void {
+  novedadesCache.clear();
+}
+
+export async function getLiveNovedades(): Promise<LiveNovedad[]> {
   const table = config.appsheetNovedadesTable;
-  const now = new Date();
-  const day = colombiaDateKey(now);
-  let rows: AppSheetRow[];
-  try {
-    rows = await findAppSheetRows(table, dailySelector(table));
-  } catch (error) {
-    return failedResult(table, day, [error instanceof Error ? error.message : String(error)]);
-  }
+  const appId = config.appsheetNovedadesAppId;
+  const accessKey = config.appsheetNovedadesAccessKey;
+  if (!table || !appId || !accessKey) return [];
 
-  const parsedRows = parseNovedadesRows(rows, table);
-  const mappedSourceRows = new Set(parsedRows.map((row) => row.excelRow)).size;
-  const rejected = Math.max(0, rows.length - mappedSourceRows);
+  const now = Date.now();
+  const current = novedadesCache.get(table);
+  if (current && current.expiresAt > now) return current.promise;
 
-  // Una respuesta no vacía pero completamente inválida normalmente indica un
-  // cambio de columnas. En ese caso se conserva el snapshot y se informa error.
-  if (rows.length > 0 && parsedRows.length === 0) {
-    return failedResult(
-      table,
-      day,
-      [`AppSheet devolvió ${rows.length} filas, pero ninguna tenía NovedadID y ScanCode/Lista_Estudiantes válidos`],
-      rows.length,
-    );
-  }
-
-  // Segunda barrera: nunca confiar únicamente en el Selector remoto. Sólo las
-  // novedades cuyo día efectivo sea hoy en Colombia llegan a PostgreSQL.
-  const dailyRows = novedadesForColombiaDay(parsedRows, now);
-  const sourceRowsMapped = new Set(dailyRows.map((row) => row.excelRow)).size;
-  const outOfDay = Math.max(0, mappedSourceRows - sourceRowsMapped);
-  const warnings: string[] = [];
-  if (rejected > 0) {
-    warnings.push(`${rejected} fila(s) sin NovedadID o código de estudiante fueron omitidas`);
-  }
-  if (outOfDay > 0) {
-    warnings.push(`${outOfDay} fila(s) fuera del día ${day} fueron omitidas`);
-  }
-
-  try {
-    const novedades = await persistNovedades(table, dailyRows, {
-      // El almacenamiento es un cache del día actual, no un histórico. Una
-      // respuesta válida sin filas para hoy limpia el snapshot del día anterior.
-      replaceSources: CANONICAL_NOVEDADES_DB_NAMES,
+  const promise = findAppSheetRows(table, undefined, { appId, accessKey })
+    .then((rows) =>
+      parseNovedadesRows(rows as Record<string, unknown>[], `AppSheet:${table}`).map((row) => ({
+        ...row,
+        id: `${row.novedadId}:${row.codigoEstudiante}`,
+        archivo: table,
+      })),
+    )
+    .catch((error) => {
+      novedadesCache.delete(table);
+      throw error;
     });
-    lastSuccessfulSyncAt = Date.now();
-    lastSuccessfulCount = novedades;
-    return {
-      ok: true,
-      source: "appsheet",
-      table,
-      day,
-      received: rows.length,
-      sourceRowsMapped,
-      rejected,
-      outOfDay,
-      novedades,
-      skipped: false,
-      warnings,
-      errors: [],
-    };
-  } catch (error) {
-    return failedResult(
-      table,
-      day,
-      [`Error guardando novedades de AppSheet: ${error instanceof Error ? error.message : String(error)}`],
-      rows.length,
-    );
-  }
+  novedadesCache.set(table, { expiresAt: now + NOVEDADES_CACHE_MS, promise });
+  return promise;
 }
 
-/** Lee directamente de AppSheet únicamente las novedades del día actual en Colombia. */
-export function syncAppSheetNovedades(options: { force?: boolean } = {}): Promise<AppSheetNovedadesSyncResult> {
-  if (runningSync) return runningSync;
-  if (!options.force && Date.now() - lastSuccessfulSyncAt < SYNC_MIN_INTERVAL_MS) {
-    return Promise.resolve({
-      ok: true,
-      source: "appsheet",
-      table: config.appsheetNovedadesTable,
-      day: colombiaDateKey(new Date()),
-      received: 0,
-      sourceRowsMapped: 0,
-      rejected: 0,
-      outOfDay: 0,
-      novedades: lastSuccessfulCount,
-      skipped: true,
-      warnings: [],
-      errors: [],
-    });
-  }
-
-  const current = runSync();
-  runningSync = current.finally(() => {
-    runningSync = null;
-  });
-  return runningSync;
+export async function getLiveNovedadesForStudents(codigos: string[]): Promise<LiveNovedad[]> {
+  const wanted = new Set(codigos);
+  return (await getLiveNovedades()).filter((row) => wanted.has(row.codigoEstudiante));
 }

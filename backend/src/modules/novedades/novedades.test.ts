@@ -70,16 +70,17 @@ describe("novedades.parser: fechas se guardan como reloj de Bogotá", () => {
     return parseNovedadesJson(JSON.stringify(json), "test.xlsx");
   }
 
-  it("fecha de solo-día '1/09/2026' se guarda como medianoche Bogotá = 05:00Z", () => {
-    const [row] = parseRow("1/09/2026");
-    expect(row.fechaNovedad!.toISOString()).toBe("2026-09-01T05:00:00.000Z");
-    expect(colombiaDateKey(row.fechaNovedad!)).toBe("2026-09-01");
+  // AppSheet envía las fechas con formato MM/DD/YYYY: "09/07/2026" = 7 de septiembre.
+  it("fecha de solo-día '09/07/2026' (MM/DD/YYYY) se guarda como medianoche Bogotá = 05:00Z", () => {
+    const [row] = parseRow("09/07/2026");
+    expect(row.fechaNovedad!.toISOString()).toBe("2026-09-07T05:00:00.000Z");
+    expect(colombiaDateKey(row.fechaNovedad!)).toBe("2026-09-07");
   });
 
-  it("fecha con hora '1/09/2026 14:30' se guarda como 19:30Z (14:30 Bogotá)", () => {
-    const [row] = parseRow("1/09/2026 14:30");
-    expect(row.fechaNovedad!.toISOString()).toBe("2026-09-01T19:30:00.000Z");
-    expect(colombiaDateKey(row.fechaNovedad!)).toBe("2026-09-01");
+  it("fecha con hora '09/07/2026 14:30' se guarda como 19:30Z (14:30 Bogotá)", () => {
+    const [row] = parseRow("09/07/2026 14:30");
+    expect(row.fechaNovedad!.toISOString()).toBe("2026-09-07T19:30:00.000Z");
+    expect(colombiaDateKey(row.fechaNovedad!)).toBe("2026-09-07");
   });
 
   it("ISO con zona explícita no se desplaza", () => {

@@ -1,140 +1,26 @@
-import { Request, Response } from "express";
-import { sql, first } from "../../config/db";
-import { AppError } from "../../middlewares/errorHandler";
+import type { Request, Response } from "express";
 import { param } from "../../utils/reqParams";
+import { getClassRoster, resolveLogicalClass } from "../attendance/attendance.service";
+import { schedulePayload, teacherPayload } from "../appsheet/appsheet.views";
 
-function nowColombia() {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Bogota",
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-    hour12: false,
-  }).formatToParts(now);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value || "0";
-  return new Date(`${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`);
-}
-
-// Roster de SOLO LECTURA para la secretaria: dados una asignación y un horario,
-// devuelve la clase lógica completa (todos los grados y co-profesores del código)
-// para el día, sin crear sesión ni poder marcar asistencia.
-export async function getSecretaryClassStudents(req: Request, res: Response) {
-  const idAsignacion = param(req, "asignacionId");
-  const idHorario = param(req, "horarioId");
-
-  const assignment = await first<any>(
-    await sql(
-      `SELECT ea."idAsignacion", ea."codigoDisciplina", ea."idGrado", ea."idProfesor",
-              t."nombre" AS "profesorNombre", t."apellido" AS "profesorApellido",
-              d."nombre" AS "discNombre"
-       FROM "ExtracurricularAssignment" ea
-       LEFT JOIN "Teacher" t ON t."idProfesor" = ea."idProfesor"
-       LEFT JOIN "Discipline" d ON d."codigoDisciplina" = ea."codigoDisciplina"
-       WHERE ea."idAsignacion" = $1 LIMIT 1`,
-      [idAsignacion]
-    ) as unknown as any[]
-  );
-  if (!assignment) {
-    throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Asignación no encontrada");
-  }
-
-  const schedule = await first<any>(
-    await sql`SELECT "idHorario", "diaSemana", "horaInicio", "horaFin", "aula" FROM "Schedule" WHERE "idHorario" = ${idHorario} LIMIT 1` as unknown as any[]
-  );
-  if (!schedule) {
-    throw new AppError(404, "SCHEDULE_NOT_FOUND", "Horario no encontrado");
-  }
-
-  // Todos los grados activos de la clase compartida en este horario.
-  const codeGrades = (await sql`
-    SELECT DISTINCT ea."idGrado"
-    FROM "ExtracurricularAssignment" ea
-    INNER JOIN "AssignmentSchedule" asch ON asch."idAsignacion" = ea."idAsignacion"
-    WHERE ea."codigoDisciplina" = ${assignment.codigoDisciplina}
-      AND asch."idHorario" = ${idHorario}
-      AND ea."estado" = 'activo'
-  `) as unknown as Array<{ idGrado: number }>;
-  const gradeIds = codeGrades.map((g) => g.idGrado);
-
-  const gradeNameRows = (await sql`
-    SELECT "idGrado", "nombre" FROM "Grade" WHERE "idGrado" = ANY(${gradeIds})
-  `) as unknown as Array<{ idGrado: number; nombre: string }>;
-  const gradeNameMap = new Map(gradeNameRows.map((g) => [g.idGrado, g.nombre]));
-  const sessionGrades = gradeIds
-    .slice()
-    .sort((a, b) => a - b)
-    .map((idGrado) => ({ idGrado, nombre: gradeNameMap.get(idGrado) ?? String(idGrado) }));
-
-  const today = nowColombia();
-  const todayStr = today.toISOString().split("T")[0];
-
-  const enrolledStudents = (await sql`
-    SELECT
-      ss."codigoEstudiante",
-      st."nombre", st."apellido", st."grupo", st."fotoUrl", st."idGrado"
-    FROM "StudentSchedule" ss
-    LEFT JOIN "Student" st ON st."codigoEstudiante" = ss."codigoEstudiante"
-    WHERE ss."codigoDisciplina" = ${assignment.codigoDisciplina}
-      AND ss."diaSemana" = ${schedule.diaSemana}
-      AND st."idGrado" = ANY(${gradeIds})
-    ORDER BY st."idGrado" ASC, st."apellido" ASC, st."nombre" ASC
-  `) as unknown as Array<{
-    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null; idGrado: number;
-  }>;
-
-  const stays = (await sql`
-    SELECT
-      st."codigoEstudiante",
-      s."nombre", s."apellido", s."grupo", s."fotoUrl", s."idGrado"
-    FROM "SupervisorStay" st
-    LEFT JOIN "Student" s ON s."codigoEstudiante" = st."codigoEstudiante"
-    WHERE st."idAsignacion" = ${idAsignacion}
-      AND st."idHorario" = ${idHorario}
-      AND st."fecha" = ${todayStr}::date
-  `) as unknown as Array<{
-    codigoEstudiante: string; nombre: string; apellido: string; grupo: string | null; fotoUrl: string | null; idGrado: number;
-  }>;
-
-  const students = [
-    ...enrolledStudents.map((es) => ({
-        codigoEstudiante: es.codigoEstudiante,
-        nombre: es.nombre,
-        apellido: es.apellido,
-        grupo: es.grupo,
-        fotoUrl: es.fotoUrl,
-        gradoNombre: gradeNameMap.get(es.idGrado) ?? String(es.idGrado),
-        origen: "inscrito" as const,
-      })),
-    ...stays
-      .filter((st) => !enrolledStudents.some((e) => e.codigoEstudiante === st.codigoEstudiante))
-      .map((st) => ({
-        codigoEstudiante: st.codigoEstudiante,
-        nombre: st.nombre,
-        apellido: st.apellido,
-        grupo: st.grupo,
-        fotoUrl: st.fotoUrl,
-        gradoNombre: gradeNameMap.get(st.idGrado) ?? String(st.idGrado),
-        origen: "quedado" as const,
-      })),
-  ];
-
+/** Roster de solo lectura para secretaría; no crea ni modifica asistencia. */
+export async function getSecretaryClassStudents(req: Request, res: Response): Promise<void> {
+  const context = await resolveLogicalClass(param(req, "asignacionId"), param(req, "horarioId"));
+  const roster = await getClassRoster(context);
+  const teacher = context.data.userById.get(context.assignment.teacherId);
   res.json({
     success: true,
     data: {
       assignment: {
-        idAsignacion,
-        codigoDisciplina: assignment.codigoDisciplina,
-        discipline: { codigoDisciplina: assignment.codigoDisciplina, nombre: assignment.discNombre },
-        grades: sessionGrades,
-        teacher: {
-          idProfesor: assignment.idProfesor,
-          nombre: assignment.profesorNombre,
-          apellido: assignment.profesorApellido,
-        },
+        idAsignacion: context.assignment.id,
+        codigoDisciplina: context.assignment.disciplineCode,
+        discipline: { codigoDisciplina: context.assignment.disciplineCode, nombre: context.assignment.disciplineCode },
+        grades: roster.grades,
+        teacher: teacherPayload(teacher),
       },
-      schedule,
-      date: todayStr,
-      students,
+      schedule: schedulePayload(context.data.scheduleById.get(context.scheduleId)),
+      date: context.date,
+      students: roster.students,
     },
   });
 }
