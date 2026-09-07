@@ -40,17 +40,38 @@ export async function getLiveStudentIndex(): Promise<Map<string, LiveStudentInfo
   return result;
 }
 
+const NOVEDADES_CACHE_MS = 15_000;
+type NovedadesCacheEntry = { expiresAt: number; promise: Promise<LiveNovedad[]> };
+const novedadesCache = new Map<string, NovedadesCacheEntry>();
+
+export function clearNovedadesCache(): void {
+  novedadesCache.clear();
+}
+
 export async function getLiveNovedades(): Promise<LiveNovedad[]> {
   const table = config.appsheetNovedadesTable;
   const appId = config.appsheetNovedadesAppId;
   const accessKey = config.appsheetNovedadesAccessKey;
   if (!table || !appId || !accessKey) return [];
-  const rows = await findAppSheetRows(table, undefined, { appId, accessKey });
-  return parseNovedadesRows(rows as Record<string, unknown>[], `AppSheet:${table}`).map((row) => ({
-    ...row,
-    id: `${row.novedadId}:${row.codigoEstudiante}`,
-    archivo: table,
-  }));
+
+  const now = Date.now();
+  const current = novedadesCache.get(table);
+  if (current && current.expiresAt > now) return current.promise;
+
+  const promise = findAppSheetRows(table, undefined, { appId, accessKey })
+    .then((rows) =>
+      parseNovedadesRows(rows as Record<string, unknown>[], `AppSheet:${table}`).map((row) => ({
+        ...row,
+        id: `${row.novedadId}:${row.codigoEstudiante}`,
+        archivo: table,
+      })),
+    )
+    .catch((error) => {
+      novedadesCache.delete(table);
+      throw error;
+    });
+  novedadesCache.set(table, { expiresAt: now + NOVEDADES_CACHE_MS, promise });
+  return promise;
 }
 
 export async function getLiveNovedadesForStudents(codigos: string[]): Promise<LiveNovedad[]> {
