@@ -250,7 +250,7 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
                     <div key={novedad.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
                       {st && (
                         <p className="text-amber-900 dark:text-amber-200 font-semibold">
-                          {st.apellido}, {st.nombre} {st.grupo ? `· ${st.grupo}` : ""}
+                          {st.nombre} {st.apellido} {st.grupo ? `· ${st.grupo}` : ""}
                         </p>
                       )}
                       {novedad.descripcion && (
@@ -308,7 +308,7 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">
-                      {r.apellido}, {r.nombre}
+                      {r.nombre} {r.apellido}
                     </p>
                     <p className="text-xs text-surface-500 break-words">{r.codigoEstudiante}{r.grupo ? ` · ${r.grupo}` : ""}</p>
                     {rutaHoy.length > 0 && (
