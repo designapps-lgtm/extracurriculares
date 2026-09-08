@@ -15,6 +15,8 @@ import {
 import {
   assignmentPayload,
   disciplineCodes,
+  disciplinePayload,
+  gradePayload,
   loadCoreData,
   matchesTokens,
   schedulePayload,
@@ -240,8 +242,68 @@ export async function getSupervisorClasses(_req: Request, res: Response): Promis
 
 export async function getSupervisorTeacherSchedules(_req: Request, res: Response): Promise<void> {
   const data = await loadCoreData();
-  const rows = data.assignments.map((assignment) => assignmentPayload(assignment, data));
-  res.json({ success: true, data: rows });
+  res.json({ success: true, data: scheduleClasses(data) });
+}
+
+// Una clase de Extracurriculares reúne todas las asignaciones del mismo
+// profesor + disciplina + horario: aunque en AppSheet exista una fila por
+// grado, la clase es UNA y cubre un rango continuo de grados (6 a 12 aquí).
+// El rango sale de la unión de grados de asignaciones e inscripciones.
+export function scheduleClasses(data: CoreData): Array<{
+  idAsignacion: string;
+  esPrincipal: boolean;
+  teacher: ReturnType<typeof teacherPayload>;
+  discipline: Record<string, unknown>;
+  grade: Record<string, unknown>;
+  grades: Array<{ idGrado: number; nombre: string }>;
+  schedules: Array<ReturnType<typeof schedulePayload>>;
+  enrolledCount: number;
+}> {
+  const byKey = new Map<string, { assignments: typeof data.assignments; scheduleId: string }>();
+  for (const assignment of data.assignments) {
+    if (assignment.status !== "activo") continue;
+    for (const scheduleId of assignment.scheduleIds) {
+      const key = `${assignment.teacherId}|${assignment.disciplineCode}|${scheduleId}`;
+      const entry = byKey.get(key) ?? { assignments: [], scheduleId };
+      entry.assignments.push(assignment);
+      byKey.set(key, entry);
+    }
+  }
+
+  const rows: Array<{ [K in keyof ReturnType<typeof scheduleClasses>[number]]: ReturnType<typeof scheduleClasses>[number][K] }> = [];
+  for (const { assignments, scheduleId } of byKey.values()) {
+    const schedule = data.scheduleById.get(scheduleId);
+    if (!schedule) continue;
+    const [code, teacherId] = [assignments[0].disciplineCode, assignments[0].teacherId];
+    assignments.sort((a, b) => Number(b.primary) - Number(a.primary) || a.gradeId - b.gradeId || a.id.localeCompare(b.id));
+    const canonical = assignments[0];
+
+    const gradeIds = new Set(assignments.map((assignment) => assignment.gradeId));
+    for (const row of data.enrollments) {
+      if (row.disciplineCode !== code || row.day !== schedule.day) continue;
+      const student = data.studentByCode.get(row.studentCode);
+      if (student && Number.isFinite(student.gradeId)) gradeIds.add(student.gradeId);
+    }
+    const min = Math.min(...gradeIds);
+    const max = Math.max(...gradeIds);
+    const grades = Array.from({ length: max - min + 1 }, (_, index) => {
+      const id = min + index;
+      const named = data.gradeById.get(id);
+      return { idGrado: id, nombre: named?.name ?? String(id) };
+    });
+
+    rows.push({
+      idAsignacion: canonical.id,
+      esPrincipal: canonical.primary,
+      teacher: teacherPayload(data.userById.get(teacherId)),
+      discipline: disciplinePayload(code),
+      grade: gradePayload(data.gradeById.get(min), min),
+      grades,
+      schedules: [schedulePayload(schedule)],
+      enrolledCount: data.enrollments.filter((row) => row.disciplineCode === code && row.day === schedule.day).length,
+    });
+  }
+  return rows;
 }
 
 function sessionsForClass(views: SessionView[], disciplineCode: string, scheduleId: string, data: CoreData) {
@@ -263,18 +325,32 @@ export async function getSupervisorAssignmentHistory(req: Request, res: Response
     return data.enrollments
       .filter((row) => row.disciplineCode === assignment.disciplineCode && row.day === day)
       .map((row) => data.studentByCode.get(row.studentCode))
-      .filter((student) => student?.gradeId === assignment.gradeId)
+      .filter((student): student is NonNullable<typeof student> => Boolean(student))
       .map((student) => ({
-        codigoEstudiante: student!.code,
-        nombre: student!.firstName,
-        apellido: student!.lastName,
-        idGrado: student!.gradeId,
-        gradoNombre: data.gradeById.get(student!.gradeId)?.name ?? student!.gradeName,
-        grupo: student!.group,
-        correo: student!.email,
-        fotoUrl: student!.photoUrl,
+        codigoEstudiante: student.code,
+        nombre: student.firstName,
+        apellido: student.lastName,
+        idGrado: student.gradeId,
+        gradoNombre: data.gradeById.get(student.gradeId)?.name ?? student.gradeName,
+        grupo: student.group,
+        correo: student.email,
+        fotoUrl: student.photoUrl,
       }));
   };
+  const classGradeIds = new Set<number>([assignment.gradeId]);
+  for (const row of data.enrollments) {
+    if (row.disciplineCode !== assignment.disciplineCode) continue;
+    const student = data.studentByCode.get(row.studentCode);
+    if (student && Number.isFinite(student.gradeId)) classGradeIds.add(student.gradeId);
+  }
+  const minGrade = Math.min(...classGradeIds);
+  const maxGrade = Math.max(...classGradeIds);
+  const classGrades = Array.from({ length: maxGrade - minGrade + 1 }, (_, index) => {
+    const id = minGrade + index;
+    const named = data.gradeById.get(id);
+    return { idGrado: id, nombre: named?.name ?? String(id) };
+  });
+
   res.json({
     success: true,
     data: {
@@ -282,6 +358,7 @@ export async function getSupervisorAssignmentHistory(req: Request, res: Response
         teacher: teacherPayload(data.userById.get(assignment.teacherId)),
         discipline: { codigoDisciplina: assignment.disciplineCode, nombre: assignment.disciplineCode },
         grade: { idGrado: assignment.gradeId, nombre: data.gradeById.get(assignment.gradeId)?.name ?? String(assignment.gradeId) },
+        grades: classGrades,
       },
       schedules: assignment.scheduleIds.map((id) => ({
         schedule: schedulePayload(data.scheduleById.get(id)),

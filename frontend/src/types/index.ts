@@ -154,6 +154,7 @@ export interface SupervisorTeacherSchedule {
   teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
   discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
   grade: Pick<Grade, "idGrado" | "nombre">;
+  grades?: { idGrado: number; nombre: string }[];
   schedules: Schedule[];
 }
 
@@ -188,6 +189,7 @@ export interface SupervisorAssignmentHistory {
     teacher: Pick<Teacher, "idProfesor" | "nombre" | "apellido">;
     discipline: Pick<Discipline, "codigoDisciplina" | "nombre">;
     grade: Pick<Grade, "idGrado" | "nombre">;
+    grades?: { idGrado: number; nombre: string }[];
   };
   schedules: {
     schedule: Schedule;

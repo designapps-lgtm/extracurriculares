@@ -5,6 +5,7 @@ import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
 import { matchesSearchText } from "../../utils/search";
+import { formatGradesRange } from "../../utils/formatGrades";
 import type {
   SupervisorTeacherSchedule,
   SupervisorAssignmentHistory,
@@ -271,7 +272,10 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
 
   const gradosDisponibles = useMemo(() => {
     const set = new Map<number, string>();
-    for (const a of assignments) set.set(a.grade.idGrado, a.grade.nombre);
+    for (const a of assignments) {
+      const grades = a.grades && a.grades.length > 0 ? a.grades : [a.grade];
+      for (const g of grades) set.set(g.idGrado, g.nombre);
+    }
     return [...set.entries()]
       .sort((x, y) => x[0] - y[0])
       .map(([idGrado, nombre]) => ({ idGrado, nombre }));
@@ -290,7 +294,11 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
         matchesSearchText(`${a.discipline.codigoDisciplina} ${a.discipline.nombre}`, disciplinaQuery),
       );
     }
-    if (grado) list = list.filter((a) => String(a.grade.idGrado) === grado);
+    if (grado) {
+      list = list.filter((a) =>
+        (a.grades && a.grades.some((g) => String(g.idGrado) === grado)) || String(a.grade.idGrado) === grado,
+      );
+    }
     if (fecha) {
       const d = diaDeFecha(fecha);
       list = list.filter((a) => a.schedules.some((sc) => sc.diaSemana === d));
@@ -475,7 +483,11 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
                         <p className="font-semibold text-surface-900 dark:text-surface-100">
                           {a.discipline.nombre}
                         </p>
-                        <span className="badge-neutral text-xs">{a.grade.nombre}°</span>
+                        {a.grades && a.grades.length > 0 ? (
+                          <span className="badge-neutral text-xs">Grados {formatGradesRange(a.grades)}</span>
+                        ) : (
+                          <span className="badge-neutral text-xs">{a.grade.nombre}°</span>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-2 mt-3">
                         {renderSchedules(a)}
@@ -523,7 +535,11 @@ export default function SupervisorSchedules({ role = "supervisor" }: PageProps) 
               <div className="min-w-0">
                 <h2 className="font-display font-bold text-surface-900 dark:text-surface-100 truncate">
                   {history?.assignment.discipline.nombre ?? "Clase"}
-                  <span className="ml-2 text-sm text-surface-500">Grado {history?.assignment.grade.nombre ?? ""}</span>
+                  <span className="ml-2 text-sm text-surface-500">
+                    {history?.assignment.grades && history.assignment.grades.length > 0
+                      ? `Grados ${formatGradesRange(history.assignment.grades)}`
+                      : `Grado ${history?.assignment.grade.nombre ?? ""}`}
+                  </span>
                 </h2>
                 <p className="text-sm text-surface-500 mt-1">
                   {history ? `${history.assignment.teacher.nombre} ${history.assignment.teacher.apellido}` : "Cargando…"}

@@ -32,11 +32,19 @@ export async function getTeacherClasses(req: Request, res: Response): Promise<vo
     const [roster, state] = await Promise.all([getClassRoster(context), sessionState(context.sessionId)]);
     const schedule = context.data.scheduleById.get(scheduleId);
     const hasAttendance = state.records.length > 0;
+    const rosterGradeIds = roster.grades.map((row) => row.idGrado);
+    const min = Math.min(...rosterGradeIds);
+    const max = Math.max(...rosterGradeIds);
+    const grades = Array.from({ length: max - min + 1 }, (_, index) => {
+      const id = min + index;
+      const named = context.data.gradeById.get(id);
+      return { idGrado: id, nombre: named?.name ?? String(id) };
+    });
     return {
       idAsignacion: context.assignment.id,
       discipline: { codigoDisciplina: context.assignment.disciplineCode, nombre: context.assignment.disciplineCode },
       grade: roster.grades[0] ?? { idGrado: context.assignment.gradeId, nombre: context.data.gradeById.get(context.assignment.gradeId)?.name ?? String(context.assignment.gradeId) },
-      grades: roster.grades,
+      grades,
       schedule: schedulePayload(schedule),
       enrolledCount: roster.enrolledCount,
       stayCount: roster.stayCount,
