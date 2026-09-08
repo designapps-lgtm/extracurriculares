@@ -157,8 +157,8 @@ async function smokeTest(baseUrl) {
 }
 
 async function main() {
-  console.error("[deploy:safe] 1/4 Preflight (vars + secretos)...");
-  run(`node ${join(workerDir, "scripts", "predeploy.mjs")}`);
+  console.error("[deploy:safe] 1/4 Preflight (vars de wrangler.toml)...");
+  run(`node ${join(workerDir, "scripts", "predeploy.mjs")} --vars-only`);
 
   const missing = missingRemoteSecrets();
   if (missing.length > 0) {
