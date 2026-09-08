@@ -30,6 +30,16 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+// AppSheet guarda los DateTime como hora local cruda (sin zona). Escribir
+// ahoraIso() (UTC con Z) hace que se guarde el reloj UTC y al leerlo el
+// frontend lo muestra como hora Bogotá, quedando desfasado. Por eso para
+// columnas de fecha/hora que se leen por hora local hay que escribir el
+// instante ya convertido a Bogotá y en formato ISO naive (sin Z).
+export function nowBogotaLocal(): string {
+  const parts = bogotaParts();
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
 // AppSheet devuelve las fechas en "MM/DD/YYYY HH:mm:ss" en el Find, pero al
 // hacer Edit recha esos mismos valores si se reenvían tal cual (los re-interpreta
 // y falla). Convertimos a formato ISO local (sin Z) que AppSheet acepta como input.
