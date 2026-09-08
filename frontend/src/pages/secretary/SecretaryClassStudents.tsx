@@ -42,7 +42,17 @@ export default function SecretaryClassStudents({ role = "secretary" }: { role?: 
           .catch(() => setNovedadesMap({}));
         getRutasPorCodigo().then(setRutasMap);
       })
-      .catch((err) => {
+      .catch((err: any) => {
+        const isAuth = err.status === 401 || String(err.message || "").includes("401") || String(err.message || "").includes("No autenticado");
+        if (isAuth) {
+          navigate("/");
+          return;
+        }
+        const transient = err.status === 503;
+        if (transient) {
+          notify.error(err.message || "Error transitorio al cargar los estudiantes, intentá de nuevo");
+          return;
+        }
         notify.error(err.message || "Error al cargar los estudiantes");
         navigate(`${basePath}/classes`);
       })
@@ -60,7 +70,9 @@ export default function SecretaryClassStudents({ role = "secretary" }: { role?: 
   if (!data) {
     return (
       <div className="min-h-screen min-h-[100dvh] bg-surface-50 dark:bg-surface-950 flex items-center justify-center">
-        <div className="card p-8 text-center text-surface-500 text-sm">Clase no encontrada</div>
+        <div className="card p-8 text-center text-surface-500 text-sm">
+          No se pudieron cargar los estudiantes. Si el problema persiste, volvé a intentarlo en unos minutos.
+        </div>
       </div>
     );
   }
