@@ -24,6 +24,7 @@ const NAV_GROUPS: NavGroup[] = [
       { path: "/admin/classes", label: "Clases Extracurriculares", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
       { path: "/admin/schedules", label: "Horarios Extracurriculares", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002-2z" },
       { path: "/admin/novedades", label: "Novedades diarias", icon: "M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" },
+      { path: "/admin/rutas", label: "Rutas de transporte", icon: "M8 6v6m0 0V18m0-6h2.5m0 0a2.5 2.5 0 01-5 0m5 0a2.5 2.5 0 00-2.5 2.5M8 6a2 2 0 014 0M8 6V3m0 0h1.5M8 3H6m16 9a8 8 0 11-16 0 8 8 0 0116 0z" },
     ],
   },
   {

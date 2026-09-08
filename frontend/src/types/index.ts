@@ -430,3 +430,24 @@ export interface ReportProblemInput {
   descripcion: string;
   pagina: string;
 }
+
+// Rutas de transporte: estudiantes que se van en ruta según columnas de día/hora en Demograficos
+export interface RutaSlot {
+  columnKey: string;
+  diaSemana: string;
+  hora: string;
+  sortKey: string;
+}
+
+export interface RutaEstudiante {
+  codigo: string;
+  nombre: string;
+  grupo: string | null;
+  ruta: RutaSlot[];
+}
+
+export interface RutasReport {
+  generatedAt: string;
+  slots: RutaSlot[];
+  estudiantes: RutaEstudiante[];
+}

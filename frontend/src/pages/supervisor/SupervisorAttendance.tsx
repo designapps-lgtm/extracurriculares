@@ -4,8 +4,10 @@ import { roleApis, type RoleKind } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import Logo from "../../components/common/Logo";
 import { Avatar } from "../../components/common/Avatar";
-import type { AttendanceStudent as Student, Schedule, Assignment, Novedad } from "../../types";
+import type { AttendanceStudent as Student, Schedule, Assignment, Novedad, RutaSlot } from "../../types";
 import { colombiaDateKey, todayColombiaDateKey } from "../../utils/colombiaDate";
+import { DIAS_CORTO } from "../../utils/dias";
+import { getRutasPorCodigo } from "../../services/rutas";
 
 export default function SupervisorAttendance({ role = "supervisor" }: { role?: RoleKind }) {
   const api = roleApis[role];
@@ -19,6 +21,7 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
   const [teacher, setTeacher] = useState<{ nombre: string; apellido: string } | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [novedadesMap, setNovedadesMap] = useState<Record<string, Novedad[]>>({});
+  const [rutasMap, setRutasMap] = useState<Record<string, RutaSlot[]>>({});
   const [fechaConsulta, setFechaConsulta] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,6 +47,7 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
             return acc;
           }, {} as Record<string, Novedad[]>)
         );
+        getRutasPorCodigo().then(setRutasMap);
       })
       .catch((err) => {
         notify.error(err.message || "Error al cargar la Asistencia Extracurriculares");
@@ -192,6 +196,9 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
         <div className="space-y-1">
           {students.map((student, i) => {
             const novedades = novedadesMap[student.codigoEstudiante] || [];
+            const rutaHoy = (rutasMap[student.codigoEstudiante] || []).filter(
+              (r) => r.diaSemana === schedule?.diaSemana,
+            );
             return (
               <div
                 key={student.codigoEstudiante}
@@ -228,6 +235,21 @@ export default function SupervisorAttendance({ role = "supervisor" }: { role?: R
                         {student.codigoEstudiante} · {student.gradoNombre ? `Grado ${student.gradoNombre} · ` : ""}{student.grupo || "—"}
                         {student.origen === "quedado" && <span className="ml-1 text-brand-600">· Se queda</span>}
                       </p>
+                      {rutaHoy.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {rutaHoy.map((slot) => (
+                            <span
+                              key={slot.columnKey}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 dark:bg-surface-800 border border-brand-200 dark:border-surface-700 px-2.5 py-1.5 text-xs font-medium text-brand-700 dark:text-brand-400"
+                            >
+                              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 6v6m0 0V18m0-6h2.5m0 0a2.5 2.5 0 01-5 0m5 0a2.5 2.5 0 00-2.5 2.5M8 6a2 2 0 014 0M8 6V3m0 0h1.5M8 3H6m16 9a8 8 0 11-16 0 8 8 0 0116 0z" />
+                              </svg>
+                              Se va en ruta: {DIAS_CORTO[slot.diaSemana] || slot.diaSemana} · {slot.hora}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {novedades.length > 0 && (
                         <div className="mt-2 space-y-1.5">
                           {novedades.map((n) => (
