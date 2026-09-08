@@ -62,7 +62,11 @@ npx wrangler secret put JWT_SECRET
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put APPSHEET_APPLICATION_ACCESS_KEY
 npx wrangler secret put APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY
+npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
 ```
+
+`GOOGLE_SERVICE_ACCOUNT_JSON` es el JSON del service account de Google Drive:
+sin él, el proxy de fotos (`/api/photos/drive/:fileId`) responde `503 DRIVE_NOT_CONFIGURED` y las imágenes de estudiantes, profesores y novedades se rompen en producción.
 
 Wrangler solicitará cada valor de forma interactiva. Para comprobar únicamente los nombres configurados:
 
@@ -74,7 +78,6 @@ Secretos opcionales, sólo si se habilita el watch de Drive
 (`GOOGLE_DRIVE_FOLDER_ID` con valor real en `wrangler.toml`):
 
 ```text
-GOOGLE_SERVICE_ACCOUNT_JSON
 GOOGLE_DRIVE_WEBHOOK_TOKEN
 APPSHEET_WEBHOOK_TOKEN
 ```
@@ -118,7 +121,7 @@ El dry-run debe completar el bundle sin publicar cambios.
 
 Antes de desplegar, revise además:
 
-- que `wrangler secret list` muestre `JWT_SECRET`, `GOOGLE_CLIENT_ID` y `APPSHEET_APPLICATION_ACCESS_KEY`;
+- que `wrangler secret list` muestre `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `APPSHEET_APPLICATION_ACCESS_KEY`, `APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY` y `GOOGLE_SERVICE_ACCOUNT_JSON`;
 - que no haya secretos en el diff;
 - que `APPSHEET_APP_ID` apunte a la aplicación esperada;
 - que las tablas requeridas respondan a lecturas controladas;
@@ -148,16 +151,40 @@ También debe probarse una escritura reversible en `EC_Asistencias` y `Profesore
 
 ## 6. Despliegue del Worker
 
-Publicar es un cambio de producción. Ejecútelo sólo después de revisar el dry-run y los esquemas pendientes. Usar SIEMPRE el deploy verificado (comprueba que las 12 vars estén en `wrangler.toml` y que los 4 secretos existan en Cloudflare ANTES de subir; si falta algo, aborta sin publicar):
+Publicar es un cambio de producción. Usar SIEMPRE el deploy autocurativo (el único que publica de forma segura):
 
 ```bash
 cd backend/worker
 npm run deploy:safe
 ```
 
-`wrangler deploy` a secas sigue disponible, pero no verifica nada: si olvidó cargar un secreto, el Worker sale roto a producción.
+`npm run deploy:safe` ejecuta un pipeline en 4 pasos (ver `backend/worker/scripts/deploy.mjs`):
 
-Cloudflare conserva versiones del Worker. Si los smoke tests detectan una regresión, use el historial de despliegues del dashboard para volver inmediatamente a la versión anterior mientras se investiga.
+1. **Preflight** — valida que las 12 vars estén en `wrangler.toml` y que los 5 secretos existan en Cloudflare; si falta algo, aborta sin publicar.
+2. **Restaurar secretos** — si un deploy previo (por ejemplo, de assets o del dashboard) borró los secretos, los recrea automáticamente desde `backend/worker/.secrets.production` (archivo local, gitignored, con los valores vigentes). Si ese archivo no existe, aborta con instrucciones.
+3. **Publicar** — sube el Worker a `extracurriculares-api`.
+4. **Smoke test + rollback** — verifica contra la URL real de producción que `/api/health` responda `200` con `appsheet: "connected"` y `secrets: "ok"`, que el proxy de fotos `/api/photos/drive/:fileId` NO responda `503` (si responde 503, falta `GOOGLE_SERVICE_ACCOUNT_JSON`), y que `/api/auth/google` con un token falso devuelva `401` (no `404`, no 500 de "no configurado"). Si algo falla, vuelve automáticamente a la versión anterior con `wrangler rollback` y aborta con exit 1.
+
+`wrangler deploy` a secas sigue disponible, pero NO verifica nada: puede publicar un Worker roto y **no restaura secretos**. No lo use para producción si querés evitar el ciclo de "el login se rompió de nuevo".
+
+### Por qué "cada vez que subía un cambio se rompía el login"
+
+El frontend de Vercel reescribe `/api/*` a la URL del Worker `extracurriculares-api.gi-school.workers.dev`. Si esa URL deja de servir la API Express, TODO lo que dependa del backend responde `404` y el login (que arranca con `GET /api/auth/me`) muere.
+
+El mecanismo recurrente era:
+
+1. Se publicaba una versión **sin la configuración de la API** (por ejemplo, un build de assets/frontend desplegado al worker `extracurriculares-api` desde el dashboard o desde otro proyecto que usa el mismo nombre).
+2. Esa publicación reemplaza el script y **borra los secretos del Worker** (`wrangler secret list` quedaba vacío: `JWT_SECRET`, `GOOGLE_CLIENT_ID`, las llaves de AppSheet y el service account de Drive).
+3. El resultado: `/api/health` → `404` (o seguidamente 500 por secretos faltantes), login roto hasta volver a setear secretos y redesplegar la API.
+
+Reglas para que no vuelva a pasar:
+
+- El worker `extracurriculares-api` es **solo la API Express**. Nunca lo pise con un deploy de assets/frontend (ni desde el dashboard ni desde otro proyecto con el mismo nombre).
+- Revise **Cloudflare Dashboard → Workers & Pages → `extracurriculares-api` → Settings/Triggers** y desactive cualquier auto-deploy ("deploy from git"/preview) conectado a este worker; si está conectado a un repo, cada push vuelve a romper el login.
+- No borre los secretos manualmente; si un deploy raro los deja sin secretos, `npm run deploy:safe` los restaura solo desde `.secrets.production`.
+- `backend/worker/.secrets.production` NO se commitea (gitignore). Si se pierde, los secretos hay que volver a cargarlos con `wrangler secret put` y mantener ese archivo local al día.
+
+Cloudflare conserva versiones del Worker. Si los smoke tests detectan una regresión, `deploy:safe` ya hizo `wrangler rollback` automáticamente; si no, use el historial de despliegues del dashboard para volver a la versión anterior mientras se investiga.
 
 El handler `scheduled` actual es un no-op: AppSheet se consulta en vivo y no existe una réplica que deba sincronizarse por cron.
 
@@ -173,12 +200,16 @@ curl -i -X POST \
   -H 'Content-Type: application/json' \
   --data '{"credential":"invalid-test-token"}' \
   https://extracurriculares-api.gi-school.workers.dev/api/auth/google
+
+curl -i \
+  https://extracurriculares-api.gi-school.workers.dev/api/photos/drive/unknown-file-id-0000
 ```
 
 Resultados esperados:
 
-- `/api/health`: HTTP 200, `status: "ok"` y `appsheet: "connected"`.
+- `/api/health`: HTTP 200, `status: "ok"`, `appsheet: "connected"` y `checks.secrets: "ok"`. Si `checks.secrets` lista nombres, faltan secretos en el Worker (corra `npm run deploy:safe` para restaurarlos).
 - token falso: HTTP 401 con código `INVALID_GOOGLE_TOKEN`, sin detalles internos.
+- proxy de fotos con fileId desconocido: HTTP 400 o 404 (el proxy está configurado). Si responde `503 DRIVE_NOT_CONFIGURED`, falta `GOOGLE_SERVICE_ACCOUNT_JSON` y las imágenes están rotas.
 
 ### Flujo autenticado en navegador
 

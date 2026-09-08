@@ -11,15 +11,18 @@ import { fileURLToPath } from "node:url";
 
 const WORKER_NAME = "extracurriculares-api";
 
-// Secretos obligatorios en producción. Los opcionales de Drive/webhooks
-// (GOOGLE_SERVICE_ACCOUNT_JSON, GOOGLE_DRIVE_WEBHOOK_TOKEN,
-// APPSHEET_WEBHOOK_TOKEN) solo se exigen si el watch está habilitado,
-// es decir, si GOOGLE_DRIVE_FOLDER_ID tiene valor real en wrangler.toml.
+// Secretos obligatorios en producción. GOOGLE_SERVICE_ACCOUNT_JSON es
+// requerido porque sin él el proxy de fotos (/api/photos/drive/:fileId)
+// responde 503 y las imágenes se rompen. Los opcionales de Drive/webhooks
+// (GOOGLE_DRIVE_WEBHOOK_TOKEN, APPSHEET_WEBHOOK_TOKEN) solo se exigen si el
+// watch está habilitado, es decir, si GOOGLE_DRIVE_FOLDER_ID tiene valor real
+// en wrangler.toml.
 const REQUIRED_SECRETS = [
   "JWT_SECRET",
   "GOOGLE_CLIENT_ID",
   "APPSHEET_APPLICATION_ACCESS_KEY",
   "APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY",
+  "GOOGLE_SERVICE_ACCOUNT_JSON",
 ];
 
 // Toda var no secreta DEBE vivir en wrangler.toml: `wrangler deploy`
@@ -84,7 +87,7 @@ if (missingSecrets.length > 0) {
 // 3. Si el watch de Drive está habilitado en el toml, sus secrets pasan a ser obligatorios.
 const driveEnabled = /GOOGLE_DRIVE_FOLDER_ID\s*=\s*"[^"]+"/.test(toml);
 if (driveEnabled) {
-  const driveSecrets = ["GOOGLE_SERVICE_ACCOUNT_JSON", "GOOGLE_DRIVE_WEBHOOK_TOKEN"];
+  const driveSecrets = ["GOOGLE_DRIVE_WEBHOOK_TOKEN"];
   const missingDrive = driveSecrets.filter((s) => !containsName(secretsOutput, s));
   if (missingDrive.length > 0) {
     console.error(
@@ -94,4 +97,4 @@ if (driveEnabled) {
   }
 }
 
-console.log(`[predeploy] OK: ${REQUIRED_VARS.length} vars en wrangler.toml, secrets obligatorios presentes en "${WORKER_NAME}".`);
+console.log(`[predeploy] OK: ${REQUIRED_VARS.length} vars en wrangler.toml, ${REQUIRED_SECRETS.length} secretos obligatorios presentes en "${WORKER_NAME}".`);
