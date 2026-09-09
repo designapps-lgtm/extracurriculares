@@ -94,4 +94,16 @@ if (driveEnabled) {
   }
 }
 
-console.log(`[predeploy] OK: ${REQUIRED_VARS.length} vars en wrangler.toml, secrets obligatorios presentes en "${WORKER_NAME}".`);
+// 4. Caché compartida (KV): el binding debe tener un namespace real. Sin él el
+// deploy falla en wrangler, pero preferimos explicar el paso antes.
+const kvPlaceholder = /binding\s*=\s*"APPSHEET_KV"[\s\S]*?id\s*=\s*"REEMPLAZAR_CON_ID_DEL_KV_NAMESPACE"/.test(toml);
+if (kvPlaceholder) {
+  console.error(
+    "[predeploy] Falta crear el namespace KV de la caché compartida (APPSHEET_KV).\n" +
+      "  Crearlo con `npx wrangler kv namespace create appsheet-cache`, pegar el ID\n" +
+      "  en wrangler.toml → [[kv_namespaces]] (y en preview_id), y reintentar.",
+  );
+  process.exit(1);
+}
+
+console.log(`[predeploy] OK: ${REQUIRED_VARS.length} vars en wrangler.toml, KV configurado, secrets obligatorios presentes en "${WORKER_NAME}".`);

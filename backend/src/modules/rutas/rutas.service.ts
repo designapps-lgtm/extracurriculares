@@ -1,15 +1,12 @@
-import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
-import { findAppSheetRows } from "../appsheet/appsheet.service";
+import { getTableRows, APPSHEET_TABLES } from "../appsheet/appsheet.repository";
 import { buildRutasReport, type RutasReport } from "./rutas.domain";
-
-const DEMOGRAFICOS_TABLE = config.appsheetDemograficosTable;
 
 /** Reporte de ruta: estudiantes marcados en las columnas de día/hora de Demograficos. */
 export async function getRutasReport(): Promise<RutasReport> {
   let rows;
   try {
-    rows = await findAppSheetRows(DEMOGRAFICOS_TABLE);
+    rows = await getTableRows(APPSHEET_TABLES.demographics);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new AppError(
