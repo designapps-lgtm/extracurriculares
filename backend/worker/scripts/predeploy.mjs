@@ -11,15 +11,18 @@ import { fileURLToPath } from "node:url";
 
 const WORKER_NAME = "extracurriculares-api";
 
-// Secretos obligatorios en producción. Los opcionales de Drive/webhooks
-// (GOOGLE_SERVICE_ACCOUNT_JSON, GOOGLE_DRIVE_WEBHOOK_TOKEN,
-// APPSHEET_WEBHOOK_TOKEN) solo se exigen si el watch está habilitado,
-// es decir, si GOOGLE_DRIVE_FOLDER_ID tiene valor real en wrangler.toml.
+// Secretos obligatorios en producción. GOOGLE_SERVICE_ACCOUNT_JSON es
+// requerido porque sin él el proxy de fotos (/api/photos/drive/:fileId)
+// responde 503 y las imágenes se rompen. Los opcionales de Drive/webhooks
+// (GOOGLE_DRIVE_WEBHOOK_TOKEN, APPSHEET_WEBHOOK_TOKEN) solo se exigen si el
+// watch está habilitado, es decir, si GOOGLE_DRIVE_FOLDER_ID tiene valor real
+// en wrangler.toml.
 const REQUIRED_SECRETS = [
   "JWT_SECRET",
   "GOOGLE_CLIENT_ID",
   "APPSHEET_APPLICATION_ACCESS_KEY",
   "APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY",
+  "GOOGLE_SERVICE_ACCOUNT_JSON",
 ];
 
 // Toda var no secreta DEBE vivir en wrangler.toml: `wrangler deploy`
@@ -58,6 +61,11 @@ function containsName(output, name) {
   return new RegExp(`(^|[^A-Z0-9_])${name}([^A-Z0-9_]|$)`, "m").test(output);
 }
 
+// En autocurativo (--vars-only) el chequeo de secretos lo hace deploy.mjs
+// DESPUÉS del chequeo de vars y ANTES del deploy, para poder restaurar los
+// secretos borrados antes de publicar. En uso manual, predeploy exige todo.
+const VARS_ONLY = process.argv.includes("--vars-only");
+
 // 1. Vars declaradas en wrangler.toml (fuente de verdad del deploy).
 const toml = readFileSync(join(workerDir, "wrangler.toml"), "utf8");
 const missingVars = REQUIRED_VARS.filter((v) => !containsName(toml, v));
@@ -69,28 +77,30 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
-// 2. Secretos cargados en Cloudflare (sobreviven al deploy, pero solo
-// si se cargaron con `wrangler secret put`, nunca como vars de texto).
-const secretsOutput = run(`npx wrangler secret list --name ${WORKER_NAME}`);
-const missingSecrets = REQUIRED_SECRETS.filter((s) => !containsName(secretsOutput, s));
-if (missingSecrets.length > 0) {
-  console.error(
-    `[predeploy] Faltan secrets en el Worker "${WORKER_NAME}": ${missingSecrets.join(", ")}\n` +
-      "Cargalos con `npx wrangler secret put <NOMBRE>` (te lo pide interactivo) y reintentá.",
-  );
-  process.exit(1);
-}
-
-// 3. Si el watch de Drive está habilitado en el toml, sus secrets pasan a ser obligatorios.
-const driveEnabled = /GOOGLE_DRIVE_FOLDER_ID\s*=\s*"[^"]+"/.test(toml);
-if (driveEnabled) {
-  const driveSecrets = ["GOOGLE_SERVICE_ACCOUNT_JSON", "GOOGLE_DRIVE_WEBHOOK_TOKEN"];
-  const missingDrive = driveSecrets.filter((s) => !containsName(secretsOutput, s));
-  if (missingDrive.length > 0) {
+if (!VARS_ONLY) {
+  // 2. Secretos cargados en Cloudflare (sobreviven al deploy, pero solo
+  // si se cargaron con `wrangler secret put`, nunca como vars de texto).
+  const secretsOutput = run(`npx wrangler secret list --name ${WORKER_NAME}`);
+  const missingSecrets = REQUIRED_SECRETS.filter((s) => !containsName(secretsOutput, s));
+  if (missingSecrets.length > 0) {
     console.error(
-      `[predeploy] El watch de Drive está habilitado en wrangler.toml pero faltan secrets: ${missingDrive.join(", ")}`,
+      `[predeploy] Faltan secrets en el Worker "${WORKER_NAME}": ${missingSecrets.join(", ")}\n` +
+        "Cargalos con `npx wrangler secret put <NOMBRE>` (te lo pide interactivo) y reintentá.",
     );
     process.exit(1);
+  }
+
+  // 3. Si el watch de Drive está habilitado en el toml, sus secrets pasan a ser obligatorios.
+  const driveEnabled = /GOOGLE_DRIVE_FOLDER_ID\s*=\s*"[^"]+"/.test(toml);
+  if (driveEnabled) {
+    const driveSecrets = ["GOOGLE_DRIVE_WEBHOOK_TOKEN"];
+    const missingDrive = driveSecrets.filter((s) => !containsName(secretsOutput, s));
+    if (missingDrive.length > 0) {
+      console.error(
+        `[predeploy] El watch de Drive está habilitado en wrangler.toml pero faltan secrets: ${missingDrive.join(", ")}`,
+      );
+      process.exit(1);
+    }
   }
 }
 

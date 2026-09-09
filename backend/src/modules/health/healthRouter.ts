@@ -1,13 +1,39 @@
 import { Router, type Request, type Response } from "express";
+import { config } from "../../config";
 import { getUsers } from "../appsheet/appsheet.domain";
 import { AppSheetApiError } from "../appsheet/appsheet.service";
 
 const router = Router();
 
+// Diagnóstico para el flujo de deploy: si un deploy pierde bindings (por
+// ejemplo, una publicación de assets que pisa al worker de la API), los
+// secretos pueden faltar y el login rompe con 500/404 "mudo". Este chequeo
+// reporta qué secretos faltan (incluido el service account de Drive, porque
+// sin él el proxy de fotos responde 503) para que /api/health lo diga claro
+// y el smoke test post-deploy lo detecte antes de dar un deploy por bueno.
+function missingSecrets(): string[] {
+  const missing: string[] = [];
+  try {
+    if (!config.jwtSecret) missing.push("JWT_SECRET");
+  } catch {
+    missing.push("JWT_SECRET");
+  }
+  if (!config.googleClientId) missing.push("GOOGLE_CLIENT_ID");
+  if (!config.appsheetAccessKey) missing.push("APPSHEET_APPLICATION_ACCESS_KEY");
+  if (!config.googleServiceAccountJson) missing.push("GOOGLE_SERVICE_ACCOUNT_JSON");
+  return missing;
+}
+
 router.get("/health", async (_req: Request, res: Response) => {
   try {
     const users = await getUsers({ fresh: true });
-    res.json({ status: "ok", appsheet: "connected", database: "not_used", checks: { usuariosRoles: users.length } });
+    const secrets = missingSecrets();
+    res.json({
+      status: "ok",
+      appsheet: "connected",
+      database: "not_used",
+      checks: { usuariosRoles: users.length, secrets: secrets.length === 0 ? "ok" : secrets },
+    });
   } catch (error) {
     const timeout = error instanceof AppSheetApiError && error.timedOut;
     res.status(503).json({

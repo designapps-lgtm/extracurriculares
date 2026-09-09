@@ -200,6 +200,57 @@ describe("servicio de asistencia", () => {
     ]);
   });
 
+  it("incluye en el roster a los inscriptos aunque su grado no esté entre los grados de la asignación", async () => {
+    const data = coreData();
+    data.students.push({
+      code: "S3",
+      firstName: "Carla",
+      lastName: "Celis",
+      gradeId: 9,
+      gradeName: "9°",
+      group: null,
+      email: null,
+      photoUrl: null,
+      sourceStatus: "activo",
+      createdAt: null,
+      updatedAt: null,
+    });
+    data.studentByCode = new Map(data.students.map((student) => [student.code, student]));
+    data.gradeById.set(9, {
+      id: 9,
+      name: "9°",
+      level: null,
+      status: "activo",
+      createdAt: null,
+      updatedAt: null,
+    });
+    data.enrollments.push({
+      id: "enrollment-2",
+      studentCode: "S3",
+      disciplineCode: "ROBOTICA",
+      day: "LUNES",
+      status: "activo",
+      active: true,
+      createdAt: null,
+      updatedAt: null,
+    });
+    mocks.loadCoreData.mockResolvedValue(data);
+
+    const context = await resolveLogicalClass("assignment-1", "schedule-1");
+    const roster = await getClassRoster(context);
+
+    expect(roster).toMatchObject({ enrolledCount: 2, stayCount: 1 });
+    expect(roster.students).toEqual([
+      expect.objectContaining({ codigoEstudiante: "S1", origen: "inscrito" }),
+      expect.objectContaining({ codigoEstudiante: "S2", origen: "quedado" }),
+      expect.objectContaining({ codigoEstudiante: "S3", origen: "inscrito" }),
+    ]);
+    expect(roster.grades).toEqual([
+      expect.objectContaining({ idGrado: 7 }),
+      expect.objectContaining({ idGrado: 9 }),
+    ]);
+  });
+
   it("rechaza finalizar si falta cualquier estudiante del roster", async () => {
     await expect(saveAttendance(SESSION_ID, [
       { codigoEstudiante: "S1", estado: "presente" },

@@ -6,6 +6,7 @@ import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
 import type { SupervisorCallableClass, SupervisorClassesResponse } from "../../types";
 import { NIVELES, nivelDeGrado, nivelLabel, type Nivel } from "../../utils/niveles";
+import { formatGradesRange } from "../../utils/formatGrades";
 
 const DIAS_CORTO: Record<string, string> = {
   LUNES: "Lun", MARTES: "Mar", MIERCOLES: "Mié", JUEVES: "Jue",
@@ -269,7 +270,7 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
                             <span className="text-sm text-surface-400 font-normal">{cls.discipline.nombre}</span>
                             {cls.grades && cls.grades.length > 0 ? (
                               <span className="badge-neutral text-xs">
-                                {cls.grades.map((g) => g.nombre).join(", ")}
+                                {formatGradesRange(cls.grades)}
                               </span>
                             ) : (
                               <span className="badge-neutral text-xs">{cls.grade.nombre}°</span>

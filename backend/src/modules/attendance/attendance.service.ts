@@ -109,9 +109,12 @@ export async function getClassRoster(context: LogicalClassContext): Promise<{
   const enrolledCodes = new Set(
     context.data.enrollments
       .filter((row) => row.disciplineCode === context.assignment.disciplineCode && row.day === schedule.day)
-      .filter((row) => gradeIds.has(context.data.studentByCode.get(row.studentCode)?.gradeId ?? -1))
       .map((row) => row.studentCode),
   );
+  for (const code of enrolledCodes) {
+    const student = context.data.studentByCode.get(code);
+    if (student && Number.isFinite(student.gradeId)) gradeIds.add(student.gradeId);
+  }
   const stays = staysForContext(context, await getStays());
   const stayCodes = new Set(stays.map((row) => row.studentCode).filter((code) => !enrolledCodes.has(code)));
   const rows: Array<{

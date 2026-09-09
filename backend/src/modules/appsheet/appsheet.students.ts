@@ -1,6 +1,10 @@
 import { config } from "../../config";
+import { nowIso } from "../../utils/colombiaTime";
 import { normalizeStudentName, type MappedStudent } from "../../import/excel/excelMapper";
 import { findAppSheetRows, type AppSheetRow } from "./appsheet.service";
+import { addRows, deleteRows, APPSHEET_TABLES } from "./appsheet.repository";
+import { getEnrollments } from "./appsheet.domain";
+import { computeEnrollmentReconcile } from "./appsheet.reconcile";
 
 // Fuente de verdad de estudiantes en AppSheet (tabla Demograficos del Sheet
 // "DEMOGRAFICOS 2026-2027"). El Sheet se comparte con la cuenta del colegio y
@@ -116,6 +120,14 @@ export interface AppSheetStudentSyncResult {
   processed: number;
   created: number;
   updated: number;
+  /** Filas de EC_Inscripciones agregadas por el reconcile CC_* -> EC. */
+  enrollmentAdded: number;
+  /** Filas de EC_Inscripciones eliminadas por el reconcile CC_* -> EC. */
+  enrollmentRemoved: number;
+  /** Estudiantes cuyo conjunto de inscripciones cambió tras el reconcile. */
+  enrollmentChangedStudents: number;
+  /** Códigos de estudiantes con inscripciones en EC pero ausentes de Demograficos (no se tocan). */
+  enrollmentOrphanCodes: string[];
   errors: string[];
 }
 
@@ -135,6 +147,10 @@ function failedSync(
     processed: 0,
     created: 0,
     updated: 0,
+    enrollmentAdded: 0,
+    enrollmentRemoved: 0,
+    enrollmentChangedStudents: 0,
+    enrollmentOrphanCodes: [],
     errors,
   };
 }
@@ -170,6 +186,50 @@ function validateMappedStudents(rows: AppSheetRow[], students: MappedStudent[]):
 
 let runningSync: Promise<AppSheetStudentSyncResult> | null = null;
 
+export interface EnrollmentReconcileApplied {
+  added: number;
+  removed: number;
+  changedStudents: number;
+  orphanCodes: string[];
+}
+
+/**
+ * Deja EC_Inscripciones como espejo de las columnas CC_* de Demograficos:
+ * - Consulta el estado actual de EC_Inscripciones (fuera del caché compartido).
+ * - Calcula el diff con computeEnrollmentReconcile.
+ * - Agrega las filas faltantes y elimina las sobradas con la llave compuesta.
+ * - Los huérfanos (estudiante ausente de Demograficos) se reportan, no se borran.
+ */
+export async function applyEnrollmentReconcile(students: MappedStudent[]): Promise<EnrollmentReconcileApplied> {
+  if (students.length === 0) return { added: 0, removed: 0, changedStudents: 0, orphanCodes: [] };
+
+  const enrollments = await getEnrollments({ fresh: true });
+  const diff = computeEnrollmentReconcile(students, enrollments);
+
+  const timestamp = nowIso();
+  const additionRows: AppSheetRow[] = diff.additions.map((row) => ({
+    InscripcionID: crypto.randomUUID(),
+    CodigoEstudiante: row.studentCode,
+    CodigoDisciplina: row.disciplineCode,
+    DiaSemana: row.day,
+    EstadoRegistro: "activo",
+    CreatedAt: timestamp,
+    UpdatedAt: timestamp,
+  }));
+
+  if (additionRows.length > 0) await addRows(APPSHEET_TABLES.enrollments, additionRows);
+  if (diff.removals.length > 0) {
+    await deleteRows(APPSHEET_TABLES.enrollments, diff.removals.map((row) => ({ InscripcionID: row.id })));
+  }
+
+  return {
+    added: additionRows.length,
+    removed: diff.removals.length,
+    changedStudents: diff.changedStudents,
+    orphanCodes: diff.orphanCodes,
+  };
+}
+
 async function runAppSheetStudentsSync(): Promise<AppSheetStudentSyncResult> {
   let rows: AppSheetRow[];
   try {
@@ -190,8 +250,19 @@ async function runAppSheetStudentsSync(): Promise<AppSheetStudentSyncResult> {
     return failedSync(validationErrors.slice(0, 20), rows.length, students.length, rows.length - students.length);
   }
 
-  // AppSheet/Sheets es ahora la fuente final; este endpoint únicamente valida
-  // que el snapshot sea legible y consistente, sin replicarlo a otro sistema.
+  // AppSheet/Sheets es ahora la fuente final; el snapshot se valida y luego se
+  // reconcilian las inscripciones operativas (EC_Inscripciones) contra las
+  // columnas CC_* para que la app refleje lo que el colegio carga en el Sheet.
+  let reconciled: EnrollmentReconcileApplied;
+  try {
+    reconciled = await applyEnrollmentReconcile(students);
+  } catch (error) {
+    return failedSync([
+      ...validationErrors,
+      `reconcile de inscripciones falló: ${error instanceof Error ? error.message : String(error)}`,
+    ], rows.length, students.length, rows.length - students.length);
+  }
+
   return {
     ok: true,
     table: DEMOGRAFICOS_TABLE,
@@ -202,6 +273,10 @@ async function runAppSheetStudentsSync(): Promise<AppSheetStudentSyncResult> {
     processed: students.length,
     created: 0,
     updated: 0,
+    enrollmentAdded: reconciled.added,
+    enrollmentRemoved: reconciled.removed,
+    enrollmentChangedStudents: reconciled.changedStudents,
+    enrollmentOrphanCodes: reconciled.orphanCodes,
     errors: [],
   };
 }
