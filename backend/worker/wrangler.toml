@@ -42,8 +42,8 @@ GOOGLE_DRIVE_WEBHOOK_URL = ""
 # y se pega el ID acá (y en preview_id si querés dev aparte).
 [[kv_namespaces]]
 binding = "APPSHEET_KV"
-id = "REEMPLAZAR_CON_ID_DEL_KV_NAMESPACE"
-preview_id = "REEMPLAZAR_CON_ID_DEL_KV_NAMESPACE"
+id = "297187af28da4602b5de9d7cf0f80fac"
+preview_id = "297187af28da4602b5de9d7cf0f80fac"
 
 [triggers]
 crons = ["*/10 * * * *"]
