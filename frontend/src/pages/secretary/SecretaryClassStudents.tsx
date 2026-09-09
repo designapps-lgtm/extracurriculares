@@ -9,6 +9,7 @@ import { Avatar } from "../../components/common/Avatar";
 import { DIAS_CORTO } from "../../utils/dias";
 import { todayColombiaDateKey } from "../../utils/colombiaDate";
 import { getRutasPorCodigo } from "../../services/rutas";
+import { formatGradesRange } from "../../utils/formatGrades";
 import type { Novedad, RutaSlot } from "../../types";
 
 export default function SecretaryClassStudents({ role = "secretary" }: { role?: RoleKind }) {

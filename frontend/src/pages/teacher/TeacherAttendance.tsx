@@ -8,6 +8,7 @@ import { ReportProblemButton } from "../../components/common/ReportProblemModal"
 import type { AttendanceStudent as Student, Schedule, Assignment, Novedad, RutaSlot } from "../../types";
 import { DIAS_CORTO } from "../../utils/dias";
 import { getRutasPorCodigo } from "../../services/rutas";
+import { formatGradesRange } from "../../utils/formatGrades";
 
 export default function TeacherAttendance() {
   const { sessionId } = useParams<{ sessionId: string }>();
