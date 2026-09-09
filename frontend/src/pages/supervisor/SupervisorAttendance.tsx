@@ -8,6 +8,7 @@ import type { AttendanceStudent as Student, Schedule, Assignment, Novedad, RutaS
 import { colombiaDateKey, todayColombiaDateKey } from "../../utils/colombiaDate";
 import { DIAS_CORTO } from "../../utils/dias";
 import { getRutasPorCodigo } from "../../services/rutas";
+import { formatGradesRange } from "../../utils/formatGrades";
 
 export default function SupervisorAttendance({ role = "supervisor" }: { role?: RoleKind }) {
   const api = roleApis[role];
