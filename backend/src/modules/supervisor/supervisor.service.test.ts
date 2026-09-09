@@ -1,192 +1,165 @@
-import { describe, expect, it, vi } from "vitest";
-import type { AppAssignment, AppGrade, AppSchedule, AppStudent, AppUser } from "../appsheet/appsheet.domain";
-import type { CoreData } from "../appsheet/appsheet.views";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   loadCoreData: vi.fn(),
-  dispatch: vi.fn(),
+  schedulePayload: vi.fn(),
+  teacherPayload: vi.fn(),
+  resolveLogicalClass: vi.fn(),
+  getClassRoster: vi.fn(),
+  sessionState: vi.fn(),
+  todayColombia: vi.fn(),
+  dayColombia: vi.fn(),
 }));
 
 vi.mock("../appsheet/appsheet.views", () => ({
-  disciplinePayload: (code: string) => ({ codigoDisciplina: code, nombre: code }),
   loadCoreData: mocks.loadCoreData,
-  schedulePayload: (schedule: AppSchedule | undefined) => ({
+  schedulePayload: mocks.schedulePayload,
+  teacherPayload: mocks.teacherPayload,
+  assignmentPayload: vi.fn((a: unknown) => a),
+  disciplineCodes: vi.fn(() => []),
+  matchesTokens: vi.fn(() => true),
+}));
+
+vi.mock("../attendance/attendance.service", () => ({
+  resolveLogicalClass: mocks.resolveLogicalClass,
+  getClassRoster: mocks.getClassRoster,
+  sessionState: mocks.sessionState,
+}));
+
+vi.mock("../../utils/colombiaTime", () => ({
+  todayColombia: mocks.todayColombia,
+  dayColombia: mocks.dayColombia,
+  nowIso: vi.fn(() => "2026-09-08T00:00:00.000Z"),
+  normalizeDateOnly: vi.fn((value: string) => value),
+}));
+
+import { getSupervisorClasses } from "./supervisor.service";
+
+const teacherUser = { id: "t1", firstName: "Ana", lastName: "Perez", role: "teacher", active: true };
+const grade = { id: 1, name: "1" };
+const scheduleMon = { id: "s-mon", day: "LUNES", startTime: "07:00", endTime: "08:00", classroom: "Aula 1", status: "activo" };
+const scheduleMonPm = { id: "s-mon-pm", day: "LUNES", startTime: "15:00", endTime: "16:00", classroom: "Aula 2", status: "activo" };
+const scheduleTue = { id: "s-tue", day: "MARTES", startTime: "07:00", endTime: "08:00", classroom: "Aula 1", status: "activo" };
+const assignment = {
+  id: "a1",
+  disciplineCode: "MT",
+  teacherId: "t1",
+  gradeId: 1,
+  primary: 1,
+  scheduleIds: ["s-mon", "s-mon-pm", "s-tue"],
+  status: "activo",
+};
+
+function buildData(assignments = [assignment]) {
+  const schedules = [scheduleMon, scheduleMonPm, scheduleTue];
+  const users = [teacherUser];
+  return {
+    users,
+    students: [],
+    grades: [grade],
+    schedules,
+    enrollments: [],
+    assignments,
+    userById: new Map(users.map((row: any) => [row.id, row])),
+    studentByCode: new Map(),
+    gradeById: new Map([[1, grade]]),
+    scheduleById: new Map(schedules.map((row: any) => [row.id, row])),
+  };
+}
+
+function roster(gradeId = 1) {
+  return { students: [], grades: [{ idGrado: gradeId, nombre: "1" }], enrolledCount: 2, stayCount: 0 };
+}
+
+const emptyState = { records: [], estado: "en_curso", llamadaAt: null, llamadaPorTipo: null, llamadaPorId: null };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.schedulePayload.mockImplementation((schedule: any) => ({
     idHorario: schedule?.id ?? "",
     diaSemana: schedule?.day ?? "",
     horaInicio: schedule?.startTime ?? null,
     horaFin: schedule?.endTime ?? null,
     aula: schedule?.classroom ?? null,
-  }),
-  teacherPayload: (teacher: AppUser | undefined) => ({
-    idProfesor: teacher?.id ?? "",
-    nombre: teacher?.firstName ?? "",
-    apellido: teacher?.lastName ?? "",
-  }),
-  gradePayload: (grade: AppGrade | undefined, id: number) => ({
-    idGrado: id,
-    nombre: grade?.name ?? String(id),
-  }),
-}));
-
-import { scheduleClasses } from "./supervisor.service";
-
-const teacher: AppUser = {
-  id: "teacher-1",
-  role: "teacher",
-  code: "T1",
-  email: "t@gi.edu.co",
-  firstName: "Juan",
-  lastName: "Ríos",
-  photoUrl: null,
-  status: "activo",
-  active: true,
-  permissions: {
-    canViewStudents: true,
-    canManageNews: false,
-    canManageAttendance: true,
-    canManageSchedules: true,
-    canAdministerUsers: false,
-  },
-  createdAt: null,
-  updatedAt: null,
-};
-
-function assignment(id: string, gradeId: number, scheduleIds: string[], primary = false): AppAssignment {
-  return {
-    id,
-    teacherId: teacher.id,
-    teacherEmail: teacher.email,
-    disciplineCode: "XC_SEC_ProgRobot",
-    gradeId,
-    primary,
-    status: "activo",
-    scheduleIds,
-    createdAt: null,
-    updatedAt: null,
-  };
-}
-
-const lunes: AppSchedule = {
-  id: "horario-lunes",
-  day: "LUNES",
-  startTime: null,
-  endTime: null,
-  classroom: null,
-  status: "activo",
-  createdAt: null,
-  updatedAt: null,
-};
-
-const martes: AppSchedule = {
-  id: "horario-martes",
-  day: "MARTES",
-  startTime: null,
-  endTime: null,
-  classroom: null,
-  status: "activo",
-  createdAt: null,
-  updatedAt: null,
-};
-
-function coreData(): CoreData {
-  const grades: AppGrade[] = [6, 7, 8, 9, 10, 11, 12].map((id) => ({
-    id,
-    name: `${id}°`,
-    level: null,
-    status: "activo",
-    createdAt: null,
-    updatedAt: null,
+    estado: schedule?.status ?? "activo",
   }));
-  const students: AppStudent[] = [
-    {
-      code: "S6",
-      firstName: "Ana",
-      lastName: "Uno",
-      gradeId: 6,
-      gradeName: "6°",
-      group: null,
-      email: null,
-      photoUrl: null,
-      sourceStatus: "activo",
-      createdAt: null,
-      updatedAt: null,
-    },
-    {
-      code: "S12",
-      firstName: "Luis",
-      lastName: "Doce",
-      gradeId: 12,
-      gradeName: "12°",
-      group: null,
-      email: null,
-      photoUrl: null,
-      sourceStatus: "activo",
-      createdAt: null,
-      updatedAt: null,
-    },
-    {
-      code: "S9",
-      firstName: "Mar",
-      lastName: "Nueve",
-      gradeId: 9,
-      gradeName: "9°",
-      group: null,
-      email: null,
-      photoUrl: null,
-      sourceStatus: "activo",
-      createdAt: null,
-      updatedAt: null,
-    },
-  ];
-  const assignments = [assignment("asign-6", 6, [lunes.id]), assignment("asign-12", 12, [lunes.id])];
-  return {
-    users: [teacher],
-    students,
-    grades,
-    schedules: [lunes, martes],
-    enrollments: [
-      { id: "e1", studentCode: "S6", disciplineCode: "XC_SEC_ProgRobot", day: "LUNES", status: "activo", active: true, createdAt: null, updatedAt: null },
-      { id: "e2", studentCode: "S12", disciplineCode: "XC_SEC_ProgRobot", day: "LUNES", status: "activo", active: true, createdAt: null, updatedAt: null },
-      { id: "e3", studentCode: "S9", disciplineCode: "XC_SEC_ProgRobot", day: "LUNES", status: "activo", active: true, createdAt: null, updatedAt: null },
-    ],
-    assignments,
-    userById: new Map([[teacher.id, teacher]]),
-    studentByCode: new Map(students.map((s) => [s.code, s])),
-    gradeById: new Map(grades.map((g) => [g.id, g])),
-    scheduleById: new Map([[lunes.id, lunes], [martes.id, martes]]),
-  };
-}
+  mocks.teacherPayload.mockImplementation((user: any) => ({
+    idProfesor: user?.id ?? "",
+    nombre: user?.firstName ?? "",
+    apellido: user?.lastName ?? "",
+  }));
+  mocks.resolveLogicalClass.mockImplementation((assignmentId: string, scheduleId: string, date: string) => {
+    const data = buildData();
+    return { data, assignment, logicalAssignments: [assignment], scheduleId, date, sessionId: `${assignmentId}__${scheduleId}__${date}` };
+  });
+  mocks.getClassRoster.mockResolvedValue(roster());
+  mocks.sessionState.mockResolvedValue(emptyState);
+});
 
-describe("scheduleClasses: clases de horarios unificadas por profesor + disciplina + día", () => {
-  it("agrupa las asignaciones del mismo profesor y disciplina en una sola clase que cubre 6 a 12", () => {
-    const classes = scheduleClasses(coreData());
+describe("getSupervisorClasses: filtro today", () => {
+  it("con today=1 devuelve solo las clases de hoy", async () => {
+    mocks.loadCoreData.mockResolvedValue(buildData());
+    mocks.todayColombia.mockReturnValue("2026-09-08");
+    mocks.dayColombia.mockReturnValue("LUNES");
 
-    expect(classes).toHaveLength(1);
-    expect(classes[0].idAsignacion).toBe("asign-6");
-    expect(classes[0].grades.map((grade) => grade.idGrado)).toEqual([6, 7, 8, 9, 10, 11, 12]);
-    expect(classes[0].grade.idGrado).toBe(6);
-    expect(classes[0].schedules).toHaveLength(1);
-    expect(classes[0].enrolledCount).toBe(3);
+    const res = { json: vi.fn() } as any;
+    await getSupervisorClasses({ query: { today: "1" } } as any, res);
+
+    const data = res.json.mock.calls[0][0].data;
+    expect(data.dayName).toBe("LUNES");
+    expect(data.classes).toHaveLength(2);
+    expect(data.classes.every((cls: any) => cls.isToday)).toBe(true);
+    expect(data.classes.every((cls: any) => cls.schedule.idHorario === "s-mon" || cls.schedule.idHorario === "s-mon-pm")).toBe(true);
   });
 
-  it("separa clases de horarios distintos aunque sea la misma disciplina", () => {
-    const data = coreData();
-    data.assignments.push(assignment("asign-6-martes", 6, [martes.id]));
-    data.assignments.push(assignment("asign-12-martes", 12, [martes.id]));
+  it("sin today devuelve las clases de todos los días", async () => {
+    mocks.loadCoreData.mockResolvedValue(buildData());
+    mocks.todayColombia.mockReturnValue("2026-09-08");
+    mocks.dayColombia.mockReturnValue("LUNES");
 
-    const classes = scheduleClasses(data);
+    const res = { json: vi.fn() } as any;
+    await getSupervisorClasses({ query: {} } as any, res);
 
-    expect(classes).toHaveLength(2);
-    expect(classes.map((cls) => cls.schedules[0].diaSemana).sort()).toEqual(["LUNES", "MARTES"]);
+    const data = res.json.mock.calls[0][0].data;
+    const scheduleIds = data.classes.map((cls: any) => cls.schedule.idHorario);
+    expect(scheduleIds).toEqual(["s-mon", "s-mon-pm", "s-tue"]);
+    const lun = data.classes.find((cls: any) => cls.schedule.idHorario === "s-mon");
+    const mar = data.classes.find((cls: any) => cls.schedule.idHorario === "s-tue");
+    expect(lun.isToday).toBe(true);
+    expect(mar.isToday).toBe(false);
   });
 
-  it("muestra el rango completo aunque un grado no tenga participantes", () => {
-    const data = coreData();
-    data.enrollments = data.enrollments.filter((row) => row.studentCode !== "S9");
+  it("ordena por día de la semana y luego por hora", async () => {
+    mocks.loadCoreData.mockResolvedValue(buildData());
+    mocks.todayColombia.mockReturnValue("2026-09-08");
+    mocks.dayColombia.mockReturnValue("LUNES");
 
-    const classes = scheduleClasses(data);
+    const res = { json: vi.fn() } as any;
+    await getSupervisorClasses({ query: {} } as any, res);
 
-    expect(classes[0].grades.map((grade) => grade.idGrado)).toEqual([6, 7, 8, 9, 10, 11, 12]);
-    expect(classes[0].enrolledCount).toBe(2);
+    const data = res.json.mock.calls[0][0].data;
+    expect(data.classes.map((cls: any) => cls.schedule.idHorario)).toEqual(["s-mon", "s-mon-pm", "s-tue"]);
+  });
+
+  it("refleja el estado de llamada cuando la lista ya fue tomada", async () => {
+    mocks.loadCoreData.mockResolvedValue(buildData());
+    mocks.todayColombia.mockReturnValue("2026-09-08");
+    mocks.dayColombia.mockReturnValue("LUNES");
+    mocks.sessionState.mockResolvedValue({
+      records: [{ studentCode: "c1", status: "presente" }],
+      estado: "finalizada",
+      llamadaAt: "2026-09-08T14:00:00.000Z",
+      llamadaPorTipo: "supervisor",
+      llamadaPorId: "t1",
+    });
+
+    const res = { json: vi.fn() } as any;
+    await getSupervisorClasses({ query: { today: "1" } } as any, res);
+
+    const cls = res.json.mock.calls[0][0].data.classes[0];
+    expect(cls.callStatus).toBe("finalizada");
+    expect(cls.sessionId).toBeTruthy();
+    expect(cls.calledBy.type).toBe("supervisor");
+    expect(cls.calledBy.nombre).toBe("Ana");
   });
 });

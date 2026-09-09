@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   adminStartSession,
   exportAdminAttendance,
@@ -90,6 +91,7 @@ export default function AdminAttendanceCallStatus() {
   const [exporting, setExporting] = useState(false);
   const [exportingSessionId, setExportingSessionId] = useState<string | null>(null);
   const notify = useNotify();
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -145,8 +147,7 @@ export default function AdminAttendanceCallStatus() {
         idAsignacion: cls.idAsignacion,
         idHorario: cls.schedule.idHorario,
       });
-      await loadAttendance(session.id);
-      await load();
+      navigate(`/admin/session-attendance/${session.id}`, { state: { returnTo: "/admin/call-status" } });
     } catch (err: any) {
       notify.error(err.message || "No se pudo iniciar la llamada.");
     } finally {

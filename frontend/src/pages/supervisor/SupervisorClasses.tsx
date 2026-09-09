@@ -207,6 +207,15 @@ export default function SupervisorClasses({ role = "supervisor" }: PageProps) {
           </button>
         )}
 
+        {showAll && (
+          <button
+            onClick={toggleAll}
+            className="w-full px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-sm"
+          >
+            Hoy · ver solo las listas de hoy
+          </button>
+        )}
+
         {loading && <Loading />}
 
         {role === "secretary" && (

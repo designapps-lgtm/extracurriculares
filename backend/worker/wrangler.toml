@@ -38,6 +38,14 @@ GOOGLE_DRIVE_FOLDER_ID = ""
 GOOGLE_DRIVE_WEBHOOK_URL = ""
 # El rate limiting del Worker se configura en Cloudflare, no con MemoryStore de Express.
 
+# Caché compartida entre isolates (Cloudflare KV). Se crea con:
+#   npx wrangler kv namespace create appsheet-cache
+# y se pega el ID acá (y en preview_id si querés dev aparte).
+[[kv_namespaces]]
+binding = "APPSHEET_KV"
+id = "297187af28da4602b5de9d7cf0f80fac"
+preview_id = "297187af28da4602b5de9d7cf0f80fac"
+
 [triggers]
 crons = ["*/10 * * * *"]
 

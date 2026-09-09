@@ -97,6 +97,7 @@ describe("dominio AppSheet de asistencia y permanencias", () => {
       SessionID: SESSION_ID,
       CodigoEstudiante: "S1",
       Estado: "presente",
+      RegistradoAt: "2026-09-01T10:00:00",
       CreatedAt: "2026-09-01T15:00:00.000Z",
       UpdatedAt: "2026-09-01T15:00:00.000Z",
     })]);

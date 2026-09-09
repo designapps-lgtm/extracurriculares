@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { appSheetDateTimeToIso, nowIso, normalizeDateOnly, normalizeDayName } from "../../utils/colombiaTime";
+import { appSheetDateTimeToIso, nowBogotaLocal, nowIso, normalizeDateOnly, normalizeDayName } from "../../utils/colombiaTime";
 import {
   APPSHEET_TABLES,
   addRows,
@@ -475,6 +475,7 @@ export async function upsertAttendanceRows(input: {
   const existing = (await getAttendance({ fresh: true })).filter((row) => row.sessionId === input.sessionId);
   const byStudent = new Map(existing.map((row) => [row.studentCode, row]));
   const timestamp = nowIso();
+  const registeredAt = nowBogotaLocal();
   const additions: AppSheetRow[] = [];
   const edits: AppSheetRow[] = [];
   for (const record of input.records) {
@@ -484,7 +485,7 @@ export async function upsertAttendanceRows(input: {
       SessionID: input.sessionId,
       CodigoEstudiante: record.studentCode,
       Estado: record.status,
-      RegistradoAt: timestamp,
+      RegistradoAt: registeredAt,
       RegistradoPorTipo: input.callerType,
       RegistradoPorID: input.callerId,
       Observacion: record.observation ?? current?.observation ?? "",

@@ -194,15 +194,21 @@ function callerInfo(data: CoreData, type: string | null, id: string | null) {
   };
 }
 
-export async function getSupervisorClasses(_req: Request, res: Response): Promise<void> {
-  const data = await loadCoreData();
-  const today = todayColombia();
-  const todayDay = dayColombia();
-  const groups = new Map<string, { assignmentId: string; scheduleId: string; teacherId: string }>();
+const DAY_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
+
+interface ClassGroup {
+  assignmentId: string;
+  scheduleId: string;
+  teacherId: string;
+}
+
+export async function buildClassesSnapshot(data: CoreData, date: string, todayDay: string, todayOnly: boolean) {
+  const groups = new Map<string, ClassGroup>();
   for (const assignment of data.assignments) {
     for (const scheduleId of assignment.scheduleIds) {
       const schedule = data.scheduleById.get(scheduleId);
-      if (!schedule || schedule.day !== todayDay) continue;
+      if (!schedule) continue;
+      if (todayOnly && schedule.day !== todayDay) continue;
       const key = `${assignment.disciplineCode}|${assignment.teacherId}|${scheduleId}`;
       const current = groups.get(key);
       if (!current || assignment.primary || assignment.gradeId < (data.assignments.find((row) => row.id === current.assignmentId)?.gradeId ?? Infinity)) {
@@ -211,7 +217,9 @@ export async function getSupervisorClasses(_req: Request, res: Response): Promis
     }
   }
   const classes = await Promise.all([...groups.values()].map(async (group) => {
-    const context = await resolveLogicalClass(group.assignmentId, group.scheduleId, today);
+    const schedule = data.scheduleById.get(group.scheduleId)!;
+    const isToday = schedule.day === todayDay;
+    const context = await resolveLogicalClass(group.assignmentId, group.scheduleId, date);
     const [roster, state] = await Promise.all([getClassRoster(context), sessionState(context.sessionId)]);
     const representative = data.assignments.find((row) => row.id === group.assignmentId)!;
     const teacher = data.userById.get(group.teacherId);
@@ -222,8 +230,8 @@ export async function getSupervisorClasses(_req: Request, res: Response): Promis
       grade: roster.grades[0] ?? { idGrado: representative.gradeId, nombre: data.gradeById.get(representative.gradeId)?.name ?? String(representative.gradeId) },
       grades: roster.grades,
       teacher: teacherPayload(teacher),
-      schedule: schedulePayload(data.scheduleById.get(group.scheduleId)),
-      isToday: true,
+      schedule: schedulePayload(schedule),
+      isToday,
       enrolledCount: roster.enrolledCount,
       stayCount: roster.stayCount,
       sessionId: hasAttendance ? context.sessionId : null,
@@ -236,7 +244,21 @@ export async function getSupervisorClasses(_req: Request, res: Response): Promis
       attendanceCount: state.records.length,
     };
   }));
-  classes.sort((a, b) => String((a.schedule as any).horaInicio ?? "").localeCompare(String((b.schedule as any).horaInicio ?? "")));
+  classes.sort((a, b) => {
+    const sa = a.schedule as any;
+    const sb = b.schedule as any;
+    return DAY_ORDER.indexOf(sa.diaSemana) - DAY_ORDER.indexOf(sb.diaSemana)
+      || String(sa.horaInicio ?? "").localeCompare(String(sb.horaInicio ?? ""));
+  });
+  return classes;
+}
+
+export async function getSupervisorClasses(req: Request, res: Response): Promise<void> {
+  const data = await loadCoreData();
+  const today = todayColombia();
+  const todayDay = dayColombia();
+  const todayOnly = String(req.query.today ?? "") === "1";
+  const classes = await buildClassesSnapshot(data, today, todayDay, todayOnly);
   res.json({ success: true, data: { date: today, dayName: todayDay, classes } });
 }
 

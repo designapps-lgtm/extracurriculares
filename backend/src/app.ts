@@ -16,6 +16,7 @@ import { gradeRouter } from "./modules/grades/grade.routes";
 import { assignmentRouter } from "./modules/assignments/assignment.routes";
 import { scheduleRouter } from "./modules/schedules/schedule.routes";
 import { photoRouter } from "./modules/photos/photo.routes";
+import { rutasRouter } from "./modules/rutas/rutas.routes";
 
 // Admin routes
 import { adminAuthRouter } from "./modules/admin/auth.routes";
@@ -85,6 +86,7 @@ app.use("/api/teachers", apiLimiter, teacherRouter);
 app.use("/api/grades", apiLimiter, gradeRouter);
 app.use("/api/assignments", apiLimiter, assignmentRouter);
 app.use("/api/schedules", apiLimiter, scheduleRouter);
+app.use("/api/rutas", apiLimiter, rutasRouter);
 app.use("/api/photos", photoRouter);
 
 // Auth routes (login/logout cuentan contra authLimiter por ruta; refresh no)

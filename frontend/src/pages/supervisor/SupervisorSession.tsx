@@ -4,8 +4,10 @@ import { roleApis, type RoleKind } from "../../services/roles";
 import { useNotify } from "../../components/common/Notify";
 import { Loading } from "../../components/common/States";
 import Logo from "../../components/common/Logo";
-import type { SupervisorSessionDetail, Novedad } from "../../types";
+import type { SupervisorSessionDetail, Novedad, RutaSlot } from "../../types";
 import { colombiaDateKey } from "../../utils/colombiaDate";
+import { DIAS_CORTO } from "../../utils/dias";
+import { getRutasPorCodigo } from "../../services/rutas";
 
 function formatFecha(iso: string): string {
   const d = new Date(iso);
@@ -35,6 +37,7 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
   const [exporting, setExporting] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<AttendanceFilter>("todos");
   const [novedadesMap, setNovedadesMap] = useState<Record<string, Novedad[]>>({});
+  const [rutasMap, setRutasMap] = useState<Record<string, RutaSlot[]>>({});
   const navigate = useNavigate();
   const notify = useNotify();
 
@@ -57,6 +60,7 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
         } catch {
           setNovedadesMap({});
         }
+        getRutasPorCodigo().then(setRutasMap);
       })
       .catch((err: any) => {
         if (err.message?.includes("401") || err.message?.includes("No autenticado")) {
@@ -229,6 +233,44 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
           )}
         </div>
 
+        {(() => {
+          const allNovedades = Object.entries(novedadesMap).flatMap(([codigo, list]) =>
+            list.map((n) => ({ codigo, novedad: n })),
+          );
+          if (allNovedades.length === 0) return null;
+          return (
+            <section className="card p-5 mb-6">
+              <h2 className="font-display font-semibold text-surface-900 dark:text-surface-100 text-base mb-3">
+                Novedades del día
+              </h2>
+              <div className="space-y-2">
+                {allNovedades.map(({ codigo, novedad }) => {
+                  const st = data.records.find((r) => r.codigoEstudiante === codigo);
+                  return (
+                    <div key={novedad.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
+                      {st && (
+                        <p className="text-amber-900 dark:text-amber-200 font-semibold">
+                          {st.nombre} {st.apellido} {st.grupo ? `· ${st.grupo}` : ""}
+                        </p>
+                      )}
+                      {novedad.descripcion && (
+                        <p className="text-amber-800 dark:text-amber-300 font-medium">{novedad.descripcion}</p>
+                      )}
+                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
+                        {novedad.seAusentaCon && <span>Se ausenta con: {novedad.seAusentaCon}</span>}
+                        <span>
+                          {novedad.regresaAlColegio ? "Sí regresa" : "No regresa"}
+                          {novedad.horaEstimadaRegreso ? ` · ${novedad.horaEstimadaRegreso}` : ""}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()}
+
         <div className="card overflow-hidden" aria-live="polite">
           {data.records.length === 0 ? (
             <div className="text-center py-12 text-sm text-surface-500">
@@ -249,7 +291,12 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-surface-100 dark:bg-surface-800">
-              {visibleRecords.map((r) => (
+              {visibleRecords.map((r) => {
+                const novedades = novedadesMap[r.codigoEstudiante] || [];
+                const rutaHoy = (rutasMap[r.codigoEstudiante] || []).filter(
+                  (rt) => rt.diaSemana === data.schedule.diaSemana,
+                );
+                return (
                 <div key={r.codigoEstudiante} className="flex items-start gap-3 px-3 sm:px-4 py-3 bg-white dark:bg-surface-900">
                   {r.fotoUrl ? (
                     <img src={r.fotoUrl} alt="" className="h-10 w-10 rounded-xl object-cover shrink-0" />
@@ -261,15 +308,48 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">
-                      {r.apellido}, {r.nombre}
+                      {r.nombre} {r.apellido}
                     </p>
                     <p className="text-xs text-surface-500 break-words">{r.codigoEstudiante}{r.grupo ? ` · ${r.grupo}` : ""}</p>
-                    {novedadesMap[r.codigoEstudiante]?.length > 0 && (
+                    {rutaHoy.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {rutaHoy.map((slot) => (
+                          <span
+                            key={slot.columnKey}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 dark:bg-surface-800 border border-brand-200 dark:border-surface-700 px-2.5 py-1.5 text-xs font-medium text-brand-700 dark:text-brand-400"
+                          >
+                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 6v6m0 0V18m0-6h2.5m0 0a2.5 2.5 0 01-5 0m5 0a2.5 2.5 0 00-2.5 2.5M8 6a2 2 0 014 0M8 6V3m0 0h1.5M8 3H6m16 9a8 8 0 11-16 0 8 8 0 0116 0z" />
+                            </svg>
+                            Se va en ruta: {DIAS_CORTO[slot.diaSemana] || slot.diaSemana} · {slot.hora}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {novedades.length > 0 && (
+                      <div className="mt-2 space-y-1.5">
+                        {novedades.map((n) => (
+                          <div key={n.id} className="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs">
+                            {n.descripcion && (
+                              <p className="text-amber-800 dark:text-amber-300 font-medium">{n.descripcion}</p>
+                            )}
+                            <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-amber-700 dark:text-amber-400">
+                              {n.seAusentaCon && <span>Se ausenta con: {n.seAusentaCon}</span>}
+                              <span>
+                                {n.regresaAlColegio ? "Sí regresa" : "No regresa"}
+                                {n.horaEstimadaRegreso ? ` · ${n.horaEstimadaRegreso}` : ""}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {novedades.length > 0 && (
                       <button
                         onClick={() => openNovedad(r)}
-                        className="mt-1 inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/60"
+                        className="mt-2 inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/60"
                       >
-                        Novedades
+                        Ver novedad
                       </button>
                     )}
                   </div>
@@ -277,7 +357,8 @@ export default function SupervisorSession({ role = "supervisor" }: PageProps) {
                     {ESTADO_LABEL[r.estado]?.label || r.estado}
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
