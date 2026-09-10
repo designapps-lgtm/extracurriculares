@@ -1,6 +1,6 @@
 import { AppError } from "../../middlewares/errorHandler";
 import type { PaginationParams } from "../../utils/pagination";
-import { disciplineCodes, disciplinePayload, loadCoreData } from "../appsheet/appsheet.views";
+import { disciplineCodes, disciplinePayload, loadCoreData } from "../../db/views";
 import * as disciplineService from "../disciplines/discipline.service";
 
 export function getDisciplines(query: { search?: string }, pagination: PaginationParams) {

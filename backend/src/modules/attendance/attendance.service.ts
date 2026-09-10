@@ -13,14 +13,14 @@ import {
   type AppAssignment,
   type AppAttendance,
   type AppStay,
-} from "../appsheet/appsheet.domain";
+} from "../../db/domain";
 import {
   assignmentPayload,
   loadCoreData,
   schedulePayload,
   teacherPayload,
   type CoreData,
-} from "../appsheet/appsheet.views";
+} from "../../db/views";
 
 const VALID_STATES = new Set(["presente", "ausente", "justificado"]);
 

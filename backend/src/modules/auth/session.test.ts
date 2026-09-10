@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppUser } from "../appsheet/appsheet.domain";
+import type { AppUser } from "../../db/domain";
 
 const mocks = vi.hoisted(() => ({
   assertTrustedOrigin: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock("../../utils/authCookies", () => ({
   setAuthCookies: mocks.setAuthCookies,
 }));
 
-vi.mock("../appsheet/appsheet.domain", () => ({
+vi.mock("../../db/domain", () => ({
   getUserById: mocks.getUserById,
 }));
 

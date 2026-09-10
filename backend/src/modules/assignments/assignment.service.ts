@@ -1,6 +1,6 @@
 import { AppError } from "../../middlewares/errorHandler";
 import { type PaginatedResult, type PaginationParams, paginatedResult } from "../../utils/pagination";
-import { assignmentPayload, loadCoreData, pageSlice } from "../appsheet/appsheet.views";
+import { assignmentPayload, loadCoreData, pageSlice } from "../../db/views";
 import type { AssignmentQuery } from "./assignment.types";
 
 export async function getAssignments(query: AssignmentQuery, pagination: PaginationParams): Promise<PaginatedResult<any>> {

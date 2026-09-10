@@ -1,5 +1,5 @@
 import { AppError } from "../../middlewares/errorHandler";
-import { getUserById } from "../appsheet/appsheet.domain";
+import { getUserById } from "../../db/domain";
 
 export interface AdminSessionData {
   id: string;

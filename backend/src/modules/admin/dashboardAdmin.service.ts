@@ -1,4 +1,4 @@
-import { disciplineCodes, loadCoreData } from "../appsheet/appsheet.views";
+import { disciplineCodes, loadCoreData } from "../../db/views";
 
 export async function getStats() {
   const data = await loadCoreData();

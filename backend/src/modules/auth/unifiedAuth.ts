@@ -3,7 +3,7 @@ import { config } from "../../config";
 import { AppError } from "../../middlewares/errorHandler";
 import { googleOAuthClient } from "../../utils/googleOAuth";
 import { assertTrustedOrigin } from "../../utils/originGuard";
-import { getUsersByEmail, type AppUser, type UserRole } from "../appsheet/appsheet.domain";
+import { getUsersByEmail, type AppUser, type UserRole } from "../../db/domain";
 import {
   clearAllAuthCookies,
   issueAuthSession,

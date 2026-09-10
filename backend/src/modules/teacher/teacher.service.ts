@@ -11,7 +11,7 @@ import {
   sessionState,
   startAttendanceSession,
 } from "../attendance/attendance.service";
-import { assignmentPayload, loadCoreData, schedulePayload, teacherPayload } from "../appsheet/appsheet.views";
+import { assignmentPayload, loadCoreData, schedulePayload, teacherPayload } from "../../db/views";
 
 export async function getTeacherClasses(req: Request, res: Response): Promise<void> {
   const teacherId = req.teacher!.teacherId;

@@ -7,8 +7,8 @@ import type {
   AppStay,
   AppStudent,
   AppUser,
-} from "../appsheet/appsheet.domain";
-import type { CoreData } from "../appsheet/appsheet.views";
+} from "../../db/domain";
+import type { CoreData } from "../../db/views";
 
 const mocks = vi.hoisted(() => ({
   getAssignments: vi.fn(),
@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   loadCoreData: vi.fn(),
 }));
 
-vi.mock("../appsheet/appsheet.domain", () => ({
+vi.mock("../../db/domain", () => ({
   buildSessionId: (assignmentId: string, scheduleId: string, date: string) => `${assignmentId}__${scheduleId}__${date}`,
   disciplineName: (code: string) => code,
   getAssignments: mocks.getAssignments,
@@ -29,7 +29,7 @@ vi.mock("../appsheet/appsheet.domain", () => ({
   upsertAttendanceRows: mocks.upsertAttendanceRows,
 }));
 
-vi.mock("../appsheet/appsheet.views", () => ({
+vi.mock("../../db/views", () => ({
   assignmentPayload: (assignment: AppAssignment) => ({ idAsignacion: assignment.id }),
   loadCoreData: mocks.loadCoreData,
   schedulePayload: (schedule: AppSchedule | undefined) => ({ idHorario: schedule?.id ?? "" }),

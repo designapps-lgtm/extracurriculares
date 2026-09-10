@@ -1,6 +1,6 @@
 import { AppError } from "../../middlewares/errorHandler";
 import { type PaginatedResult, type PaginationParams, paginatedResult } from "../../utils/pagination";
-import { loadCoreData, pageSlice, schedulePayload } from "../appsheet/appsheet.views";
+import { loadCoreData, pageSlice, schedulePayload } from "../../db/views";
 import type { ScheduleQuery } from "./schedule.types";
 
 const DAY_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];

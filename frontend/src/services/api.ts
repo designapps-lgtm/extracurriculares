@@ -1,7 +1,6 @@
-// El backend se proxya via vercel.json (/api/* -> Cloudflare worker) para que el
-// navegador siempre hable con el MISMO dominio y las cookies sean first-party
-// (SameSite=None no se bloquea). En producción usamos ruta relativa. En dev
-// (docker o vite) apuntamos directo al backend local.
+// En producción la API y el frontend viven en el MISMO origen (Express sirve el
+// build): el navegador usa ruta relativa y las cookies son first-party. En dev
+// (vite) apuntamos directo al backend local.
 const BASE_URL = import.meta.env.PROD
   ? ""
   : import.meta.env.API_URL || import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -12,11 +11,11 @@ export interface ApiRequestOptions {
   [key: string]: unknown;
 }
 
-// Timeout por defecto para cada request. En Cloudflare Workers (plan free, cold
-// starts) una request puede tardar varios segundos, así que 30s es generoso.
-// Sin este timeout, si el worker tarda muy poco (nunca resuelve ni rechaza), el
-// fetch cuelga infinito y las pantallas quedan con un spinner dando vueltas
-// (ej. "Llamar lista" / asistencia del supervisor).
+// Timeout por defecto para cada request. 30s es generoso para el peor caso
+// (mutaciones AppSheet lentas o cold starts del servidor). Sin este timeout, si
+// el backend tarda muy poco en responder (nunca resuelve ni rechaza), el fetch
+// cuelga infinito y las pantallas quedan con un spinner dando vueltas (ej.
+// "Llamar lista" / asistencia del supervisor).
 const DEFAULT_TIMEOUT_MS = 30000;
 
 function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<Response> {

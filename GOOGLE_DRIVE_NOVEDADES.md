@@ -17,26 +17,26 @@ Estudiantes, inscripciones y horarios se obtienen de las tablas AppSheet vigente
 
 Antes de configurar una tabla:
 
-1. Crear o identificar la tabla/slice real en la misma aplicación AppSheet.
+1. Crear o identificar la tabla/slice en la aplicación AppSheet `Lector_QR`.
 2. Confirmar su nombre exacto y acceso mediante API.
 3. Compartir el esquema de **AppSheet → Data → Columns**.
 4. Verificar, como mínimo, identificador de novedad, código de estudiante, fecha de novedad, tipo y descripción.
 5. Probar una lectura sin datos personales en logs.
-6. Configurar `APPSHEET_NOVEDADES_TABLE` como binding server-only y desplegar nuevamente.
+6. Configurar `APPSHEET_NOVEDADES_TABLE`, `APPSHEET_NOVEDADES_APP_ID` y `APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY` como variables server-only y reiniciar el servidor.
 
 La API debe filtrar por el día solicitado usando la zona `America/Bogota`; una vista de novedades diarias no debe mezclar registros de días anteriores. El filtrado debe validarse con casos en los límites de medianoche de Colombia.
 
-Nunca exponga `APPSHEET_APPLICATION_ACCESS_KEY` al frontend. Las variables relacionadas son:
+Nunca exponga las llaves de novedades al frontend. Las variables relacionadas son:
 
 ```text
-APPSHEET_APP_ID                  # no secreta
-APPSHEET_APPLICATION_ACCESS_KEY  # secreta, sólo backend
-APPSHEET_NOVEDADES_TABLE         # omitir hasta confirmar la tabla
+APPSHEET_NOVEDADES_TABLE                  # nombre de la tabla en Lector_QR
+APPSHEET_NOVEDADES_APP_ID                 # no secreta
+APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY # secreta, sólo backend
 ```
 
 ## Google Drive opcional
 
-El código de Drive queda únicamente para un watch opcional y metadata de cambios en `EC_Sync_State`. Si se habilita, requiere credenciales server-only y validación del webhook:
+El código de Drive queda únicamente para un watch opcional y metadata de cambios en `sync_state` (MySQL). Si se habilita, requiere credenciales server-only y validación del webhook:
 
 ```text
 GOOGLE_SERVICE_ACCOUNT_JSON

@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { AppError } from "../../middlewares/errorHandler";
 import { assertTrustedOrigin } from "../../utils/originGuard";
 import { clearAuthCookies } from "../../utils/authCookies";
-import { getUserById } from "../appsheet/appsheet.domain";
+import { getUserById } from "../../db/domain";
 import { issueAuthSession, renewRoleSession, roleUserPayload } from "../auth/session";
 import { resolveRoleByEmail, verifyGoogleCredential } from "../auth/unifiedAuth";
 

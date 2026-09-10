@@ -1,5 +1,3 @@
-import { config } from "../../config";
-
 const APPSHEET_API_BASE = "https://www.appsheet.com/api/v2/apps";
 const REQUEST_TIMEOUT_MS = 20_000;
 const FIND_MAX_ATTEMPTS = 3;
@@ -31,8 +29,8 @@ export class AppSheetApiError extends Error {
 }
 
 function requireConfig(connection?: AppSheetConnection): AppSheetConnection {
-  const appId = connection?.appId ?? config.appsheetAppId;
-  const accessKey = connection?.accessKey ?? config.appsheetAccessKey;
+  const appId = connection?.appId;
+  const accessKey = connection?.accessKey;
   if (!appId || !accessKey) {
     throw new AppSheetApiError(
       "AppSheet no está configurado: faltan el App ID o la llave de acceso",
@@ -178,17 +176,4 @@ export async function findAppSheetRows(
     }
   }
   throw lastError ?? new AppSheetApiError("No se pudo consultar AppSheet", 502, tableName, "Find", APPSHEET_API_BASE, null);
-}
-
-/** Las mutaciones no se reintentan para evitar escrituras duplicadas. */
-export function addAppSheetRows(tableName: string, rows: AppSheetRow[]): Promise<AppSheetRow[]> {
-  return rows.length === 0 ? Promise.resolve([]) : executeAction(tableName, "Add", rows);
-}
-
-export function editAppSheetRows(tableName: string, rows: AppSheetRow[]): Promise<AppSheetRow[]> {
-  return rows.length === 0 ? Promise.resolve([]) : executeAction(tableName, "Edit", rows);
-}
-
-export function deleteAppSheetRows(tableName: string, rows: AppSheetRow[]): Promise<AppSheetRow[]> {
-  return rows.length === 0 ? Promise.resolve([]) : executeAction(tableName, "Delete", rows);
 }

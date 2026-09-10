@@ -4,35 +4,35 @@ Sistema web para gestionar actividades extracurriculares, usuarios, asignaciones
 
 ## Arquitectura vigente
 
-- **Frontend:** React 18, TypeScript, Vite y Tailwind CSS; producción en Vercel.
-- **API:** Express 4 y TypeScript, empaquetados como Cloudflare Worker.
-- **Fuente de datos:** AppSheet sobre Google Sheets. No existe una réplica local ni un motor de datos adicional en runtime.
+- **Frontend:** React 18, TypeScript, Vite y Tailwind CSS.
+- **API:** Express 4 y TypeScript sobre Node.js.
+- **Fuente de verdad:** MySQL local (dev) o servidor real (producción). La capa AppSheet académica fue migrada y retirada; solo sobrevive la consulta de novedades contra una app AppSheet separada (`Lector_QR`).
 - **Autenticación:** Google Identity; sesiones JWT stateless en cookies `httpOnly`.
 - **Desarrollo local:** Node.js 20 o Docker Compose.
 
 Flujo principal:
 
 ```text
-Navegador → Vercel /api/* → Cloudflare Worker → Express → servicios AppSheet → Google Sheets
+Navegador → Express (single-origin) → rutas /api → MySQL | AppSheet novedades
 ```
 
-El backend mantiene el contrato REST consumido por el frontend. Las rutas delegan en controladores/servicios y la integración externa está aislada en `backend/src/modules/appsheet/`.
+El backend sirve el build del frontend (`frontend/dist`) en el mismo origen cuando existe: `express.static` + fallback SPA para las rutas GET que no empiezan con `/api`. Así las cookies viajan first-party (sin CORS). La ruta del build se puede overridear con `FRONTEND_DIST`.
 
 ## Fuente de verdad y tablas
 
-AppSheet es la fuente autoritativa. Las tablas utilizadas por la API son:
+MySQL es la fuente autoritativa. El esquema vive en `backend/src/db/migrations/` (`001_schema.sql`, `002_enrollments_id.sql`):
 
-- `Usuarios_Roles`: identidad, rol, estado y permisos.
-- `EC_Estudiantes`, `EC_Grados` y `EC_Inscripciones`: catálogo e inscripciones.
-- `EC_Horarios`, `Profesores_Horarios` y `EC_Asignacion_Horarios`: oferta y asignaciones.
-- `EC_Asistencias`: asistencia por sesión.
-- `EC_Permanencias`: permanencias registradas por supervisión.
-- `EC_Auditoria`: auditoría no bloqueante.
-- `EC_Sync_State`: metadata opcional del watch de Google Drive.
-- `Demograficos`: snapshot de origen utilizado por el flujo de estudiantes.
-- `EC_Traslados`: reservada; no tiene un endpoint activo mientras no se confirme su esquema.
+- `users` (`Usuarios_Roles`): identidad, rol, estado y permisos.
+- `students`, `grades`, `enrollments`, `schedules`, `assignments`, `assignment_schedules`: catálogos, inscripciones y asignaciones.
+- `attendance`: asistencia por sesión.
+- `stays`: permanencias registradas por supervisión.
+- `reports`: reportes de problemas.
+- `audit_log`: auditoría no bloqueante.
+- `sync_state`: metadata del watch de Google Drive.
+- `demographics` + `student_routes`: snapshot de origen y rutas del flujo de estudiantes.
+- `novedades`: NO se persiste; se consulta en vivo desde AppSheet `Lector_QR`.
 
-Las lecturas tienen caché en memoria de 15 segundos por tabla dentro de cada instancia. Toda mutación invalida la tabla afectada. `Find` reintenta únicamente fallos temporales; `Add`, `Edit` y `Delete` no se reintentan para evitar duplicados.
+Las consultas de MySQL se ejecutan a través de la capa `backend/src/db/` (`mysql.ts`, `dates.ts`, `domain.ts`, `views.ts`, `audit.ts`).
 
 ## Autenticación
 
@@ -40,13 +40,13 @@ Las lecturas tienen caché en memoria de 15 segundos por tabla dentro de cada in
 Google ID token
   → POST /api/auth/google
   → verificación de audiencia, correo y dominio
-  → búsqueda fresca en Usuarios_Roles
+  → búsqueda fresca en users
   → cookies access/refresh httpOnly del rol
 ```
 
-Roles soportados: `admin`, `teacher`, `supervisor` y `secretary`. El estado y los permisos se leen de `Usuarios_Roles`. Login, refresh y `GET /api/auth/me` revalidan la cuenta. No existe autenticación local por contraseña.
+Roles soportados: `admin`, `teacher`, `supervisor` y `secretary`. Login, refresh y `GET /api/auth/me` revalidan la cuenta. No existe autenticación local por contraseña.
 
-El frontend llama a `/api/*` en su mismo dominio; `frontend/vercel.json` reescribe esas peticiones al Worker. Las cookies usan `Secure` en producción y `SameSite=Lax`.
+El frontend llama a `/api/*` en su mismo dominio. Las cookies usan `Secure` en producción y `SameSite=Lax`; el login y refresh se validan contra la base cuando es un servidor relacional.
 
 ## Configuración
 
@@ -56,28 +56,11 @@ Copiar el ejemplo únicamente para desarrollo local:
 cp .env.example .env
 ```
 
-Variables server-only obligatorias en producción:
+Variables server-only obligatorias en producción: `JWT_SECRET`, `GOOGLE_CLIENT_ID`, credenciales MySQL (`DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`). Variables no secretas principales: `FRONTEND_URL`, `ACCESS_TOKEN_EXPIRES_IN`, `SESSION_DURATION_HOURS`, `GOOGLE_INSTITUTION_DOMAIN`.
 
-```text
-JWT_SECRET
-GOOGLE_CLIENT_ID
-APPSHEET_APPLICATION_ACCESS_KEY
-```
+Novedades: `APPSHEET_NOVEDADES_APP_ID`, `APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY` y `APPSHEET_NOVEDADES_TABLE`. Si no están definidas, los endpoints de novedades responden vacíos. No exponga `JWT_SECRET` ni las llaves de AppSheet mediante variables `VITE_*`.
 
-Variables no secretas principales:
-
-```text
-FRONTEND_URL
-ACCESS_TOKEN_EXPIRES_IN
-SESSION_DURATION_HOURS
-GOOGLE_INSTITUTION_DOMAIN
-APPSHEET_APP_ID
-APPSHEET_DEMOGRAFICOS_TABLE
-```
-
-`APPSHEET_NOVEDADES_TABLE` debe permanecer sin definir hasta contar con una tabla real. No exponga `JWT_SECRET`, la llave de AppSheet ni credenciales de Google mediante variables `VITE_*`.
-
-Consulte `.env.example` para desarrollo y `backend/worker/wrangler.toml` para los bindings de producción.
+Consulte `.env.example` para el listado completo.
 
 ## Inicio local
 
@@ -108,13 +91,15 @@ npm ci
 npm run dev
 ```
 
-Para probar el Worker localmente, cree `backend/worker/.dev.vars` sólo en su máquina con los secretos vigentes y ejecute:
+### Modo producción single-origin (sin Vite)
 
 ```bash
-cd backend/worker
-npm ci
-npm run dev
+cd frontend && npm ci && npm run build
+cd ../backend && npm ci && npm run build
+NODE_ENV=production FRONTEND_DIST=../frontend/dist npm start
 ```
+
+Con `NODE_ENV=production` la app asume servidor single-origin: sirve `frontend/dist`, confía en el reverse proxy (`trust proxy`) y emite cookies `Secure`. Para probarlo contra `localhost` usá `NODE_ENV=development` (cookies sin `Secure`).
 
 ## API principal
 
@@ -124,7 +109,7 @@ npm run dev
 GET /api/health
 ```
 
-Una respuesta sana indica `status: "ok"`, `appsheet: "connected"` y la cantidad de filas válidas de `Usuarios_Roles` observadas por el chequeo.
+Una respuesta sana indica `status: "ok"`, `database: "connected"` y la cantidad de filas válidas de `users` observadas por el chequeo. `novedades: "appsheet"` cuando está configurada la app Lector_QR.
 
 ### Catálogos públicos
 
@@ -158,20 +143,25 @@ SessionID    = <AsignacionID>__<HorarioID>__<YYYY-MM-DD>
 AsistenciaID = <SessionID>|<CodigoEstudiante>
 ```
 
-El roster combina `EC_Inscripciones` y `EC_Permanencias`. Guardar asistencia separa altas y ediciones por `AsistenciaID`, por lo que repetir la operación actualiza filas existentes en lugar de crear duplicados. Históricos con identificadores opacos anteriores a esta convención no se atribuyen a una clase sin evidencia.
+El roster combina `enrollments` y `stays`. Guardar asistencia separa altas y ediciones por `AsistenciaID`, por lo que repetir la operación actualiza filas existentes en lugar de crear duplicados. Históricos con identificadores opacos anteriores a esta convención no se atribuyen a una clase sin evidencia.
 
 ## Novedades
 
-Las novedades se cargan en una aplicación AppSheet separada (`Lector_QR`) y se consultan directamente desde la tabla `Novedades_Diarias`. El backend usa un App ID y una llave server-only distintos de los usados por la aplicación académica principal. La vista de novedades vuelve a consultar la fuente cada 15 segundos mientras permanece abierta; no se mantiene una copia local.
+Las novedades se cargan en una aplicación AppSheet separada (`Lector_QR`) y se consultan directamente desde la tabla `Novedades_Diarias`. El backend usa un App ID y una llave server-only distintos de la (ya retirada) app académica. La vista de novedades vuelve a consultar la fuente cada 15 segundos mientras permanece abierta; no se mantiene una copia local.
+
+## Migración AppSheet → MySQL
+
+La migración one-shot vivió en `backend/src/db/migrate-appsheet.ts` y ya se ejecutó contra la base de desarrollo: leyó las tablas de AppSheet, deduplicó usuarios por jerarquía de rol (admin > secretary > supervisor > teacher) y volcó la data a MySQL en una transacción. Los volúmenes migrados y las particularidades (p. ej. `EC_Reportes_Problemas` no existía en AppSheet y se migró vacía; `InscripcionID` requería `VARCHAR(100)`) quedaron documentados en el historial de la rama `feature/santi`.
 
 ## Estructura relevante
 
 ```text
 backend/
 ├── src/
+│   ├── db/                  # mysql, migraciones, dates, domain, views, audit
 │   ├── modules/
-│   │   ├── appsheet/       # cliente HTTP, repositorio, dominio, vistas y auditoría
-│   │   ├── auth/           # Google, JWT y sesiones por cookies
+│   │   ├── appsheet/        # cliente HTTP de novedades (service + novedades)
+│   │   ├── auth/            # Google, JWT y sesiones por cookies
 │   │   ├── attendance/
 │   │   ├── admin/
 │   │   ├── teacher/
@@ -179,12 +169,13 @@ backend/
 │   │   └── secretary/
 │   ├── middlewares/
 │   ├── config/
+│   ├── staticFiles.ts       # serving single-origin del build frontend
 │   └── app.ts
-└── worker/                  # entrypoint y configuración Cloudflare
+└── migrations/              # SQL de schema (001, 002)
 
 frontend/
 ├── src/
-└── vercel.json              # proxy /api hacia Cloudflare
+└── dist/                    # build servido por Express en producción
 ```
 
 ## Validación
@@ -198,18 +189,12 @@ npm run build
 cd ../frontend
 npm ci
 npm run build
-
-cd ../backend/worker
-npm ci
-npm run typecheck
-npm run deploy:dry-run
 ```
 
 El despliegue y los smoke tests están documentados en `DEPLOY.md`.
 
 ## Limitaciones que requieren confirmación
 
-- Las columnas de `EC_Auditoria` y `EC_Permanencias` se infirieron porque ambas tablas estaban vacías. Deben confirmarse en **AppSheet → Data → Columns** o mediante una mutación controlada y reversible.
-- `Profesores_Horarios` debe validarse con una escritura controlada antes de usar su CRUD en producción.
-- `EC_Traslados` no se escribe hasta conocer su esquema real.
+- `EC_Traslados` no se usa hasta conocer su esquema real (no se migró).
 - El inicio de una clase no persiste estado `en_curso`; la sesión queda materializada al guardar asistencia.
+- Las novedades dependen de que la app `Lector_QR` responda; sin credenciales, los endpoints devuelven vacío.

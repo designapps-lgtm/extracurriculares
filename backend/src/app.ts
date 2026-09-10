@@ -6,6 +6,7 @@ import { config } from "./config";
 import { unifiedAuthRouter } from "./modules/auth/unifiedAuth.routes";
 import { errorHandler, notFound } from "./middlewares/errorHandler";
 import { requestLogger } from "./middlewares/requestLogger";
+import { frontendDistDir, hasFrontendBuild } from "./staticFiles";
 import { authenticate, requireAdmin } from "./middlewares/auth";
 import { apiLimiter } from "./middlewares/rateLimiter";
 import { healthRouter } from "./modules/health/healthRouter";
@@ -33,7 +34,6 @@ import { adminSecretaryRouter } from "./modules/admin/secretaryAdmin.routes";
 import { adminNovedadesRouter } from "./modules/admin/novedadesAdmin.routes";
 import { adminOperationsRouter } from "./modules/admin/operationsAdmin.routes";
 import { driveSyncRouter } from "./modules/driveSync/driveSync.routes";
-import { appSheetSyncRouter } from "./modules/appsheet/appsheet.routes";
 import { adminReportRouter, reportRouter } from "./modules/reports/report.routes";
 
 // Teacher routes
@@ -53,9 +53,9 @@ import { authenticateSecretary, requireActiveSecretary } from "./middlewares/sec
 
 const app = express();
 
-// Detrás de Cloudflare u otro reverse proxy, la IP real del cliente viene en
-// X-Forwarded-For. Sin "trust proxy", req.ip es siempre el proxy → el rate
-// limiter cuenta a todos los usuarios como una sola IP y bloquea la app entera.
+// Detrás de un reverse proxy, la IP real del cliente viene en X-Forwarded-For.
+// Sin "trust proxy", req.ip es siempre el proxy → el rate limiter cuenta a
+// todos los usuarios como una sola IP y bloquea la app entera.
 if (config.nodeEnv === "production") {
   app.set("trust proxy", 1);
 }
@@ -136,8 +136,25 @@ app.use("/api/admin/reports", authenticate, requireAdmin, adminReportRouter);
 // Drive webhooks / manual sync bootstrap
 app.use("/api/webhooks", driveSyncRouter);
 
-// AppSheet: sync de estudiantes desde la tabla "Demograficos"
-app.use("/api/webhooks/appsheet", appSheetSyncRouter);
+// AppSheet: solo sobrevive el brazo de novedades (consume la app separada).
+// El sync de estudiantes desde "Demograficos" via webhook ya no aplica:
+// MySQL es la fuente de verdad tras la migración.
+
+// Frontend estático single-origin: si existe el build del frontend, Express lo
+// sirve en el mismo origen que la API para que las cookies sean first-party.
+// Fallback SPA solo para GET que no empiecen con /api (la API sigue devolviendo
+// JSON 404 vía notFound).
+if (hasFrontendBuild()) {
+  const distDir = frontendDistDir();
+  app.use(express.static(distDir, { index: false, maxAge: "1h" }));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api")) {
+      next();
+      return;
+    }
+    res.sendFile("index.html", { root: distDir });
+  });
+}
 
 // 404 + error handler
 app.use(notFound);

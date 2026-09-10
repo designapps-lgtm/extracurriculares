@@ -1,6 +1,6 @@
 import { AppError } from "../../middlewares/errorHandler";
 import { type PaginatedResult, type PaginationParams, paginatedResult } from "../../utils/pagination";
-import { assignmentPayload, gradePayload, loadCoreData, pageSlice, studentPayload } from "../appsheet/appsheet.views";
+import { assignmentPayload, gradePayload, loadCoreData, pageSlice, studentPayload } from "../../db/views";
 
 function withCounts(data: Awaited<ReturnType<typeof loadCoreData>>, gradeId: number) {
   return {

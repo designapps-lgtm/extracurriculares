@@ -1,5 +1,5 @@
 import { config } from "../../config";
-import { loadCoreData } from "./appsheet.views";
+import { loadCoreData } from "../../db/views";
 import { findAppSheetRows } from "./appsheet.service";
 import { parseNovedadesRows, type ParsedNovedadRow } from "../novedades/novedades.parser";
 

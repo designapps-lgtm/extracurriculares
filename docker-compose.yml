@@ -1,4 +1,25 @@
 services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root-local-dev}
+      MYSQL_DATABASE: ${DB_NAME:-extracurriculares}
+      MYSQL_USER: ${DB_USER:-app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-app-local-dev}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-root-local-dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./backend
@@ -20,11 +41,14 @@ services:
       GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID:-}
       GOOGLE_DRIVE_WEBHOOK_URL: ${GOOGLE_DRIVE_WEBHOOK_URL:-}
       GOOGLE_DRIVE_WEBHOOK_TOKEN: ${GOOGLE_DRIVE_WEBHOOK_TOKEN:-}
-      APPSHEET_APP_ID: ${APPSHEET_APP_ID:-}
-      APPSHEET_APPLICATION_ACCESS_KEY: ${APPSHEET_APPLICATION_ACCESS_KEY:-}
-      APPSHEET_DEMOGRAFICOS_TABLE: ${APPSHEET_DEMOGRAFICOS_TABLE:-Demograficos}
+      APPSHEET_NOVEDADES_APP_ID: ${APPSHEET_NOVEDADES_APP_ID:-}
+      APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY: ${APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY:-}
       APPSHEET_NOVEDADES_TABLE: ${APPSHEET_NOVEDADES_TABLE:-}
-      APPSHEET_WEBHOOK_TOKEN: ${APPSHEET_WEBHOOK_TOKEN:-}
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_USER: ${DB_USER:-app}
+      DB_PASSWORD: ${DB_PASSWORD:-app-local-dev}
+      DB_NAME: ${DB_NAME:-extracurriculares}
     volumes:
       - ./backend/src:/app/src
 
@@ -46,3 +70,6 @@ services:
       - ./frontend/vite.config.ts:/app/vite.config.ts
     depends_on:
       - backend
+
+volumes:
+  mysql_data:

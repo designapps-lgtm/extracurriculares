@@ -3,7 +3,7 @@ import { config } from "../../config";
 import { AppError, asyncHandler } from "../../middlewares/errorHandler";
 import { apiLimiter } from "../../middlewares/rateLimiter";
 import { getLiveNovedades } from "../appsheet/appsheet.novedades";
-import { loadCoreData } from "../appsheet/appsheet.views";
+import { loadCoreData } from "../../db/views";
 import { getDriveToken, parseServiceAccount } from "../novedades/googleDrive.service";
 
 export const photoRouter = Router();

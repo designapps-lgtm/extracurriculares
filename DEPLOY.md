@@ -1,102 +1,123 @@
 # Despliegue a producción — Extracurriculares
 
-Arquitectura oficial: **Vercel** para el frontend, **Cloudflare Workers** para la API Express y **AppSheet/Google Sheets** como fuente de verdad.
+Arquitectura oficial: **servidor Node/Express single-origin** que sirve el build del frontend (`frontend/dist`) y la API REST, con **MySQL** como fuente de verdad. La única integración AppSheet que queda es la consulta de novedades contra la app `Lector_QR`.
 
-La URL vigente del Worker es:
-
-```text
-https://extracurriculares-api.gi-school.workers.dev
-```
-
-El frontend no llama esa URL directamente desde el navegador. `frontend/vercel.json` reescribe `/api/*` al Worker para mantener las cookies como first-party.
+El frontend habla con la API en el MISMO origen (rutas relativas `/api/*`), así las cookies de sesión viajan first-party y `SameSite=Lax` alcanza (mitiga CSRF).
 
 ## 1. Requisitos
 
 - Node.js 20 o superior.
-- Sesión de Wrangler autorizada para la cuenta correcta de Cloudflare.
-- Acceso administrativo a la aplicación de AppSheet.
-- Cliente OAuth web de Google con los orígenes del frontend autorizados.
-- Árbol de trabajo revisado y validaciones locales en verde.
+- Servidor con MySQL 8 para la base de datos.
+- Cliente OAuth web de Google con el origen del frontend autorizado.
+- Credenciales de la app AppSheet `Lector_QR` (opcional: solo para novedades).
 
-El backend de producción es únicamente el Worker. No se debe habilitar otro servidor en paralelo con el mismo frontend.
+## 2. Base de datos
 
-## 2. Configuración de Cloudflare
-
-> Por qué se "borraban" las variables: `wrangler deploy` SINCRONIZA el bloque
-> `[vars]` de `backend/worker/wrangler.toml` con Cloudflare. Toda variable de
-> texto creada a mano en el dashboard que no esté en ese archivo SE ELIMINA en
-> cada deploy. Los secretos (`wrangler secret put`) viven aparte y sobreviven,
-> pero SOLO si se cargaron como secretos: si pegás un secreto en el dashboard
-> como variable de texto, el próximo deploy también lo borra.
->
-> Regla: vars de texto → siempre en `wrangler.toml`. Secretos → siempre con
-> `wrangler secret put`. Nunca al revés, nunca solo en el dashboard.
-
-### Variables no secretas
-
-Se versionan en `backend/worker/wrangler.toml` y se suben solas con cada deploy:
-
-- `NODE_ENV`
-- `PORT`
-- `FRONTEND_URL` (sin barra final)
-- `ACCESS_TOKEN_EXPIRES_IN`
-- `SESSION_DURATION_HOURS`
-- `GOOGLE_INSTITUTION_DOMAIN`
-- `APPSHEET_APP_ID`
-- `APPSHEET_DEMOGRAFICOS_TABLE`
-- `APPSHEET_NOVEDADES_APP_ID`
-- `APPSHEET_NOVEDADES_TABLE`
-- `GOOGLE_DRIVE_FOLDER_ID` (vacía = watch de Drive apagado)
-- `GOOGLE_DRIVE_WEBHOOK_URL` (vacía = watch de Drive apagado)
-
-`FRONTEND_URL` debe coincidir con el sitio de Vercel permitido. Si cambia la URL del Worker, también debe actualizarse el destino de `/api/:path*` en `frontend/vercel.json`.
-
-### Secretos obligatorios
-
-No se guardan en Git ni se pasan al frontend. Cargarlos una vez (persisten entre deploys):
+Levantar MySQL y aplicar las migraciones (crean tablas e índices, idempotentes):
 
 ```bash
-cd backend/worker
-npx wrangler login
-npx wrangler secret put JWT_SECRET
-npx wrangler secret put GOOGLE_CLIENT_ID
-npx wrangler secret put APPSHEET_APPLICATION_ACCESS_KEY
-npx wrangler secret put APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY
-npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
+cd backend
+npm ci
+npm run build
+npx ts-node --transpile-only src/db/migrate.ts
 ```
 
-`GOOGLE_SERVICE_ACCOUNT_JSON` es el JSON del service account de Google Drive:
-sin él, el proxy de fotos (`/api/photos/drive/:fileId`) responde `503 DRIVE_NOT_CONFIGURED` y las imágenes de estudiantes, profesores y novedades se rompen en producción.
+Las migraciones viven en `backend/src/db/migrations/`: `001_schema.sql` (14 tablas) y `002_enrollments_id.sql` (`enrollments.id` ampliado a `VARCHAR(100)` para los IDs compuestos heredados de AppSheet).
 
-Wrangler solicitará cada valor de forma interactiva. Para comprobar únicamente los nombres configurados:
-
-```bash
-npx wrangler secret list --name extracurriculares-api
-```
-
-Secretos opcionales, sólo si se habilita el watch de Drive
-(`GOOGLE_DRIVE_FOLDER_ID` con valor real en `wrangler.toml`):
+### Variables de base de datos obligatorias
 
 ```text
-GOOGLE_DRIVE_WEBHOOK_TOKEN
-APPSHEET_WEBHOOK_TOKEN
+DB_HOST
+DB_PORT
+DB_USER
+DB_PASSWORD
+DB_NAME
 ```
 
-## 3. Rotación obligatoria de la llave AppSheet
+Crear el usuario con privilegios sobre la base correspondiente:
 
-La llave que se compartió fuera del almacén de secretos debe considerarse comprometida:
+```sql
+CREATE USER 'app'@'%' IDENTIFIED BY '<password>';
+GRANT ALL PRIVILEGES ON `extracurriculares%`.* TO 'app'@'%';
+FLUSH PRIVILEGES;
+```
 
-1. Genere/revoque la llave desde la administración de AppSheet.
-2. Cargue la nueva llave con `wrangler secret put APPSHEET_APPLICATION_ACCESS_KEY`.
-3. Despliegue una nueva versión del Worker.
-4. Verifique `/api/health` y un login real.
-5. Confirme que la llave anterior ya no funciona.
+## 3. Configuración
 
-Nunca pegue la llave en comandos versionados, archivos del frontend, issues o logs.
+Copiar `.env.example` a `.env` en el servidor y completar:
 
-## 4. Validación previa
+### Secrets obligatorios
 
-Desde la raíz del repositorio:
+```text
+JWT_SECRET            # rotar; usado para firmar access/refresh
+GOOGLE_CLIENT_ID      # verificación de audiencia del ID token
+DB_HOST / DB_USER / DB_PASSWORD / DB_NAME
+```
+
+### No secretos
+
+```text
+PORT                  # por defecto 3000
+FRONTEND_URL          # origen público del sitio, sin barra final
+ACCESS_TOKEN_EXPIRES_IN   # por defecto 15m
+SESSION_DURATION_HOURS    # por defecto 168
+GOOGLE_INSTITUTION_DOMAIN # por defecto gi.edu.co
+```
+
+### Novedades (opcional)
+
+```text
+APPSHEET_NOVEDADES_APP_ID
+APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY
+APPSHEET_NOVEDADES_TABLE       # Novedades_Diarias
+```
+
+Sin estas tres variables, los endpoints de novedades devuelven vacío (no rompen el resto).
+
+### Google Drive (opcional, proxy de fotos y watch)
+
+```text
+GOOGLE_SERVICE_ACCOUNT_JSON
+GOOGLE_DRIVE_FOLDER_ID
+GOOGLE_DRIVE_WEBHOOK_URL
+GOOGLE_DRIVE_WEBHOOK_TOKEN
+```
+
+Sin `GOOGLE_SERVICE_ACCOUNT_JSON`, el proxy de fotos (`/api/photos/drive/:fileId`) responde `503 DRIVE_NOT_CONFIGURED`.
+
+## 4. Build y despliegue
+
+### Build del frontend
+
+```bash
+cd frontend
+npm ci
+npm run build        # genera frontend/dist
+```
+
+### Build del backend
+
+```bash
+cd backend
+npm ci
+npm run build        # genera backend/dist
+```
+
+### Arranque single-origin
+
+```bash
+cd backend
+NODE_ENV=production FRONTEND_DIST=../frontend/dist npm start
+```
+
+Con `NODE_ENV=production` la app Express:
+- sirve `frontend/dist` con `express.static` + fallback SPA para GET que no empiecen con `/api`;
+- confía en el reverse proxy (`app.set("trust proxy", 1)`) para rate limiting por IP real;
+- emite cookies `Secure` + `SameSite=Lax` (requiere servir sobre HTTPS).
+
+Si se sirve detrás de un reverse proxy (Nginx/Caddy), forwardear HTTP y usar certificado. Si se quiere probar en `localhost` contra HTTP, usar `NODE_ENV=development` (cookies sin `Secure`).
+
+## 5. Validación previa
 
 ```bash
 cd backend
@@ -108,145 +129,43 @@ cd ../frontend
 npm ci
 npm run build
 
-cd ../backend/worker
-npm ci
-npm run typecheck
-npm run deploy:dry-run
-
-cd ../..
 git diff --check
 ```
 
-El dry-run debe completar el bundle sin publicar cambios.
+## 6. Upgrades y migraciones de schema
 
-Antes de desplegar, revise además:
-
-- que `wrangler secret list` muestre `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `APPSHEET_APPLICATION_ACCESS_KEY`, `APPSHEET_NOVEDADES_APPLICATION_ACCESS_KEY` y `GOOGLE_SERVICE_ACCOUNT_JSON`;
-- que no haya secretos en el diff;
-- que `APPSHEET_APP_ID` apunte a la aplicación esperada;
-- que las tablas requeridas respondan a lecturas controladas;
-- que cualquier escritura de prueba use datos identificables y pueda revertirse.
-
-## 5. Validación de esquemas AppSheet
-
-Antes de habilitar mutaciones administrativas o de supervisión en producción, confirme en **AppSheet → Data → Columns**:
-
-### `EC_Auditoria`
-
-```text
-AuditoriaID, UsuarioID, TipoUsuario, Accion, Entidad, EntidadID,
-Detalles, CreatedAt
-```
-
-### `EC_Permanencias`
-
-```text
-PermanenciaID, AsignacionID, HorarioID, CodigoEstudiante, Fecha,
-SupervisorID, CreatedAt
-```
-
-También debe probarse una escritura reversible en `EC_Asistencias` y `Profesores_Horarios`. Si AppSheet rechaza una mutación por columnas requeridas, detenga las pruebas y obtenga el esquema exacto; no adivine campos adicionales.
-
-`EC_Traslados` permanece sin escritura ni endpoint activo hasta conocer sus columnas.
-
-## 6. Despliegue del Worker
-
-Publicar es un cambio de producción. Usar SIEMPRE el deploy autocurativo (el único que publica de forma segura):
-
-```bash
-cd backend/worker
-npm run deploy:safe
-```
-
-`npm run deploy:safe` ejecuta un pipeline en 4 pasos (ver `backend/worker/scripts/deploy.mjs`):
-
-1. **Preflight** — valida que las 12 vars estén en `wrangler.toml` y que los 5 secretos existan en Cloudflare; si falta algo, aborta sin publicar.
-2. **Restaurar secretos** — si un deploy previo (por ejemplo, de assets o del dashboard) borró los secretos, los recrea automáticamente desde `backend/worker/.secrets.production` (archivo local, gitignored, con los valores vigentes). Si ese archivo no existe, aborta con instrucciones.
-3. **Publicar** — sube el Worker a `extracurriculares-api`.
-4. **Smoke test + rollback** — verifica contra la URL real de producción que `/api/health` responda `200` con `appsheet: "connected"` y `secrets: "ok"`, que el proxy de fotos `/api/photos/drive/:fileId` NO responda `503` (si responde 503, falta `GOOGLE_SERVICE_ACCOUNT_JSON`), y que `/api/auth/google` con un token falso devuelva `401` (no `404`, no 500 de "no configurado"). Si algo falla, vuelve automáticamente a la versión anterior con `wrangler rollback` y aborta con exit 1.
-
-`wrangler deploy` a secas sigue disponible, pero NO verifica nada: puede publicar un Worker roto y **no restaura secretos**. No lo use para producción si querés evitar el ciclo de "el login se rompió de nuevo".
-
-### Por qué "cada vez que subía un cambio se rompía el login"
-
-El frontend de Vercel reescribe `/api/*` a la URL del Worker `extracurriculares-api.gi-school.workers.dev`. Si esa URL deja de servir la API Express, TODO lo que dependa del backend responde `404` y el login (que arranca con `GET /api/auth/me`) muere.
-
-El mecanismo recurrente era:
-
-1. Se publicaba una versión **sin la configuración de la API** (por ejemplo, un build de assets/frontend desplegado al worker `extracurriculares-api` desde el dashboard o desde otro proyecto que usa el mismo nombre).
-2. Esa publicación reemplaza el script y **borra los secretos del Worker** (`wrangler secret list` quedaba vacío: `JWT_SECRET`, `GOOGLE_CLIENT_ID`, las llaves de AppSheet y el service account de Drive).
-3. El resultado: `/api/health` → `404` (o seguidamente 500 por secretos faltantes), login roto hasta volver a setear secretos y redesplegar la API.
-
-Reglas para que no vuelva a pasar:
-
-- El worker `extracurriculares-api` es **solo la API Express**. Nunca lo pise con un deploy de assets/frontend (ni desde el dashboard ni desde otro proyecto con el mismo nombre).
-- Revise **Cloudflare Dashboard → Workers & Pages → `extracurriculares-api` → Settings/Triggers** y desactive cualquier auto-deploy ("deploy from git"/preview) conectado a este worker; si está conectado a un repo, cada push vuelve a romper el login.
-- No borre los secretos manualmente; si un deploy raro los deja sin secretos, `npm run deploy:safe` los restaura solo desde `.secrets.production`.
-- `backend/worker/.secrets.production` NO se commitea (gitignore). Si se pierde, los secretos hay que volver a cargarlos con `wrangler secret put` y mantener ese archivo local al día.
-
-Cloudflare conserva versiones del Worker. Si los smoke tests detectan una regresión, `deploy:safe` ya hizo `wrangler rollback` automáticamente; si no, use el historial de despliegues del dashboard para volver a la versión anterior mientras se investiga.
-
-El handler `scheduled` actual es un no-op: AppSheet se consulta en vivo y no existe una réplica que deba sincronizarse por cron.
+Cada cambio de schema agrega `NNN_*.sql` en `backend/src/db/migrations/` y se aplica con `npx ts-node --transpile-only src/db/migrate.ts`. El runner registra las aplicadas en `migrations` y es idempotente.
 
 ## 7. Smoke tests
 
-### Estado y manejo de token inválido
+### Estado
 
 ```bash
-curl --fail-with-body \
-  https://extracurriculares-api.gi-school.workers.dev/api/health
-
-curl -i -X POST \
-  -H 'Content-Type: application/json' \
-  --data '{"credential":"invalid-test-token"}' \
-  https://extracurriculares-api.gi-school.workers.dev/api/auth/google
-
-curl -i \
-  https://extracurriculares-api.gi-school.workers.dev/api/photos/drive/unknown-file-id-0000
+curl --fail-with-body http://localhost:3000/api/health
 ```
 
-Resultados esperados:
+Esperado: HTTP 200 con `status: "ok"`, `database: "connected"`, `novedades: "appsheet"` (si está configurada) y `checks.usuariosRoles` con la cantidad de usuarios.
 
-- `/api/health`: HTTP 200, `status: "ok"`, `appsheet: "connected"` y `checks.secrets: "ok"`. Si `checks.secrets` lista nombres, faltan secretos en el Worker (corra `npm run deploy:safe` para restaurarlos).
-- token falso: HTTP 401 con código `INVALID_GOOGLE_TOKEN`, sin detalles internos.
-- proxy de fotos con fileId desconocido: HTTP 400 o 404 (el proxy está configurado). Si responde `503 DRIVE_NOT_CONFIGURED`, falta `GOOGLE_SERVICE_ACCOUNT_JSON` y las imágenes están rotas.
+### Autenticación e imágenes
 
-### Flujo autenticado en navegador
+- token Google inválido en `POST /api/auth/google` → `401 INVALID_GOOGLE_TOKEN`.
+- `GET /api/auth/me` conserva la sesión tras recargar (cookies httpOnly).
+- proxy de fotos con fileId desconocido → `400`/`404` (configurado) o `503 DRIVE_NOT_CONFIGURED` (falta el service account).
 
-1. Abrir el frontend de Vercel y entrar con una cuenta institucional registrada.
-2. Confirmar que `GET /api/auth/me` conserva la sesión tras recargar.
-3. Probar `/api/teacher/classes` con un profesor activo.
-4. Abrir una clase, comprobar el roster y guardar una asistencia controlada.
-5. Verificar paneles de supervisor, secretaría y administración según permisos.
-6. Confirmar en DevTools que los tokens están sólo en cookies `httpOnly`, no en almacenamiento web.
+### Frontend sobre la API
 
-### Observabilidad mínima
+1. Abrir la URL del servidor y entrar con una cuenta institucional registrada.
+2. Confirmar que `GET /api/auth/me` y las rutas de cada rol responden bien en el mismo origen.
+3. Verificar en DevTools que los tokens están sólo en cookies `httpOnly`, no en almacenamiento web.
 
-En errores de AppSheet, revise los logs del Worker buscando estado HTTP, tabla, acción y timeout. No copie encabezados de autenticación ni cuerpos que contengan datos personales a canales públicos.
-
-## 8. Frontend en Vercel
-
-Configuración esperada:
-
-- Root Directory: `frontend/`
-- Build Command: `npm run build`
-- Output Directory: `dist`
-
-`VITE_GOOGLE_CLIENT_ID` es configuración pública del cliente OAuth. Ningún secreto server-only debe usar prefijo `VITE_`.
-
-El rewrite crítico está en `frontend/vercel.json`:
-
-```text
-/api/:path* → https://extracurriculares-api.gi-school.workers.dev/api/:path*
-```
-
-Después de cambiar ese archivo, despliegue Vercel y repita login, refresh y logout desde el dominio final.
-
-## 9. Seguridad operativa
+## 8. Seguridad operativa
 
 - Access y refresh JWT se firman con `JWT_SECRET` y se envían en cookies `httpOnly`, `Secure` y `SameSite=Lax` en producción.
-- Login, refresh y `/api/auth/me` revalidan usuario, rol y estado contra `Usuarios_Roles`.
-- Las mutaciones de AppSheet no tienen reintentos automáticos.
-- Configure rate limiting de producción en Cloudflare; un contador en memoria de Express no es compartido entre instancias.
+- Login, refresh y `/api/auth/me` revalidan usuario, rol y estado contra `users`.
+- Configure rate limiting en el reverse proxy si hay múltiples instancias; el contador en memoria de Express no es compartido.
 - Los webhooks de Drive deben validar `X-Goog-Channel-Token`, canal y recurso.
-- No elimine fuentes o proyectos remotos anteriores como parte del despliegue. Cualquier borrado irreversible requiere una aprobación separada y una copia verificada.
+- Backup regular de MySQL (dumps). Es la única fuente de verdad persistida.
+
+## 9. Nota histórica
+
+La arquitectura anterior (frontend en Vercel + API como Cloudflare Worker + AppSheet/Google Sheets como fuente de verdad) fue reemplazada por esta migración a MySQL single-origin. Se retiraron: `backend/worker/`, `frontend/vercel.json`, el KV/cron del worker y toda la capa AppSheet académica (dominio, repositorio, sync por webhook); solo se conserva la consulta de novedades (`backend/src/modules/appsheet/{appsheet.service.ts, appsheet.novedades.ts}`).

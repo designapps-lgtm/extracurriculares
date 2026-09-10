@@ -1,5 +1,5 @@
 import { AppError } from "../../middlewares/errorHandler";
-import { createUser, getUserById, getUsers, removeUser, updateUser } from "../appsheet/appsheet.domain";
+import { createUser, getUserById, getUsers, removeUser, updateUser } from "../../db/domain";
 import { rolePayload } from "./userRoleAdmin";
 
 export interface AdminUserData {

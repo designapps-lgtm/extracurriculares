@@ -1,5 +1,7 @@
 import { normalizeStudentName } from "../../import/excel/excelMapper";
-import type { AppSheetRow } from "../appsheet/appsheet.service";
+
+/** Fila plana de estudiante con columnas de ruta; las claves LU_7_AM viven normalizadas en student_routes. */
+type RutaRow = Record<string, unknown>;
 
 const DAY_CODES: Record<string, string> = {
   LU: "LUNES",
@@ -87,7 +89,7 @@ export function parseRutaColumnKey(columnKey: string): RutaSlot | null {
   };
 }
 
-function getCell(row: AppSheetRow, candidates: string[]): string {
+function getCell(row: RutaRow, candidates: string[]): string {
   for (const candidate of candidates) {
     const value = row[candidate];
     if (value !== undefined && value !== null) return String(value).trim();
@@ -95,7 +97,7 @@ function getCell(row: AppSheetRow, candidates: string[]): string {
   return "";
 }
 
-function isSlotMarked(row: AppSheetRow, columnKey: string): boolean {
+function isSlotMarked(row: RutaRow, columnKey: string): boolean {
   const value = row[columnKey];
   if (value === undefined || value === null) return false;
   return String(value).trim().length > 0;
@@ -106,7 +108,7 @@ function sortSlots(slots: RutaSlot[]): RutaSlot[] {
 }
 
 /** Reporte de estudiantes que se van en ruta: cruza las columnas de día/hora de Demograficos. */
-export function buildRutasReport(rows: AppSheetRow[]): RutasReport {
+export function buildRutasReport(rows: RutaRow[]): RutasReport {
   const slotByKey = new Map<string, RutaSlot>();
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;

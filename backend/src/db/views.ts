@@ -6,14 +6,15 @@ import {
   getSchedules,
   getStudents,
   getUsers,
+  isActiveValue,
+  normalizeSearch,
   type AppAssignment,
   type AppEnrollment,
   type AppGrade,
   type AppSchedule,
   type AppStudent,
   type AppUser,
-} from "./appsheet.domain";
-import { isActiveValue, normalizeSearch } from "./appsheet.repository";
+} from "./domain";
 
 const DAY_ORDER = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 
