@@ -1,3 +1,5 @@
+# SOLO DESARROLLO LOCAL. Producción no usa Docker: el Windows Server corre
+# MySQL + Node nativos y la app como servicio de Windows (ver DEPLOY.md).
 services:
   mysql:
     image: mysql:8.4
