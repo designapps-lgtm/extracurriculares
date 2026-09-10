@@ -1,7 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { config } from "../../config";
-import { getUsers } from "../appsheet/appsheet.domain";
-import { AppSheetApiError } from "../appsheet/appsheet.service";
+import { getUsers } from "../../db/domain";
 
 const router = Router();
 
@@ -19,7 +18,6 @@ function missingSecrets(): string[] {
     missing.push("JWT_SECRET");
   }
   if (!config.googleClientId) missing.push("GOOGLE_CLIENT_ID");
-  if (!config.appsheetAccessKey) missing.push("APPSHEET_APPLICATION_ACCESS_KEY");
   if (!config.googleServiceAccountJson) missing.push("GOOGLE_SERVICE_ACCOUNT_JSON");
   return missing;
 }
@@ -30,16 +28,17 @@ router.get("/health", async (_req: Request, res: Response) => {
     const secrets = missingSecrets();
     res.json({
       status: "ok",
-      appsheet: "connected",
-      database: "not_used",
+      database: "connected",
+      novedades: config.appsheetNovedadesTable && config.appsheetNovedadesAppId && config.appsheetNovedadesAccessKey
+        ? "appsheet"
+        : "disabled",
       checks: { usuariosRoles: users.length, secrets: secrets.length === 0 ? "ok" : secrets },
     });
   } catch (error) {
-    const timeout = error instanceof AppSheetApiError && error.timedOut;
     res.status(503).json({
       status: "error",
-      appsheet: timeout ? "timeout" : "disconnected",
-      database: "not_used",
+      database: "disconnected",
+      novedades: "unknown",
     });
   }
 });

@@ -11,7 +11,7 @@ import {
   clearAuthCookies,
   setAuthCookies,
 } from "../../utils/authCookies";
-import { getUserById, type AppUser, type UserPermissions, type UserRole } from "../appsheet/appsheet.domain";
+import { getUserById, type AppUser, type UserPermissions, type UserRole } from "../../db/domain";
 
 export interface AccessClaims extends JwtPayload {
   tokenType: "access";

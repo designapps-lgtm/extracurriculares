@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import { config } from "../../config";
 import { nowIso } from "../../utils/colombiaTime";
+import { isoToMysql, mysqlToIsoUtc } from "../../db/dates";
+import { execute, queryOne } from "../../db/mysql";
 import {
   getStartPageToken,
   isDriveConfigured,
@@ -8,7 +10,6 @@ import {
   parseServiceAccount,
   watchDriveChanges,
 } from "../novedades/googleDrive.service";
-import { APPSHEET_TABLES, addRows, editRows, getTableRows, textCell } from "../appsheet/appsheet.repository";
 
 const STATE_KEY = "drive-watch";
 
@@ -19,33 +20,58 @@ type DriveWatchState = {
   expiration: string | null;
 };
 
+interface SyncStateRow {
+  sync_id: string;
+  proceso: string | null;
+  page_token: string | null;
+  channel_id: string | null;
+  resource_id: string | null;
+  expiration_at: string | null;
+  last_run_at: string | null;
+  estado: string | null;
+  detalles: string | null;
+  updated_at: string | null;
+}
+
 async function getState(): Promise<DriveWatchState | null> {
-  const row = (await getTableRows(APPSHEET_TABLES.syncState)).find((item) => textCell(item, "SyncID") === STATE_KEY || textCell(item, "Proceso") === STATE_KEY);
+  const row = await queryOne<SyncStateRow>(
+    "SELECT * FROM sync_state WHERE sync_id = ? OR proceso = ? LIMIT 1",
+    [STATE_KEY, STATE_KEY],
+  );
   if (!row) return null;
   return {
-    pageToken: textCell(row, "PageToken"),
-    channelId: textCell(row, "ChannelID"),
-    resourceId: textCell(row, "ResourceID"),
-    expiration: textCell(row, "ExpirationAt") || null,
+    pageToken: row.page_token ?? "",
+    channelId: row.channel_id ?? "",
+    resourceId: row.resource_id ?? "",
+    expiration: row.expiration_at ? mysqlToIsoUtc(row.expiration_at) : null,
   };
 }
 
 async function setState(value: DriveWatchState): Promise<void> {
-  const existing = await getState();
-  const row = {
-    SyncID: STATE_KEY,
-    Proceso: STATE_KEY,
-    PageToken: value.pageToken,
-    ChannelID: value.channelId,
-    ResourceID: value.resourceId,
-    ExpirationAt: value.expiration ?? "",
-    LastRunAt: nowIso(),
-    Estado: "activo",
-    Detalles: "Google Drive watch metadata",
-    UpdatedAt: nowIso(),
-  };
-  if (existing) await editRows(APPSHEET_TABLES.syncState, [row]);
-  else await addRows(APPSHEET_TABLES.syncState, [row]);
+  await execute(
+    `INSERT INTO sync_state (sync_id, proceso, page_token, channel_id, resource_id, expiration_at, last_run_at, estado, detalles, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'activo', 'Google Drive watch metadata', ?)
+     ON DUPLICATE KEY UPDATE
+       proceso = VALUES(proceso),
+       page_token = VALUES(page_token),
+       channel_id = VALUES(channel_id),
+       resource_id = VALUES(resource_id),
+       expiration_at = VALUES(expiration_at),
+       last_run_at = VALUES(last_run_at),
+       estado = VALUES(estado),
+       detalles = VALUES(detalles),
+       updated_at = VALUES(updated_at)`,
+    [
+      STATE_KEY,
+      STATE_KEY,
+      value.pageToken,
+      value.channelId,
+      value.resourceId,
+      value.expiration ? isoToMysql(value.expiration) : null,
+      isoToMysql(nowIso()),
+      isoToMysql(nowIso()),
+    ],
+  );
 }
 
 function callbackUrl(): string {

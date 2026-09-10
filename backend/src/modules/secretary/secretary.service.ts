@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { param } from "../../utils/reqParams";
 import { getClassRoster, resolveLogicalClass } from "../attendance/attendance.service";
-import { schedulePayload, teacherPayload } from "../appsheet/appsheet.views";
+import { schedulePayload, teacherPayload } from "../../db/views";
 
 /** Roster de solo lectura para secretaría; no crea ni modifica asistencia. */
 export async function getSecretaryClassStudents(req: Request, res: Response): Promise<void> {

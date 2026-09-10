@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { writeAuditEvent } from "../modules/appsheet/appsheet.audit";
+import { writeAuditEvent } from "../db/audit";
 import { AppSheetApiError } from "../modules/appsheet/appsheet.service";
 
 export class AppError extends Error {

@@ -1,6 +1,6 @@
 import { AppError } from "../../middlewares/errorHandler";
 import type { PaginationParams } from "../../utils/pagination";
-import { loadCoreData } from "../appsheet/appsheet.views";
+import { loadCoreData } from "../../db/views";
 import * as teacherService from "../teachers/teacher.service";
 import { createRoleUser, deleteRoleUser, rolePayload, updateRoleUser } from "./userRoleAdmin";
 

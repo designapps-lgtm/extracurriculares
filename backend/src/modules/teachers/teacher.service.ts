@@ -1,6 +1,6 @@
 import { AppError } from "../../middlewares/errorHandler";
 import { type PaginatedResult, type PaginationParams, paginatedResult } from "../../utils/pagination";
-import { assignmentPayload, loadCoreData, matchesTokens, pageSlice, teacherPayload } from "../appsheet/appsheet.views";
+import { assignmentPayload, loadCoreData, matchesTokens, pageSlice, teacherPayload } from "../../db/views";
 import type { TeacherQuery } from "./teacher.types";
 
 export async function getTeachers(query: TeacherQuery, pagination: PaginationParams): Promise<PaginatedResult<any>> {

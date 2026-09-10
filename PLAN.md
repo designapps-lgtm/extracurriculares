@@ -1,44 +1,33 @@
-# Plan vigente — validación de la migración AppSheet
+# Plan vigente — migración AppSheet → MySQL ✓
 
-Este documento reemplaza el plan histórico basado en la arquitectura anterior. AppSheet/Google Sheets es ahora la única fuente de datos del backend y Cloudflare Worker es el runtime oficial de producción.
+Este documento reemplaza el plan histórico basado en la arquitectura AppSheet/Cloudflare. **La migración a MySQL está completa**; MySQL es la fuente de verdad y el deploy es un servidor Express single-origin.
 
 ## Completado
 
-- Cliente AppSheet separado con timeout, errores estructurados y reintentos sólo para lecturas.
-- Repositorio con caché corta e invalidación tras mutaciones.
-- Identidad, roles, estado y permisos desde `Usuarios_Roles`.
-- Google como único autenticador y JWT stateless en cookies `httpOnly`.
-- Catálogos, asistencia, permanencias y CRUD administrativo migrados a tablas AppSheet.
-- Dependencias y archivos del almacenamiento anterior retirados del runtime.
-- Worker sin sincronización periódica: AppSheet se consulta en vivo.
-- Novedades deshabilitadas de forma segura mientras no exista una tabla válida.
+- Fase 0 — MySQL en Docker, pool, config y conexión verificada.
+- Fase 1 — `001_schema.sql` (14 tablas) + runner de migraciones con tests.
+- Fase 2 — capas `db/dates.ts`, `db/domain.ts` (15/15), `db/views.ts`; 27 consumers re-swappeados.
+- Fase 3 — reports, audit, rutas, assignmentAdmin, driveSync, healthRouter y novedades pasados a MySQL; `rutas.domain.ts` desacoplado de `AppSheetRow`; webhook sync desmontado.
+- Fase 4 — script one-shot `migrate-appsheet.ts` ejecutado contra la BD dev: grades 16, users 62 (2 dedup), schedules 15, demographics 791, student_routes 755, students 792, enrollments 1528, assignments 147, assignment_schedules 309, attendance 1289, stays/reports/audit 0, sync_state 1. Migración `002` para `enrollments.id VARCHAR(100)`. Fix de `splitStatements` en el runner.
+- Fase 5 — deploy single-origin: Express sirve `frontend/dist` + fallback SPA; cookies first-party sin CORS. Cherry-pick `0b3bf3d` (fix `formatGradesRange`).
+- Fase 6 — retirada de la capa muerta: `backend/worker/` (Cloudflare), `frontend/vercel.json`, KV/cron/webhooks de AppSheet, y todo `modules/appsheet/*` salvo `appsheet.service.ts` + `appsheet.novedades.ts` (solo novedades).
 
-## Pendiente antes del despliegue
+## Estado de validación
 
-1. Confirmar columnas reales de `EC_Auditoria` y `EC_Permanencias` en **AppSheet → Data → Columns**.
-2. Probar mutaciones controladas y reversibles en `EC_Asistencias`, `EC_Permanencias`, `EC_Auditoria` y `Profesores_Horarios`.
-3. Detener las mutaciones si AppSheet exige columnas no conocidas; no inferir nuevos campos.
-4. Añadir pruebas del cliente AppSheet, autenticación, refresh, permisos, asistencia y duplicados de permanencia.
-5. Ejecutar builds, tests, typecheck del Worker, dry-run y `git diff --check`.
-6. Revisar el diff completo y confirmar que no contiene secretos.
-7. Desplegar el Worker y ejecutar smoke tests de health, token inválido, login real y asistencia.
-8. Rotar la llave AppSheet compartida fuera del almacén de secretos, actualizar el secret del Worker y repetir smoke tests.
+- Backend: `tsc -b` limpio, 78/78 tests verdes (los 27 tests borrados pertenecían a la capa muerta).
+- Frontend: build OK.
+- Smoke local (NODE_ENV=production): `/` 200 HTML, fallback SPA 200, `/api/health` DB connected, `/api/nonexistent` 404 JSON.
+
+## Pendiente (deploy a un servidor real)
+
+1. Aplicar migraciones y variables en el servidor de producción.
+2. `npm run build` del frontend, arrancar Express con `NODE_ENV=production FRONTEND_DIST=../frontend/dist`.
+3. Servir detrás de HTTPS (reverse proxy) para cookies `Secure`.
+4. Backup periódico de MySQL (dumps).
 
 ## Limitaciones conocidas
 
-- Filas históricas con `SessionID` opaco no se relacionan con asignaciones sin evidencia adicional.
-- Sin una tabla de sesiones, iniciar una clase no materializa estado `en_curso`; guardar asistencia materializa la sesión.
-- `EC_Traslados` no se usa hasta confirmar su esquema y diseñar el contrato correspondiente.
-- No hay tabla de novedades configurada; los endpoints devuelven vacío.
-- El esquema de `Profesores_Horarios` puede exigir columnas adicionales y debe verificarse antes de usar su CRUD en producción.
-
-## Criterios de aceptación
-
-- Backend, frontend y Worker compilan sin errores.
-- Tests automatizados cubren éxito y fallos temporales de AppSheet, auth y escrituras idempotentes.
-- `/api/health` confirma acceso a `Usuarios_Roles`.
-- Un token Google inválido produce `401 INVALID_GOOGLE_TOKEN`.
-- Una cuenta inactiva no puede iniciar ni renovar sesión.
-- Guardar dos veces la misma asistencia edita la fila existente en vez de duplicarla.
-- Ningún secreto aparece en archivos versionados, respuestas o logs.
-- No se realiza ninguna eliminación remota irreversible como parte de esta migración.
+- `EC_Traslados` no se usa (no se migró).
+- El inicio de una clase no materializa estado `en_curso`; la sesión queda al guardar asistencia.
+- Novedades dependen de la app AppSheet `Lector_QR`; sin credenciales devuelven vacío.
+- `EC_Reportes_Problemas` no existía en AppSheet: `reports` se migró vacía (ya era 100% MySQL).

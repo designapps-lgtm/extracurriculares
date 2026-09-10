@@ -11,7 +11,7 @@ import {
   removeStay,
   resolveSessionId,
   type AppAttendance,
-} from "../appsheet/appsheet.domain";
+} from "../../db/domain";
 import {
   assignmentPayload,
   disciplineCodes,
@@ -22,7 +22,7 @@ import {
   schedulePayload,
   teacherPayload,
   type CoreData,
-} from "../appsheet/appsheet.views";
+} from "../../db/views";
 import { getClassRoster, resolveLogicalClass, sessionState } from "../attendance/attendance.service";
 
 interface SessionView {

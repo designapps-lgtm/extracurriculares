@@ -6,7 +6,5 @@ dist/
 *.log
 .DS_Store
 *.tsbuildinfo
-/backend/worker/worker-configuration.d.ts
 /correos_profes.xlsx
 /Profesores para app.xlsx
-/backend/worker/.secrets.production

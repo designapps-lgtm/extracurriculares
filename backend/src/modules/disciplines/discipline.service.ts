@@ -11,7 +11,7 @@ import {
   schedulePayload,
   studentPayload,
   teacherPayload,
-} from "../appsheet/appsheet.views";
+} from "../../db/views";
 import type { DisciplineQuery } from "./discipline.types";
 
 export async function getDisciplines(query: DisciplineQuery, pagination: PaginationParams): Promise<PaginatedResult<any>> {

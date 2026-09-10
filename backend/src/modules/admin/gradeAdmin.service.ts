@@ -1,4 +1,4 @@
-import { loadCoreData, gradePayload } from "../appsheet/appsheet.views";
+import { loadCoreData, gradePayload } from "../../db/views";
 
 export async function listGrades() {
   const data = await loadCoreData();

@@ -1,90 +1,41 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  getTableRows: vi.fn(),
-  addRows: vi.fn(),
-  editRows: vi.fn(),
+  query: vi.fn(),
+  queryOne: vi.fn(),
+  execute: vi.fn(),
 }));
 
-vi.mock("../appsheet/appsheet.repository", () => {
-  const tables = {
-    demographics: "Demograficos",
-    assignmentSchedules: "EC_Asignacion_Horarios",
-    attendance: "EC_Asistencias",
-    audit: "EC_Auditoria",
-    students: "EC_Estudiantes",
-    grades: "EC_Grados",
-    schedules: "EC_Horarios",
-    enrollments: "EC_Inscripciones",
-    stays: "EC_Permanencias",
-    syncState: "EC_Sync_State",
-    transfers: "EC_Traslados",
-    teacherSchedules: "Profesores_Horarios",
-    users: "Usuarios_Roles",
-    reports: "EC_Reportes_Problemas",
-  } as const;
-  const cell = (row: Record<string, unknown>, ...names: string[]) => {
-    for (const name of names) {
-      if (row[name] !== undefined && row[name] !== null) return row[name];
-    }
-    return undefined;
-  };
-  const textCell = (row: Record<string, unknown>, ...names: string[]) => {
-    const value = cell(row, ...names);
-    return value === undefined || value === null ? "" : String(value).trim();
-  };
-  return {
-    APPSHEET_TABLES: tables,
-    getTableRows: mocks.getTableRows,
-    addRows: mocks.addRows,
-    editRows: mocks.editRows,
-    cell,
-    textCell,
-    nullableTextCell: (row: Record<string, unknown>, ...names: string[]) => textCell(row, ...names) || null,
-    photoUrlCell: (row: Record<string, unknown>, ...names: string[]) => {
-      const value = textCell(row, ...names);
-      if (!value) return null;
-      const trimmed = value.trim();
-      if (trimmed.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(trimmed) as { Url?: string };
-          return parsed.Url?.trim() || null;
-        } catch {
-          return null;
-        }
-      }
-      return trimmed;
-    },
-    numberCell: (row: Record<string, unknown>, ...names: string[]) => Number(textCell(row, ...names)) || 0,
-    yesNoCell: (row: Record<string, unknown>, ...names: string[]) => ["y", "yes", "si", "sí", "true", "1"].includes(textCell(row, ...names).toLowerCase()),
-    normalizeSearch: (value: string) => value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim(),
-    isActiveValue: (value: string) => !["inactivo", "cancelado", "eliminado", "disabled", "n"].includes(value.toLowerCase()),
-  };
-});
+vi.mock("../../db/mysql", () => ({
+  query: mocks.query,
+  queryOne: mocks.queryOne,
+  execute: mocks.execute,
+}));
 
 import { createReport, listReports, updateReportEstado } from "./report.domain";
 
 const ROW = (overrides: Record<string, unknown> = {}) => ({
-  ReporteID: "rep-1",
-  Categoria: "problema",
-  Descripcion: "No carga la lista de estudiantes",
-  Pagina: "/supervisor/dashboard",
-  UsuarioID: "sup-1",
-  TipoUsuario: "supervisor",
-  Correo: "super1@colegio.edu.co",
-  Estado: "nuevo",
-  CreatedAt: "2026-09-07T14:00:00.000Z",
+  id: "rep-1",
+  categoria: "problema",
+  descripcion: "No carga la lista de estudiantes",
+  pagina: "/supervisor/dashboard",
+  usuario_id: "sup-1",
+  tipo_usuario: "supervisor",
+  correo: "super1@colegio.edu.co",
+  estado: "nuevo",
+  created_at: "2026-09-07T14:00:00.000Z",
+  updated_at: "2026-09-07T14:00:00.000Z",
   ...overrides,
 });
 
-describe("dominio AppSheet de reportes de problemas", () => {
+describe("dominio MySQL de reportes de problemas", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-07T15:00:00.000Z"));
-    mocks.getTableRows.mockResolvedValue([]);
-    mocks.addRows.mockResolvedValue([]);
-    mocks.editRows.mockResolvedValue([]);
+    mocks.query.mockResolvedValue([]);
+    mocks.queryOne.mockResolvedValue(null);
+    mocks.execute.mockResolvedValue({ affectedRows: 1 } as never);
   });
 
   afterEach(() => {
@@ -92,12 +43,13 @@ describe("dominio AppSheet de reportes de problemas", () => {
   });
 
   it("crea un reporte nuevo con estado inicial 'nuevo'", async () => {
-    const written: Array<Record<string, unknown>> = [];
-    mocks.addRows.mockImplementation((_table: string, rows: Array<Record<string, unknown>>) => {
-      written.push(...rows);
-      return Promise.resolve(rows);
+    let inserted: Record<string, unknown> | null = null;
+    mocks.execute.mockImplementation((_sql: string, params: any[]) => {
+      const [id, categoria, descripcion, pagina, usuarioId, tipoUsuario, correo, createdAt] = params;
+      inserted = { id, categoria, descripcion, pagina, usuario_id: usuarioId, tipo_usuario: tipoUsuario, correo, estado: "nuevo", created_at: createdAt, updated_at: createdAt };
+      return Promise.resolve({ affectedRows: 1 } as never);
     });
-    mocks.getTableRows.mockImplementation(() => Promise.resolve(written));
+    mocks.queryOne.mockImplementation((_sql: string, params: any[]) => Promise.resolve(inserted));
 
     const reporte = await createReport({
       categoria: "problema",
@@ -113,23 +65,16 @@ describe("dominio AppSheet de reportes de problemas", () => {
     expect(reporte.categoria).toBe("problema");
     expect(reporte.tipoUsuario).toBe("supervisor");
 
-    expect(mocks.addRows).toHaveBeenCalledTimes(1);
-    const [table, rows] = mocks.addRows.mock.calls[0] as [string, Array<Record<string, unknown>>];
-    expect(table).toBe("EC_Reportes_Problemas");
-    expect(rows[0]).toMatchObject({
-      Categoria: "problema",
-      Descripcion: "No carga la lista de estudiantes",
-      Estado: "nuevo",
-      TipoUsuario: "supervisor",
-      Correo: "super1@colegio.edu.co",
-    });
-    expect(rows[0].CreatedAt).toBe("2026-09-07T15:00:00.000Z");
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
+    const [sql, params] = mocks.execute.mock.calls[0] as [string, any[]];
+    expect(sql).toContain("INSERT INTO reports");
+    expect(params.slice(1, 7)).toMatchObject(["problema", "No carga la lista de estudiantes", "/supervisor/dashboard", "sup-1", "supervisor", "super1@colegio.edu.co"]);
   });
 
   it("lista reportes filtrando por estado", async () => {
-    mocks.getTableRows.mockResolvedValue([
-      ROW({ ReporteID: "rep-1", Estado: "nuevo", CreatedAt: "2026-09-07T10:00:00.000Z" }),
-      ROW({ ReporteID: "rep-2", Estado: "resuelto", CreatedAt: "2026-09-07T12:00:00.000Z" }),
+    mocks.query.mockResolvedValue([
+      ROW({ id: "rep-2", estado: "resuelto", created_at: "2026-09-07T12:00:00.000Z" }),
+      ROW({ id: "rep-1", estado: "nuevo", created_at: "2026-09-07T10:00:00.000Z" }),
     ]);
 
     const nuevos = await listReports({ estado: "nuevo" });
@@ -142,40 +87,34 @@ describe("dominio AppSheet de reportes de problemas", () => {
   });
 
   it("cambia el estado de un reporte existente", async () => {
-    const current = ROW({ ReporteID: "rep-1", Estado: "nuevo" });
-    const rows: Array<Record<string, unknown>> = [current];
-    mocks.getTableRows.mockImplementation(() => Promise.resolve(rows));
-    mocks.editRows.mockImplementation((_table: string, changes: Array<Record<string, unknown>>) => {
-      for (const change of changes) {
-        const target = rows.find((row) => row.ReporteID === change.ReporteID);
-        if (target) Object.assign(target, change);
-      }
-      return Promise.resolve(changes);
-    });
+    mocks.queryOne
+      .mockResolvedValueOnce(ROW({ id: "rep-1", estado: "nuevo" }))
+      .mockResolvedValueOnce(ROW({ id: "rep-1", estado: "en_progreso" }));
 
     const reporte = await updateReportEstado("rep-1", "en_progreso");
 
     expect(reporte.estado).toBe("en_progreso");
-    expect(mocks.editRows).toHaveBeenCalledTimes(1);
-    const [table, changes] = mocks.editRows.mock.calls[0] as [string, Array<Record<string, unknown>>];
-    expect(table).toBe("EC_Reportes_Problemas");
-    expect(changes[0]).toMatchObject({ ReporteID: "rep-1", Estado: "en_progreso" });
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
+    const [sql, params] = mocks.execute.mock.calls[0] as [string, any[]];
+    expect(sql).toContain("UPDATE reports");
+    expect(params[0]).toBe("en_progreso");
+    expect(params[2]).toBe("rep-1");
   });
 
   it("lanza error cuando el reporte no existe al cambiar estado", async () => {
-    mocks.getTableRows.mockResolvedValue([]);
+    mocks.queryOne.mockResolvedValue(null);
 
     await expect(updateReportEstado("rep-desconocido", "resuelto")).rejects.toMatchObject({
       clientCode: "NOT_FOUND",
     });
-    expect(mocks.editRows).not.toHaveBeenCalled();
+    expect(mocks.execute).not.toHaveBeenCalled();
   });
 
-  it("ignora filas sin ReporteID o sin descripción", async () => {
-    mocks.getTableRows.mockResolvedValue([
+  it("ignora filas sin id o sin descripción", async () => {
+    mocks.query.mockResolvedValue([
       ROW(),
-      ROW({ ReporteID: "", Descripcion: "algo" }),
-      ROW({ ReporteID: "rep-3", Descripcion: "" }),
+      ROW({ id: "", descripcion: "algo" }),
+      ROW({ id: "rep-3", descripcion: "" }),
     ]);
 
     const reportes = await listReports();

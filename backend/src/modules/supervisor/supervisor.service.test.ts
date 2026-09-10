@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   dayColombia: vi.fn(),
 }));
 
-vi.mock("../appsheet/appsheet.views", () => ({
+vi.mock("../../db/views", () => ({
   loadCoreData: mocks.loadCoreData,
   schedulePayload: mocks.schedulePayload,
   teacherPayload: mocks.teacherPayload,

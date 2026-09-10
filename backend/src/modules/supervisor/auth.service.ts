@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { AppError } from "../../middlewares/errorHandler";
 import { assertTrustedOrigin } from "../../utils/originGuard";
 import { clearAuthCookies } from "../../utils/authCookies";
-import { getUserById } from "../appsheet/appsheet.domain";
+import { getUserById } from "../../db/domain";
 import { renewRoleSession, roleUserPayload } from "../auth/session";
 
 export async function supervisorRefreshSession(req: Request, res: Response): Promise<void> {

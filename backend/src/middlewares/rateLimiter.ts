@@ -1,19 +1,12 @@
 import rateLimit from "express-rate-limit";
 import type { RequestHandler } from "express";
 
-// En Cloudflare Workers, ejecutar express-rate-limit en el load-time del módulo
-// (como hace app.ts al importar) dispara un setInterval del MemoryStore en
-// global scope, que el runtime edge PROHÍBE ("Disallowed operation called
-// within global scope"). Además, un store en memoria no tiene sentido en
-// Workers: no persiste entre instancias y hay una instancia por request.
+// En producción (servidor Node), el rate limiting puede estar en el reverse
+// proxy (Nginx/Caddy) que lo maneja a nivel de edge. Por eso estos middlewares
+// son no-op por defecto: evitar que la app bloquee tráfico legítimo con 429
+// (una escuela detrás de un NAT comparte la misma IP → se satura fácil).
 //
-// El servidor SOLO corre en Cloudflare Workers en producción, y el rate
-// limiting ahí lo maneja Cloudflare mismo (a nivel de edge/plan). Por eso estos
-// middlewares son no-op por defecto: evitar que la app bloquee tráfico legítimo
-// con 429 (una escuela detrás de un NAT comparte la misma IP → se satura fácil).
-//
-// Si alguna vez se corre en Node (dev con docker o un servidor propio), el
-// limitador SOLO se activa cuando se define explícitamente un límite por env
+// El limitador SOLO se activa cuando se define explícitamente un límite por env
 // (AUTH_RATE_LIMIT / API_RATE_LIMIT). Sin env → no-op. Así nunca bloqueamos
 // por muchas peticiones sin que el operador lo decida a propósito.
 const noopLimiter: RequestHandler = (_req, _res, next) => next();

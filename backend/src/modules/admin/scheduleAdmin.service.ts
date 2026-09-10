@@ -2,7 +2,7 @@ import { AppError } from "../../middlewares/errorHandler";
 import { normalizeDayName } from "../../utils/colombiaTime";
 import type { PaginationParams } from "../../utils/pagination";
 import { normalizeTime } from "../../utils/validators";
-import { createScheduleRow } from "../appsheet/appsheet.domain";
+import { createScheduleRow } from "../../db/domain";
 import * as scheduleService from "../schedules/schedule.service";
 
 const VALID_DAYS = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];

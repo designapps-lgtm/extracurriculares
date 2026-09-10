@@ -1,19 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../config", () => ({
-  config: {
-    appsheetAppId: "test-app-id",
-    appsheetAccessKey: "test-access-key",
-  },
-}));
-
 import {
   AppSheetApiError,
-  addAppSheetRows,
   findAppSheetRows,
 } from "./appsheet.service";
 
 const fetchMock = vi.fn();
+
+const TEST_CONNECTION = { appId: "test-app-id", accessKey: "test-access-key" };
 
 function response(body: string, status = 200): Response {
   return new Response(body, {
@@ -36,7 +30,7 @@ describe("AppSheet HTTP client", () => {
   it("ejecuta Find y extrae filas de una respuesta válida", async () => {
     fetchMock.mockResolvedValue(response(JSON.stringify({ Rows: [{ UsuarioID: "U1" }] })));
 
-    await expect(findAppSheetRows("Usuarios_Roles", "Filter(Usuarios_Roles, true)")).resolves.toEqual([
+    await expect(findAppSheetRows("Usuarios_Roles", "Filter(Usuarios_Roles, true)", TEST_CONNECTION)).resolves.toEqual([
       { UsuarioID: "U1" },
     ]);
 
@@ -56,7 +50,7 @@ describe("AppSheet HTTP client", () => {
     vi.useFakeTimers();
     fetchMock.mockImplementation(async () => response("rate limited", 429));
 
-    const pending = findAppSheetRows("Usuarios_Roles");
+    const pending = findAppSheetRows("Usuarios_Roles", undefined, TEST_CONNECTION);
     const assertion = expect(pending).rejects.toMatchObject({
       status: 429,
       table: "Usuarios_Roles",
@@ -78,7 +72,7 @@ describe("AppSheet HTTP client", () => {
       }, { once: true });
     }));
 
-    const pending = findAppSheetRows("EC_Estudiantes");
+    const pending = findAppSheetRows("EC_Estudiantes", undefined, TEST_CONNECTION);
     const assertion = expect(pending).rejects.toMatchObject({
       status: 504,
       table: "EC_Estudiantes",
@@ -95,7 +89,7 @@ describe("AppSheet HTTP client", () => {
     vi.useFakeTimers();
     fetchMock.mockImplementation(async () => response("{not-json"));
 
-    const pending = findAppSheetRows("EC_Horarios");
+    const pending = findAppSheetRows("EC_Horarios", undefined, TEST_CONNECTION);
     const assertion = expect(pending).rejects.toSatisfy((error: unknown) =>
       error instanceof AppSheetApiError
       && error.status === 502
@@ -106,15 +100,5 @@ describe("AppSheet HTTP client", () => {
     await vi.runAllTimersAsync();
     await assertion;
     expect(fetchMock).toHaveBeenCalledTimes(3);
-  });
-
-  it("no reintenta mutaciones aunque AppSheet responda 429", async () => {
-    fetchMock.mockImplementation(async () => response("rate limited", 429));
-
-    await expect(addAppSheetRows("EC_Asistencias", [{ AsistenciaID: "A1" }])).rejects.toMatchObject({
-      status: 429,
-      action: "Add",
-    });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

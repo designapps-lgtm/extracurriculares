@@ -8,8 +8,8 @@ import {
   updateUser,
   type AppUser,
   type UserRole,
-} from "../appsheet/appsheet.domain";
-import { matchesTokens, pageSlice } from "../appsheet/appsheet.views";
+} from "../../db/domain";
+import { matchesTokens, pageSlice } from "../../db/views";
 
 export function rolePayload(user: AppUser): Record<string, unknown> {
   const common = {

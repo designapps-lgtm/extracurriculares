@@ -1,9 +1,9 @@
 import { AppError } from "../../middlewares/errorHandler";
 import type { PaginationParams } from "../../utils/pagination";
 import { normalizeDayName } from "../../utils/colombiaTime";
-import { replaceStudentEnrollments, updateStudentRow } from "../appsheet/appsheet.domain";
+import { replaceStudentEnrollments, updateStudentRow } from "../../db/domain";
 import * as studentService from "../students/student.service";
-import { loadCoreData } from "../appsheet/appsheet.views";
+import { loadCoreData } from "../../db/views";
 
 const VALID_DAYS = new Set(["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"]);
 
